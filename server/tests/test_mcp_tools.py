@@ -225,3 +225,38 @@ def test_fetch_clean_smoke(monkeypatch):
     content = fetch_clean("https://example.com", 2000)
 
     assert "Example Domain" in content
+
+
+def test_cap_chars_trims_without_splitting_word():
+    text = "alpha beta gamma"
+
+    capped = mcp_server._cap_chars(text, 12)
+
+    assert capped == "alpha beta"
+    assert len(capped) <= 12
+
+
+def test_cap_chars_returns_short_input_unchanged():
+    text = "alpha beta"
+
+    assert mcp_server._cap_chars(text, 20) == text
+
+
+def test_deep_research_caps_large_output_and_keeps_citations(monkeypatch):
+    citations = [
+        {"title": f"Title {index}", "url": f"https://example.com/{index}", "snippet": "", "source": "", "date": ""}
+        for index in range(5)
+    ]
+    large_summary = " ".join(["alpha"] * 5000)
+
+    def fake_web_search(query):
+        return {"summary": large_summary, "citations": citations}
+
+    monkeypatch.setattr(mcp_server, "web_search", fake_web_search)
+
+    response = mcp_server.deep_research("best climate data report", max_rounds=1)
+
+    assert len(response["summary"]) <= 700
+    assert all(len(section["content"]) <= 700 for section in response["sections"])
+    assert len(response["citations"]) == 5
+    assert len(json.dumps(response)) < 12000

@@ -110,8 +110,9 @@ def web_search(query: str, num_results: int = 5) -> dict:
         result_ids.append(_store_result(url))
         chunks.extend(_chunks(hit, content))
     ranked_chunks = rag.rank(query, chunks) if chunks else []
+    summary = _summary(ranked_chunks)
     return {
-        "summary": _summary(ranked_chunks),
+        "summary": _cap_chars(summary, 1800),
         "citations": citations,
         "result_ids": result_ids,
     }
@@ -139,10 +140,11 @@ def deep_research(query: str, max_rounds: int = 3) -> dict:
             break
     citations = _dedupe_citations(searches)
     sections = [
-        {"heading": queries[index], "content": item["summary"], "sources": item["citations"]}
+        {"heading": queries[index], "content": _cap_chars(item["summary"], 700), "sources": item["citations"]}
         for index, item in enumerate(searches)
     ]
-    return {"summary": _summary_text([item["summary"] for item in searches]), "sections": sections, "citations": citations}
+    summary = _summary_text([item["summary"] for item in searches])
+    return {"summary": _cap_chars(summary, 700), "sections": sections, "citations": citations}
 
 
 def handle_json_rpc(request):
@@ -249,6 +251,17 @@ def _summary_text(items):
         if len(words) >= _SUMMARY_MIN_WORDS:
             break
     return " ".join(words[:_SUMMARY_MAX_WORDS])
+
+
+def _cap_chars(text, limit):
+    value = str(text)
+    if len(value) <= limit:
+        return value
+    capped = value[:limit]
+    whitespace_at = max((index for index, char in enumerate(capped) if char.isspace()), default=-1)
+    if whitespace_at <= 0:
+        return capped
+    return capped[:whitespace_at].rstrip()
 
 
 def _host(url):
