@@ -1,0 +1,33 @@
+claude-code/claude-settings.snippet.json
+  s_de06d0d2272ff3::t_cd1bd797c257c8 29-39
+hooks/method_inject.py
+  s_de06d0d2272ff3::t_cd1bd797c257c8 1-32
+tests/__init__.py
+  s_de06d0d2272ff3::t_005ed4cf26c99e 1
+skills/knowledge-based-search/SKILL.md
+  s_de06d0d2272ff3::t_cd1bd797c257c8 35-36
+hooks/detector.py
+  s_de06d0d2272ff3::t_cd1bd797c257c8 33,45
+tests/test_detector.py
+  s_de06d0d2272ff3::t_005ed4cf26c99e 5,9,14-18,20-21,23-24,26-29,31-32,34-35,37-38,40-41,43-46,50-53
+hooks/claude-settings.snippet.json
+  s_de06d0d2272ff3::t_cd1bd797c257c8 13-18
+hooks/triggers.json
+  s_de06d0d2272ff3::t_cd1bd797c257c8 3-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "be90be703d83ab342bd26c422fd7d662d6190091",
+  "prompts": {},
+  "sessions": {
+    "s_de06d0d2272ff3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0a2e-8575-7a81-8c31-bb75d08a180c",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
