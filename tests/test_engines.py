@@ -35,9 +35,27 @@ BING_HTML = """
 
 DDG_LITE_HTML = """
 <table>
+  <tr><td><a href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fduckduckgo.com">DuckDuckGo</a></td></tr>
+  <tr><td><a href="https://lite.duckduckgo.com/lite/">DuckDuckGo</a></td></tr>
   <tr><td><a rel="nofollow" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fd">Example D</a></td></tr>
   <tr><td class="result-snippet">Delta <b>snippet</b></td></tr>
 </table>
+"""
+
+STARTPAGE_HTML = """
+<style><a class="w-gl__result-title" href="https://bad.example">Bad</a></style>
+<article class="w-gl__result">
+  <a class="w-gl__result-title" href="/sp/result?url=https%3A%2F%2Fexample.com%2Fs">.sx{color:red}Example S</a>
+  <p class="w-gl__description">Start <strong>snippet</strong></p>
+</article>
+"""
+
+MOJEEK_HTML = """
+<div class="result">
+  <h2><a href="https://example.com/m">Example M</a></h2>
+  <p class="s">Mojeek <strong>snippet</strong></p>
+  <a class="ob" href="https://breadcrumb.example">breadcrumb</a>
+</div>
 """
 
 BLOCK_HTML = "<html><title>captcha</title><body>unusual traffic</body></html>"
@@ -122,6 +140,34 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(hits[0]["url"], "https://example.com/d")
         self.assertEqual(hits[0]["snippet"], "Delta snippet")
         self.assertEqual(hits[0]["engine"], "duckduckgo")
+        self.assertEqual(len(hits), 1)
+
+    def test_startpage_parses_fixture(self):
+        original_get = engines._get
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: STARTPAGE_HTML
+        try:
+            hits = engines.startpage("example", k=5)
+        finally:
+            engines._get = original_get
+
+        self.assertEqual(hits[0]["title"], "Example S")
+        self.assertEqual(hits[0]["url"], "https://example.com/s")
+        self.assertEqual(hits[0]["snippet"], "Start snippet")
+        self.assertEqual(hits[0]["engine"], "startpage")
+        self.assertEqual(len(hits), 1)
+
+    def test_mojeek_parses_fixture(self):
+        original_get = engines._get
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: MOJEEK_HTML
+        try:
+            hits = engines.mojeek("example", k=5)
+        finally:
+            engines._get = original_get
+
+        self.assertEqual(hits[0]["title"], "Example M")
+        self.assertEqual(hits[0]["url"], "https://example.com/m")
+        self.assertEqual(hits[0]["snippet"], "Mojeek snippet")
+        self.assertEqual(hits[0]["engine"], "mojeek")
 
     def test_block_pages_return_empty(self):
         original_get = engines._get
@@ -130,28 +176,41 @@ class EngineTests(unittest.TestCase):
             with self.assertLogs("engines", level="WARNING") as logs:
                 self.assertEqual(engines.google("example"), [])
                 self.assertEqual(engines.bing("example"), [])
+                self.assertEqual(engines.startpage("example"), [])
+                self.assertEqual(engines.mojeek("example"), [])
         finally:
             engines._get = original_get
         self.assertEqual(
             logs.output,
-            ["WARNING:engines:google direct scraper blocked", "WARNING:engines:bing direct scraper blocked"],
+            [
+                "WARNING:engines:google direct scraper blocked",
+                "WARNING:engines:bing direct scraper blocked",
+                "WARNING:engines:startpage direct scraper blocked",
+                "WARNING:engines:mojeek direct scraper blocked",
+            ],
         )
 
     def test_search_wires_enabled_direct_engines(self):
         original_google = engines.google
         original_bing = engines.bing
         original_duckduckgo = engines.duckduckgo
+        original_startpage = engines.startpage
+        original_mojeek = engines.mojeek
         engines.google = lambda query, k=10, config=None: [engines.result("G", "https://g.example", "", "google", 1)]
         engines.bing = lambda query, k=10: [engines.result("B", "https://b.example", "", "bing", 1)]
         engines.duckduckgo = lambda query, k=10: []
+        engines.startpage = lambda query, **options: [engines.result("S", "https://s.example", "", "startpage", 1)]
+        engines.mojeek = lambda query, **options: [engines.result("M", "https://m.example", "", "mojeek", 1)]
         try:
             hits = engines.search("example", {}, k=2, cap=5)
         finally:
             engines.google = original_google
             engines.bing = original_bing
             engines.duckduckgo = original_duckduckgo
+            engines.startpage = original_startpage
+            engines.mojeek = original_mojeek
 
-        self.assertEqual({hit["engine"] for hit in hits}, {"google", "bing"})
+        self.assertEqual({hit["engine"] for hit in hits}, {"google", "bing", "startpage", "mojeek"})
 
 
 if __name__ == "__main__":

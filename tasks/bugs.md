@@ -10,8 +10,10 @@ Found during the post-build debug sweep on 2026-06-27. Verified live unless mark
 ### B2. Single flaky SearXNG source, fixed by direct engines
 endianness.de is a public instance, rate-limited and intermittent. One probe returned only google plus startpage, a later probe had every backend time out or get suspended. The kindly MCP rides the same SearXNG and returned garbage (Google homepage, an unrelated blog) for an API-pricing query, confirming the instance is the weak link. Fixed: direct google, bing, duckduckgo scrapers added so SearXNG is one source among several. Live result on "openai news": duckduckgo lite returned 5 hits, merged total 9 with searxng. DuckDuckGo plus SearXNG is the working keyless stack.
 
-### B4. Google and Bing keyless scraping is blocked
-Verified live 2026-06-27. Google returns an enablejs plus challenge page (requires JavaScript, no header tweak recovers it). Bing returns a captcha challenge regardless of headers. So keyless google and bing return [] right now. Google works only through the optional Custom Search key path (`google_api_key` plus `google_cx`). Bing has no key option (API retired). The scrapers stay in, they soft-fail fast and may catch an occasional unblocked response. Playwright would render the JS but the owner ruled it out.
+### B4. Google and Bing keyless scraping is blocked, Startpage solves the Google gap
+Verified live 2026-06-27. Google returns an enablejs plus challenge page (requires JavaScript, no header tweak recovers it). Bing returns a captcha challenge regardless of headers. So keyless google and bing return [] right now. The fix for Google is Startpage, which serves Google results as plain HTML with no JS wall. Added startpage and mojeek engines, both verified live (5 hits each, clean titles). Google direct still has the optional Custom Search key path. Bing has no key option (API retired) and stays as best-effort. Playwright would render the JS but the owner ruled it out.
+
+Engine probe results (live 2026-06-27, query "openai news"): working keyless are duckduckgo lite, searxng, startpage, mojeek. Blocked are ecosia (403), brave (cloudflare), yandex, google udm14 and gbv1, bing, and the public searx instances tried. Brave free API tier was removed February 2026, now metered with a live card.
 
 ## Resolved or closed
 
