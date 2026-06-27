@@ -1,0 +1,193 @@
+claude-code/claude-settings.snippet.json
+  s_2f9574dd52a3bd::t_4c3753a9a9be84 1-31
+claude-code/install.sh
+  s_8c5853e7780fd6::t_76723cd1d437ec 1-23
+claude-code/merge-claude-settings.py
+  s_2f9574dd52a3bd::t_6c45158bc8a78c 1-82
+codex/codex-config.snippet.toml
+  s_2f9574dd52a3bd::t_016abbac4fda43 1-17
+codex/merge-codex-config.py
+  s_2f9574dd52a3bd::t_dbd219ab20a8d6 1-51
+install.sh
+  s_8c5853e7780fd6::t_40dd7fb3b86b2e 1-151
+pi/extensions/knowledge-based-search/index.ts
+  s_2f9574dd52a3bd::t_2e57d48bb95545 1-62
+pi/merge-pi-settings.py
+  s_2f9574dd52a3bd::t_a32123706c3e76 1-49
+server/config.json
+  s_2f9574dd52a3bd::t_9a19f8274e0f82 1-4
+server/engines.py
+  s_2f9574dd52a3bd::t_8cbbe442bb0863 1-289
+server/mcp_server.py
+  s_2f9574dd52a3bd::t_f4b7337f1ca1b0 1-285
+server/rag.py
+  s_2f9574dd52a3bd::t_41936107e760c8 1-228
+server/rag_host.py
+  s_2f9574dd52a3bd::t_7431eb2c8cc7db 1-207
+server/tests/test_mcp_tools.py
+  s_2f9574dd52a3bd::t_ca34df831f8d9e 1-159
+server/tests/test_rag.py
+  s_2f9574dd52a3bd::t_4ad0b76d5c9c51 1-97
+server/tests/test_rag_host.py
+  s_2f9574dd52a3bd::t_8d3becc36a0c53 1-106
+skills/knowledge-based-search/references/README.md
+  s_2f9574dd52a3bd::t_9b37df8ab353f8 1-189
+skills/knowledge-based-search/references/digital-research-methods/ch01.md
+  s_2f9574dd52a3bd::t_767accc83f95fe 1-94
+skills/knowledge-based-search/references/digital-research-methods/ch07.md
+  s_2f9574dd52a3bd::t_0fd3a24461a6bc 1-85
+skills/knowledge-based-search/references/digital-research-methods/ch12.md
+  s_2f9574dd52a3bd::t_d8c67741e68ead 1-68
+skills/knowledge-based-search/references/digital-research-methods/ch15.md
+  s_2f9574dd52a3bd::t_164b0e40442d86 1-74
+skills/knowledge-based-search/references/digital-research-methods/ch17.md
+  s_2f9574dd52a3bd::t_c387b1c71f79d7 1-87
+skills/knowledge-based-search/references/digital-research-methods/ch23.md
+  s_2f9574dd52a3bd::t_75c956c0e08c4b 1-86
+skills/knowledge-based-search/references/exposingtheinvisible/ad-watch.md
+  s_2f9574dd52a3bd::t_58c4b25975c98e 1-101
+skills/knowledge-based-search/references/exposingtheinvisible/bio-investigation.md
+  s_2f9574dd52a3bd::t_67804c0a2d2972 1-74
+skills/knowledge-based-search/references/exposingtheinvisible/climate-change-adaptation.md
+  s_2f9574dd52a3bd::t_a70e1d7926a968 1-163
+skills/knowledge-based-search/references/exposingtheinvisible/crowdsourcing.md
+  s_2f9574dd52a3bd::t_a9bb910790e0dc 1-129
+skills/knowledge-based-search/references/exposingtheinvisible/data-acquisition.md
+  s_2f9574dd52a3bd::t_467629f045700e 1-114
+skills/knowledge-based-search/references/exposingtheinvisible/disinformation.md
+  s_2f9574dd52a3bd::t_3f412f5a4ccdcd 1-110
+skills/knowledge-based-search/references/exposingtheinvisible/elections.md
+  s_2f9574dd52a3bd::t_2309b046157d23 1-93
+skills/knowledge-based-search/references/exposingtheinvisible/evaluate-evidence.md
+  s_2f9574dd52a3bd::t_19bd18a1573ee9 1-83
+skills/knowledge-based-search/references/exposingtheinvisible/fact-checking.md
+  s_2f9574dd52a3bd::t_7a9c21d8f6a936 1-106
+skills/knowledge-based-search/references/exposingtheinvisible/field-research.md
+  s_2f9574dd52a3bd::t_02c1abbce73040 1-324
+skills/knowledge-based-search/references/exposingtheinvisible/ocean-data.md
+  s_2f9574dd52a3bd::t_459dd79b8d5e47 1-213
+skills/knowledge-based-search/references/exposingtheinvisible/supply-chain.md
+  s_48be317f0390ca::t_923d5f594556b4 1-127
+skills/knowledge-based-search/references/exposingtheinvisible/venmo.md
+  s_2f9574dd52a3bd::t_547ddd56003c11 1-146
+skills/knowledge-based-search/references/exposingtheinvisible/world-story.md
+  s_2f9574dd52a3bd::t_2bc2712c269015 1-83
+skills/knowledge-based-search/references/osint-resources/ch03.md
+  s_2f9574dd52a3bd::t_0e5c6a904d4bed 1-146
+skills/knowledge-based-search/references/osint-resources/ch05.md
+  s_2f9574dd52a3bd::t_ecb69219f499ab 1-171
+skills/knowledge-based-search/references/osint-resources/ch11.md
+  s_2f9574dd52a3bd::t_8fb12edf0cb781 1-114
+skills/knowledge-based-search/references/osint-resources/ch14.md
+  s_2f9574dd52a3bd::t_642a6a3e78973c 1-179
+skills/knowledge-based-search/references/osint-resources/ch17.md
+  s_2f9574dd52a3bd::t_e04076f053b349 1-118
+skills/knowledge-based-search/references/osint-resources/ch20.md
+  s_2f9574dd52a3bd::t_7da3d9a4bf82ed 1-148
+skills/knowledge-based-search/references/osint-resources/ch22.md
+  s_2f9574dd52a3bd::t_4aedf831bcbe9d 1-87
+skills/knowledge-based-search/references/osint-resources/ch23.md
+  s_2f9574dd52a3bd::t_c3612bf0f4ed10 1-76
+skills/knowledge-based-search/references/osint-resources/ch26.md
+  s_2f9574dd52a3bd::t_8ef2c6053c3a01 1-138
+skills/knowledge-based-search/references/osint-resources/ch28.md
+  s_12d0231cab948b::t_61595bc7cb733e 1-197
+skills/knowledge-based-search/references/osint-resources/ch33.md
+  s_2f9574dd52a3bd::t_5320e4eb2a85a6 1-260
+skills/knowledge-based-search/references/osint-resources/ch35.md
+  s_2f9574dd52a3bd::t_386d77f78ccd0c 1-109
+skills/knowledge-based-search/references/osint-resources/ch37.md
+  s_2f9574dd52a3bd::t_fade4132c79687 1-163
+skills/knowledge-based-search/references/osint-resources/ch39.md
+  s_2f9574dd52a3bd::t_fd0ad5f0681f3c 1-136
+skills/knowledge-based-search/references/osint-resources/ch44.md
+  s_2f9574dd52a3bd::t_d8240445baa806 1-219
+skills/knowledge-based-search/references/osint-resources/ch45.md
+  s_2f9574dd52a3bd::t_148c0935763a78 1-103
+skills/knowledge-based-search/references/osint-resources/ch46.md
+  s_2f9574dd52a3bd::t_59e104fe298df9 1-221
+skills/knowledge-based-search/references/osint-resources/ch47.md
+  s_2f9574dd52a3bd::t_1448e421e5d537 1-119
+skills/knowledge-based-search/references/osint-resources/ch48.md
+  s_12d0231cab948b::t_8309be89fcbd76 1-69
+skills/knowledge-based-search/references/osint-resources/ch49.md
+  s_2f9574dd52a3bd::t_855fd2be73ba01 1-109
+skills/knowledge-based-search/references/osint-techniques/ch01.md
+  s_2f9574dd52a3bd::t_fbbf171f3c3317 1-14
+skills/knowledge-based-search/references/osint-techniques/ch12.md
+  s_2f9574dd52a3bd::t_d6d5c9787fc80c 1-57
+skills/knowledge-based-search/references/osint-techniques/ch20.md
+  s_2f9574dd52a3bd::t_5ef2aabef27776 1-32
+skills/knowledge-based-search/references/osint-techniques/ch24.md
+  s_48be317f0390ca::t_1bb8bd57e9823f 1-163
+skills/knowledge-based-search/references/osint-techniques/ch25.md
+  s_2f9574dd52a3bd::t_df57b8d4f5951f 1-280
+skills/knowledge-based-search/references/osint-techniques/ch28.md
+  s_2f9574dd52a3bd::t_692767b514985c 1-96
+skills/knowledge-based-search/references/osint-techniques/ch33.md
+  s_2f9574dd52a3bd::t_de06979020f7a7 1-169
+skills/knowledge-based-search/references/osint-techniques/ch46.md
+  s_2f9574dd52a3bd::t_35db697c74c0b0 1-118
+skills/knowledge-based-search/references/osint-techniques/ch47.md
+  s_2f9574dd52a3bd::t_0ca9c254d1408d 1-64
+skills/knowledge-based-search/references/osint-techniques/ch49.md
+  s_2f9574dd52a3bd::t_60c96cb39d95a9 1-322
+skills/knowledge-based-search/references/osint-techniques/ch54.md
+  s_2f9574dd52a3bd::t_9817121dbb1dc9 1-128
+skills/knowledge-based-search/references/osint-techniques/ch56.md
+  s_2f9574dd52a3bd::t_7a9b58789597f9 1-78
+tasks/todo.md
+  s_720e631874cf5c::t_35da6de55df3f9 1-59
+tests/test_engines.py
+  s_2f9574dd52a3bd::t_445a29222f7b96 1-158
+tests/test_merge_installers.py
+  s_2f9574dd52a3bd::t_7fdc819dc773c6 1-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "bdd35c400fc96061a426829cb87a4f88b31921fe",
+  "prompts": {},
+  "sessions": {
+    "s_12d0231cab948b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3bdd1561-159d-4920-8871-b75358f5142b",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_48be317f0390ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "12298383-4a7b-4d10-b68d-87c26d0906a5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_720e631874cf5c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f09e2-6096-79a0-bdd5-76b28f2ebda3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_8c5853e7780fd6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f09d9-4631-7ed2-876a-59301d6fd2dc",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
