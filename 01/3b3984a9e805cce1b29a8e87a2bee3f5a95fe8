@@ -1,0 +1,25 @@
+tests/test_merge_installers.py
+  s_607bc9b197e56c::t_60afef1b25d75b 64-73
+  s_607bc9b197e56c::t_96975bf9c88509 16-17,74-87
+  s_607bc9b197e56c::t_ff2cceee31e22c 2
+  s_607bc9b197e56c::t_36f45a418165b0 24-59
+  s_607bc9b197e56c::t_bb1c23293ff52e 63
+claude-code/merge-claude-settings.py
+  s_607bc9b197e56c::t_d5a7542279a464 4,36-48,72-93,96-101,103-104,106,115-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "013b3984a9e805cce1b29a8e87a2bee3f5a95fe8",
+  "prompts": {},
+  "sessions": {
+    "s_607bc9b197e56c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0a9c-7bbf-7a03-82eb-e38ee4388975",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
