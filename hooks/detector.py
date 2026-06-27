@@ -30,7 +30,7 @@ def nudge_for(prompt, triggers=None):
     for key in _ROUTE_PRIORITY:
         spec = categories[key]
         if _hit(prompt, spec):
-            parts.append(f"Use {spec['route']} because {spec['reason']}.")
+            parts.append(f"Load the knowledge-based-search skill, then use {spec['route']} because {spec['reason']}.")
             break
     if not parts:
         return None
@@ -42,7 +42,7 @@ def nudge_for(prompt, triggers=None):
 
 def demo():
     triggers = load_triggers()
-    assert nudge_for("what is the latest version of pydantic", triggers).startswith("Use quick_web_search")
+    assert nudge_for("what is the latest version of pydantic", triggers).startswith("Load the knowledge-based-search skill, then use quick_web_search")
     assert "deep_research" in nudge_for("do a deep dive on this company", triggers)
     research = nudge_for("research the current state of vector databases", triggers)
     assert research and "web_search" in research, research

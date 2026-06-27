@@ -26,6 +26,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__knowledge-based-search__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __KBS_DIR__/hooks/method_inject.py"
+          }
+        ]
+      }
     ]
   }
 }

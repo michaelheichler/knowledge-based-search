@@ -32,6 +32,8 @@ For stable knowledge about research and investigation method, check the book lib
 (`mcp__library`) and the notes in `references/` first. For anything current or external,
 search the web first. The best answers draw on both.
 
+When this skill is invoked, run a search before answering any current or external question, the skill exists to search, not to answer from memory.
+
 ## Choosing a tool
 
 Four tools, a depth ladder from cheap to thorough:
