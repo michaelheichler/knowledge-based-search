@@ -1,0 +1,22 @@
+server/tests/test_fetch.py
+  s_01b21279fb860a::t_dbbc0f0d2ae416 9-11,20-28,58-88
+server/fetch.py
+  s_01b21279fb860a::t_43c896889374f8 6
+  s_01b21279fb860a::t_ae81e442ccb61d 2,98-99,102-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "c5497e47a04e4131820e9d2b04d048fe6d5e0dbc",
+  "prompts": {},
+  "sessions": {
+    "s_01b21279fb860a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0ac0-801c-79e1-9970-2c56b525ad68",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
