@@ -6,8 +6,9 @@ import fetch
 
 
 class _Response:
-    def __init__(self, html):
-        self._html = html
+    def __init__(self, body, content_type="text/html"):
+        self._body = body
+        self._content_type = content_type
 
     def __enter__(self):
         return self
@@ -16,7 +17,15 @@ class _Response:
         return False
 
     def read(self, limit):
-        return self._html.encode("utf-8")[:limit]
+        body = self._body
+        if isinstance(body, str):
+            body = body.encode("utf-8")
+        return body[:limit]
+
+    def getheader(self, name, default=None):
+        if name.lower() == "content-type":
+            return self._content_type
+        return default
 
 
 def test_fetch_clean_prefers_article_over_page_chrome(monkeypatch):
@@ -46,3 +55,34 @@ def test_fetch_clean_prefers_article_over_page_chrome(monkeypatch):
     assert "First article paragraph with durable knowledge." in result
     assert "Second article paragraph with implementation details." in result
     assert "Important list item survives too." in result
+
+
+def test_fetch_clean_returns_empty_for_pdf_magic_bytes(monkeypatch):
+    monkeypatch.setattr(fetch.urllib.request, "urlopen", lambda request, timeout: _Response(b"%PDF-1.7\ntext"))
+
+    result = fetch.fetch_clean("https://example.test/file", 1000)
+
+    assert result == ""
+
+
+def test_fetch_clean_returns_empty_for_pdf_content_type(monkeypatch):
+    monkeypatch.setattr(
+        fetch.urllib.request,
+        "urlopen",
+        lambda request, timeout: _Response("This body has readable words.", content_type="application/pdf"),
+    )
+
+    result = fetch.fetch_clean("https://example.test/file", 1000)
+
+    assert result == ""
+
+
+def test_fetch_clean_skips_pdf_path_before_fetch(monkeypatch):
+    def fail_urlopen(request, timeout):
+        raise AssertionError("urlopen should not be called")
+
+    monkeypatch.setattr(fetch.urllib.request, "urlopen", fail_urlopen)
+
+    result = fetch.fetch_clean("https://example.test/file.pdf?download=1", 1000)
+
+    assert result == ""

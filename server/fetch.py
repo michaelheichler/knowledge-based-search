@@ -1,8 +1,9 @@
 import re
+import urllib.parse
 import urllib.request
 from html.parser import HTMLParser
 
-_UA = "Mozilla/5.0 (compatible; knowledge-based-search/0.1)"
+_UA = "Mozilla/5.0 (compatible knowledge-based-search/0.1)"
 _BLOCK_TAGS = {"div", "main", "article", "section"}
 _BREAK_TAGS = {"br", "p", "li", "h1", "h2", "h3", "h4", "h5", "h6"}
 _SKIP_TAGS = {"aside", "footer", "form", "header", "nav", "noscript", "script", "style", "svg", "template"}
@@ -94,9 +95,18 @@ def _clean_text(text):
 
 
 def fetch_clean(url, max_chars):
+    if urllib.parse.urlsplit(url).path.lower().endswith(".pdf"):
+        return ""
     request = urllib.request.Request(url, headers={"User-Agent": _UA})
     with urllib.request.urlopen(request, timeout=10) as response:
-        body = response.read(min(max_chars * 4, 2_000_000)).decode("utf-8", "replace")
+        header_reader = getattr(response, "getheader", lambda name, default=None: default)
+        content_type = header_reader("Content-Type", "text/html")
+        if "html" not in (content_type or "").lower():
+            return ""
+        body = response.read(min(max_chars * 4, 2_000_000))
+        if body.startswith(b"%PDF-"):
+            return ""
+        body = body.decode("utf-8", "replace")
     parser = _TextParser()
     parser.feed(body)
     return parser.best_text()[:max_chars]
