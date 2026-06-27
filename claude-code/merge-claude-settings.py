@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
-import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -33,7 +33,19 @@ def render_snippet(path, repo):
 
 
 def hook_entry_is_ours(entry):
-    return "knowledge-based-search" in json.dumps(entry)
+    return "knowledge-based-search/hooks" in json.dumps(entry)
+
+
+def backup(path):
+    if not path.exists():
+        return
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = Path(f"{path}.kbs.{stamp}.bak")
+    copy_number = 1
+    while target.exists():
+        copy_number += 1
+        target = Path(f"{path}.kbs.{stamp}.{copy_number}.bak")
+    target.write_bytes(path.read_bytes())
 
 
 def merge_lists(current, incoming):
@@ -57,15 +69,41 @@ def deep_merge(current, incoming):
     return current
 
 
-def merge(config_path, snippet_path, repo):
+def remove_our_hooks(data):
+    hooks = data.get("hooks", {})
+    if not isinstance(hooks, dict):
+        return data
+    for event, entries in list(hooks.items()):
+        if isinstance(entries, list):
+            hooks[event] = [entry for entry in entries if not hook_entry_is_ours(entry)]
+    return data
+
+
+def merge_hooks(settings, incoming_hooks):
+    hooks = settings.setdefault("hooks", {})
+    for event, incoming_entries in incoming_hooks.items():
+        current_entries = hooks.get(event, [])
+        if not isinstance(current_entries, list):
+            current_entries = []
+        hooks[event] = [entry for entry in current_entries if not hook_entry_is_ours(entry)]
+        merge_lists(hooks[event], incoming_entries)
+    return settings
+
+
+def merge(config_path, snippet_path, repo, settings_path=None):
     config = read_json(config_path)
     snippet = render_snippet(snippet_path, repo)
-    hooks = config.setdefault("hooks", {})
-    for event in snippet.get("hooks", {}):
-        hooks[event] = [entry for entry in hooks.get(event, []) if not hook_entry_is_ours(entry)]
-    deep_merge(config, snippet)
+    settings_path = settings_path or Path.home() / ".claude" / "settings.json"
+    settings = read_json(settings_path)
+    config_snippet = {key: value for key, value in snippet.items() if key != "hooks"}
+    remove_our_hooks(config)
+    deep_merge(config, config_snippet)
+    merge_hooks(settings, snippet.get("hooks", {}))
     config_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    backup(settings_path)
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
     return config
 
 
@@ -74,7 +112,8 @@ def main(argv):
     config_path = Path(argv[1]).expanduser() if len(argv) > 1 else home / ".claude.json"
     snippet_path = Path(argv[2]).expanduser() if len(argv) > 2 else Path(__file__).with_name("claude-settings.snippet.json")
     repo = Path(argv[3]).expanduser().resolve() if len(argv) > 3 else Path(__file__).resolve().parents[1]
-    merge(config_path, snippet_path, repo)
+    settings_path = Path(argv[4]).expanduser() if len(argv) > 4 else home / ".claude" / "settings.json"
+    merge(config_path, snippet_path, repo, settings_path)
     return 0
 
 
