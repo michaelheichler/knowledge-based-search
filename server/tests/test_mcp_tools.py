@@ -116,16 +116,69 @@ def test_get_content_resolves_result_id(stubs):
     assert content["page_content"].startswith("content from https://example.com/a")
 
 
-def test_deep_research_bounded_and_deduped(stubs):
-    response = mcp_server.deep_research("alpha", max_rounds=2)
+def test_reformulate_quotes_multiword_query():
+    assert mcp_server._reformulate("climate data", 3)[0] == '"climate data"'
+
+
+def test_reformulate_adds_pdf_for_document_token():
+    assert "openai annual report data filetype:pdf" in mcp_server._reformulate("openai annual report data", 3)
+
+
+def test_reformulate_does_not_match_document_token_substrings():
+    assert all("filetype:pdf" not in result for result in mcp_server._reformulate("best vector database 2026", 3))
+
+
+def test_reformulate_respects_limit_and_never_returns_original():
+    results = mcp_server._reformulate("best climate data report", 2)
+
+    assert results == ['"best climate data report"', "best climate data report filetype:pdf"]
+    assert "best climate data report" not in results
+
+
+def test_reformulate_broadens_query():
+    assert mcp_server._reformulate("top climate data report", 3)[2] == "climate data report"
+    assert mcp_server._reformulate("climate data report 2025", 3)[2] == "climate data report"
+
+
+def test_deep_research_bounded_and_deduped(monkeypatch):
+    calls = []
+    responses = {
+        "best climate data report": {
+            "summary": "original",
+            "citations": [{"title": "A", "url": "https://a.example/report", "snippet": "", "source": "", "date": ""}],
+        },
+        '"best climate data report"': {
+            "summary": "quoted",
+            "citations": [{"title": "B", "url": "https://b.example/report", "snippet": "", "source": "", "date": ""}],
+        },
+        "best climate data report filetype:pdf": {
+            "summary": "pdf",
+            "citations": [{"title": "B2", "url": "https://b.example/other", "snippet": "", "source": "", "date": ""}],
+        },
+    }
+
+    def fake_web_search(query):
+        calls.append(query)
+        return responses[query]
+
+    monkeypatch.setattr(mcp_server, "web_search", fake_web_search)
+
+    response = mcp_server.deep_research("best climate data report", max_rounds=4)
 
     assert set(response) == {"summary", "sections", "citations"}
-    assert stubs["search"] == ["alpha", "Alpha guide"]
-    assert [item["url"] for item in response["citations"]] == [
-        "https://example.com/a",
-        "https://example.com/b",
+    assert calls == [
+        "best climate data report",
+        '"best climate data report"',
+        "best climate data report filetype:pdf",
     ]
-    assert len(response["sections"]) == 2
+    assert len(calls) <= 4
+    assert len(calls) < 4
+    assert [item["url"] for item in response["citations"]] == [
+        "https://a.example/report",
+        "https://b.example/report",
+        "https://b.example/other",
+    ]
+    assert len(response["sections"]) == 3
     assert all(set(section) == {"heading", "content", "sources"} for section in response["sections"])
 
 
@@ -150,9 +203,24 @@ def test_protocol_tools_list_and_call(stubs):
     assert payload["results"][0]["url"] == "https://example.com/a"
 
 
-@pytest.mark.skipif(not os.environ.get("KBS_LIVE"), reason="set KBS_LIVE=1 for live network smoke")
-def test_live_fetch_clean_smoke():
+def test_fetch_clean_smoke(monkeypatch):
     from fetch import fetch_clean
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, size):
+            return b"<html><body><main><p>Example Domain</p></main></body></html>"
+
+    def fake_urlopen(request, timeout):
+        assert timeout == 10
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
     content = fetch_clean("https://example.com", 2000)
 

@@ -1,8 +1,10 @@
 import importlib.util
 import json
 import os
+import re
 import sys
 import traceback
+from urllib.parse import urlsplit
 
 import engines
 import rag
@@ -12,6 +14,21 @@ DEFAULT_CONFIG = {"searxng_url": "https://endianness.de", "duckduckgo": True}
 RESULT_URLS = {}
 _SUMMARY_MAX_WORDS = 1000
 _SUMMARY_MIN_WORDS = 500
+_DOCUMENT_TOKENS = (
+    "report",
+    "reports",
+    "data",
+    "dataset",
+    "statistics",
+    "filing",
+    "filings",
+    "whitepaper",
+    "white paper",
+    "spec",
+    "specification",
+    "manual",
+    "paper",
+)
 
 
 TOOL_SCHEMAS = [
@@ -108,12 +125,21 @@ def get_content(ref: str) -> dict:
 def deep_research(query: str, max_rounds: int = 3) -> dict:
     max_rounds = max(1, int(max_rounds))
     searches = [web_search(query)]
-    sub_queries = _sub_queries(searches[0], max_rounds - 1)
-    for sub_query in sub_queries:
-        searches.append(web_search(sub_query))
+    seen_hosts = {_host(citation.get("url", "")) for citation in searches[0].get("citations", [])}
+    seen_hosts.discard("")
+    queries = [query]
+    for sub_query in _reformulate(query, max_rounds - 1):
+        search = web_search(sub_query)
+        hosts = {_host(citation.get("url", "")) for citation in search.get("citations", [])}
+        new_hosts = hosts - seen_hosts - {""}
+        searches.append(search)
+        queries.append(sub_query)
+        seen_hosts.update(new_hosts)
+        if not new_hosts:
+            break
     citations = _dedupe_citations(searches)
     sections = [
-        {"heading": query if index == 0 else sub_queries[index - 1], "content": item["summary"], "sources": item["citations"]}
+        {"heading": queries[index], "content": item["summary"], "sources": item["citations"]}
         for index, item in enumerate(searches)
     ]
     return {"summary": _summary_text([item["summary"] for item in searches]), "sections": sections, "citations": citations}
@@ -225,13 +251,40 @@ def _summary_text(items):
     return " ".join(words[:_SUMMARY_MAX_WORDS])
 
 
-def _sub_queries(search, limit):
-    titles = []
-    for citation in search.get("citations", []):
-        title = citation.get("title", "").strip()
-        if title and title not in titles:
-            titles.append(title)
-    return titles[:limit]
+def _host(url):
+    try:
+        return urlsplit(url).netloc
+    except ValueError:
+        return ""
+
+
+def _reformulate(query, limit):
+    limit = max(0, int(limit))
+    if not limit:
+        return []
+    original = query.strip()
+    if not original:
+        return []
+    candidates = []
+    words = original.split()
+    if len(words) > 1 and not (original.startswith('"') and original.endswith('"')):
+        candidates.append(f'"{original}"')
+    lower = original.lower()
+    word_tokens = set(re.findall("[a-z]+", lower))
+    if "white paper" in lower or any(token in word_tokens for token in _DOCUMENT_TOKENS if " " not in token):
+        candidates.append(f"{original} filetype:pdf")
+    removable = {"best", "top"}
+    if any(word.lower() in removable for word in words):
+        candidates.append(" ".join(word for word in words if word.lower() not in removable))
+    else:
+        candidates.append(" ".join(words[:3]))
+    results = []
+    for candidate in candidates:
+        if candidate and candidate != original and candidate not in results:
+            results.append(candidate)
+        if len(results) >= limit:
+            break
+    return results
 
 
 def _dedupe_citations(searches):
