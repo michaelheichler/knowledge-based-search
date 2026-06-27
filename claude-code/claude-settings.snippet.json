@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "knowledge-based-search": {
+      "command": "__KBS_PYTHON__",
+      "args": ["__KBS_SERVER__"]
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __KBS_DIR__/hooks/session_start.py"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __KBS_DIR__/hooks/prompt_inject.py"
+          }
+        ]
+      }
+    ]
+  }
+}

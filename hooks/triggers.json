@@ -1,0 +1,30 @@
+{
+  "_purpose": "Shared trigger vocabulary read by the UserPromptSubmit hook and referenced by the skill. One source of truth so a cue added here is not missed by either reader.",
+  "categories": {
+    "recency": {
+      "route": "quick_web_search",
+      "reason": "the request asks for current information and training data ages",
+      "words": ["latest", "current", "currently", "today", "as of now", "right now", "newest", "up to date", "up-to-date", "recent", "recently", "this year", "this month", "nowadays", "changelog", "release notes", "new version"],
+      "patterns": ["\\b20[2-9][0-9]\\b", "\\bv\\d+\\.\\d+"]
+    },
+    "research": {
+      "route": "web_search",
+      "reason": "the answer should be sourced and current, not recalled from memory",
+      "words": ["research", "look up", "look into", "find sources", "find information on", "investigate", "compare", "state of the art", "current state of", "survey of", "background on", "documentation for", "what are the options for", "who makes", "pricing of"]
+    },
+    "deep": {
+      "route": "deep_research",
+      "reason": "the request needs a thorough, multi-source investigation",
+      "words": ["deep dive", "deep research", "thoroughly investigate", "full report", "comprehensive report", "osint", "who is", "trace", "background check", "due diligence", "profile of", "everything about", "dig into"]
+    }
+  },
+  "library_first": {
+    "reason": "owned book sources cover research and OSINT method and should be checked alongside the web",
+    "tool": "mcp__library",
+    "words": ["method", "methodology", "how to investigate", "how to research", "tradecraft", "verify a claim", "fact-check", "fact check", "source evaluation"]
+  },
+  "negative_context": {
+    "reason": "local-scope requests need the codebase, not the web",
+    "words": ["my code", "this code", "this repo", "this file", "the function above", "the snippet", "my project", "in this codebase", "the class above", "this function"]
+  }
+}

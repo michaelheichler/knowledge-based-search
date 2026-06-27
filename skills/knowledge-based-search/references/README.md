@@ -1,0 +1,189 @@
+# Search and Investigation Tradecraft, Reference Index
+
+These notes distill search and investigation tradecraft from one website and three books.
+Each entry names when to consult it. Read the matching note before applying a technique.
+
+## Exposing the Invisible, The Kit (primary source)
+
+- [ad.watch, Investigating Political Ads on Facebook](exposingtheinvisible/ad-watch.md).
+- [The Making of an Anti-biometric Mass Surveillance Campaign](exposingtheinvisible/anti-biometric.md). An agent needs concrete tactics for investigating, exposing, or campaigning against government surveillance deployments, including FOI denial handling, evidence archiving, community organizing, petition infrastructure, and crowdsourced verification.
+- [Bio-investigations in the Field](exposingtheinvisible/bio-investigation.md).
+- [Investigating Climate Change Adaptation](exposingtheinvisible/climate-change-adaptation.md).
+- [Investigation is Collaboration: How to Make It Work](exposingtheinvisible/collaboration.md).
+- [What Is in a Company](exposingtheinvisible/companies.md).
+- [Thinking Critically About Maps: Researching, Resisting and Re-imagining the World](exposingtheinvisible/critical-maps.md).
+- [Crowdsourcing Evidence for Investigations](exposingtheinvisible/crowdsourcing.md).
+- [Data Acquisition for Beginners](exposingtheinvisible/data-acquisition.md).
+- [How to Track Online Disinformation Networks](exposingtheinvisible/disinformation.md).
+- [Exploring Connections Between Political Parties and Personal Data Brokers in the UK](exposingtheinvisible/elections.md).
+- [Evaluating Evidence and Information Sources](exposingtheinvisible/evaluate-evidence.md).
+- [Get Your Facts Straight: The Basics of Fact-Checking](exposingtheinvisible/fact-checking.md).
+- [Away From Your Screen, Out in the Field](exposingtheinvisible/field-research.md).
+- [Geolocation Methods: A Step by Step Guide](exposingtheinvisible/geolocation.md).
+- [Search Smarter by Dorking](exposingtheinvisible/google-dorking.md).
+- [Interviews, the Human Element of Your Investigation](exposingtheinvisible/interviews.md).
+- [What Makes an Investigation](exposingtheinvisible/investigation-concepts.md).
+- [Eight Breakable Rules of Investigative Writing](exposingtheinvisible/investigative-storytelling.md).
+- [How to Manage Your Sources](exposingtheinvisible/manage-sources.md).
+- [Using Maps to See Beyond the Obvious](exposingtheinvisible/maps.md).
+- [Navigating Libraries and Archives for Investigations](exposingtheinvisible/navigating-libraries.md).
+- [Ocean Datasets for Investigations](exposingtheinvisible/ocean-data.md).
+- [OSINT, Diving Into an Ocean of Information](exposingtheinvisible/osint-ocean.md).
+- [You Are Already an Investigator](exposingtheinvisible/preamble.md).
+- [Safety First: Digital, Physical, and Psychological Safety for Investigators](exposingtheinvisible/safety.md).
+- [Signs, Symbols and Other Visual Clues](exposingtheinvisible/signs-symbols.md).
+- [Supply Chain and Product Investigations](exposingtheinvisible/supply-chain.md).
+- [The Kit: Introduction and Purpose](exposingtheinvisible/thekit.md).
+- [Extracting Information From Social Apps: A Case of Exposed Financial Data](exposingtheinvisible/venmo.md).
+- [Gathering Visual Evidence](exposingtheinvisible/visual-evidence.md).
+- [How to Ethically Engage with Vulnerable Sources](exposingtheinvisible/vulnerable-sources.md).
+- [Retrieving and Archiving Information From Websites](exposingtheinvisible/web-archive.md).
+- [How to See What Is Behind a Website](exposingtheinvisible/web.md).
+- [All the World's a Story: Tales From Invisible Populations](exposingtheinvisible/world-story.md).
+
+## OSINT Techniques (Bazzell, Edison)
+
+- [Title Page and Copyright Notice](osint-techniques/ch01.md).
+- [macOS Host Optimization for OSINT Work](osint-techniques/ch02.md).
+- [About the Authors](osint-techniques/ch03.md).
+- [Eleventh Edition Preface](osint-techniques/ch04.md).
+- [Introduction to OSINT Techniques](osint-techniques/ch05.md).
+- [Section I Overview: OSINT Preparation](osint-techniques/ch06.md).
+- [Why Virtual Machines?](osint-techniques/ch07.md).
+- [macOS Host Optimization for OSINT Investigations](osint-techniques/ch08.md).
+- [macOS VM Software (UTM)](osint-techniques/ch09.md).
+- [Linux Host Optimization for OSINT Investigations](osint-techniques/ch10.md).
+- [Linux VM Software: VirtualBox and VMWare Workstation Pro](osint-techniques/ch11.md).
+- [Windows Host Optimization](osint-techniques/ch12.md).
+- [Windows VM Software: VirtualBox and VMWare Workstation Pro Setup](osint-techniques/ch13.md).
+- [OSINT VM Operating Systems: Building the Debian Investigation VM](osint-techniques/ch14.md).
+- [OSINT VM Web Browsers: Firefox Configuration, Extensions, and Supporting Browsers](osint-techniques/ch15.md).
+- [OSINT VM Applications: Manual Installation and Use of Linux-Based Investigation Tools](osint-techniques/ch16.md).
+- [OSINT VM Scripts: Automating Terminal Tools with Bash and Desktop Shortcuts](osint-techniques/ch17.md).
+- [OSINT VM APIs: People Data, Telephone Lookup, Breach Data, and Domain History](osint-techniques/ch18.md).
+- [OSINT VM Maintenance: Updates, Shrinking, Cloning, and Exporting](osint-techniques/ch19.md).
+- [OSINT VM Automated Build](osint-techniques/ch20.md).
+- [Android Virtualization for OSINT Investigations](osint-techniques/ch21.md).
+- [Custom Search Tools: Building and Maintaining Offline OSINT Query Pages](osint-techniques/ch22.md).
+- [Creating and Maintaining Covert Accounts for OSINT Investigations](osint-techniques/ch23.md).
+- [Search Engines for OSINT Investigations](osint-techniques/ch24.md).
+- [Social Networks: Facebook OSINT Techniques](osint-techniques/ch25.md).
+- [Social Networks: X (Twitter) - Search Methods and Investigation Techniques](osint-techniques/ch26.md).
+- [Social Networks: Instagram](osint-techniques/ch27.md).
+- [Social Networks: TikTok](osint-techniques/ch28.md).
+- [Online Communities](osint-techniques/ch29.md).
+- [Email Address Investigation Techniques](osint-techniques/ch30.md).
+- [Username OSINT: Finding Accounts, Breach Data, and Personal Pages](osint-techniques/ch31.md).
+- [People Search Engines and Supplementary Personal Data Sources](osint-techniques/ch32.md).
+- [Telephone Number OSINT: Carrier Identification, Subscriber Lookup, and Search Techniques](osint-techniques/ch33.md).
+- [Online Maps](osint-techniques/ch34.md).
+- [Documents (Finding, Retrieving, and Analyzing Document Intelligence)](osint-techniques/ch35.md).
+- [Images, Photo Search, Reverse Image Lookup, Exif Metadata, and Photo Forensics](osint-techniques/ch36.md).
+- [Video OSINT: YouTube Techniques, Video Search, Live Streams, and Reverse Video Searching](osint-techniques/ch37.md).
+- [Broadcast Streams: Live Television, Radio, Web-Controlled Receivers, and Scanners](osint-techniques/ch38.md).
+- [Domain Name Investigation](osint-techniques/ch39.md).
+- [IP Address Investigation Techniques](osint-techniques/ch40.md).
+- [Government and Business Records](osint-techniques/ch41.md).
+- [Virtual Currencies](osint-techniques/ch42.md).
+- [Section III Introduction: Leaks, Breaches, Logs, and Ransomware](osint-techniques/ch43.md).
+- [Investigative Benefits of Leaks, Breaches, Logs, and Ransomware Data](osint-techniques/ch44.md).
+- [Hardware Configuration for Breach Data Collection](osint-techniques/ch45.md).
+- [Software Configuration for OSINT Data Work](osint-techniques/ch46.md).
+- [Terminal Commands for Data Cleaning and Querying](osint-techniques/ch47.md).
+- [Data Leaks: Acquiring, Cleaning, and Querying Leaked and Public Datasets](osint-techniques/ch48.md).
+- [Data Breaches: Obtaining, Cleaning, and Querying Leaked Credential Databases](osint-techniques/ch49.md).
+- [Stealer Logs: Collection, Cleansing, and Investigative Use](osint-techniques/ch50.md).
+- [Ransomware Data as an OSINT Source](osint-techniques/ch51.md).
+- [Queries, Scripts, Databases, and Backups for Local Breach Data](osint-techniques/ch52.md).
+- [Section IV Introduction, OSINT Methodology](osint-techniques/ch53.md).
+- [Methodology and Workflow for OSINT Investigations](osint-techniques/ch54.md).
+- [Documentation and Reporting for OSINT Investigations](osint-techniques/ch55.md).
+- [Policy, Ethics, and Professional Development for OSINT Investigators](osint-techniques/ch56.md).
+- [Conclusion and Index](osint-techniques/ch57.md).
+
+## Open Source Intelligence Techniques, Resources (Bazzell)
+
+- [Computer Optimization: Preparing a Clean Investigation Environment](osint-resources/ch01.md).
+- [Host Hardening and Linux Virtual Machines for OSINT Investigations](osint-resources/ch02.md).
+- [Web Browsers for OSINT Investigations](osint-resources/ch03.md).
+- [Firefox Add-ons for OSINT Investigations](osint-resources/ch04.md).
+- [Firefox Browser Extensions for OSINT Investigations (Web Browsers, Part 2)](osint-resources/ch05.md).
+- [Browser Configuration, Bookmarklets, and Linux OSINT Application Installation](osint-resources/ch06.md).
+- [Linux VM Video Download Tools for OSINT](osint-resources/ch07.md).
+- [Linux VM Applications: Video Utilities, Stream Capture, and Instagram Collection](osint-resources/ch08.md).
+- [Linux OSINT VM Tools: Bulk Image Download, Username and Email Enumeration, Screenshot Automation, Domain Analysis, and Metadata Extraction](osint-resources/ch09.md).
+- [Linux OSINT Applications: Website Archiving, Document Metadata, Reddit Tools, Geospatial Analysis, and VM Maintenance](osint-resources/ch10.md).
+- [VM Maintenance and Preservation for OSINT Investigations](osint-resources/ch11.md).
+- [Setting Up Mac and Windows OSINT Hosts](osint-resources/ch12.md).
+- [Windows OSINT Build Completion and Android Emulation Setup](osint-resources/ch13.md).
+- [Android Emulation for OSINT Investigations and Custom Search Tool Setup](osint-resources/ch14.md).
+- [Custom Search Tools and Covert Account Creation](osint-resources/ch15.md).
+- [Search Engines: Advanced Google Techniques and Custom Search Engines](osint-resources/ch16.md).
+- [Search Engines, Web Archives, and Translation Tools for OSINT](osint-resources/ch17.md).
+- [Search Engines: Advanced Techniques, Specialized Engines, Newspaper Archives, FTP, and Source Code Search](osint-resources/ch18.md).
+- [Facebook OSINT: Profile Search, URL Enumeration, and Base64 Graph Queries](osint-resources/ch19.md).
+- [Facebook Advanced Search Techniques and Twitter Investigation Fundamentals](osint-resources/ch20.md).
+- [Twitter Search Operators, Deleted Content Recovery, and Third-Party Tools](osint-resources/ch21.md).
+- [Twitter Third-Party Analytics Tools for OSINT Investigation](osint-resources/ch22.md).
+- [Social Networks: Instagram Investigation Techniques](osint-resources/ch23.md).
+- [Social Networks: General (LinkedIn, Snapchat, Google Networks)](osint-resources/ch24.md).
+- [General Social Networks and Online Communities: Tumblr, Telegram, International Networks, Alternative Platforms, and Reddit](osint-resources/ch25.md).
+- [Online Communities Investigation: Reddit Archives, Alternative Platforms, Dating Sites, and Tinder](osint-resources/ch26.md).
+- [Online Communities, Classified Ads, and Auction Sites as OSINT Sources](osint-resources/ch27.md).
+- [Online Communities and Email Address Investigation](osint-resources/ch28.md).
+- [Email Address and Username Investigation (Breach Lookups, Verification, Domain Connections, and Username Search)](osint-resources/ch29.md).
+- [Username Investigation and People Search Engines](osint-resources/ch30.md).
+- [People Search Engines (Continued), Resumes, Registries, Addresses, and Telephone Carrier Lookup](osint-resources/ch31.md).
+- [Telephone Number OSINT: Carrier Identification, Reverse Caller ID, and Search Enumeration](osint-resources/ch32.md).
+- [Telephone Number Lookup Techniques and Online Mapping for Location Intelligence](osint-resources/ch33.md).
+- [Online Maps (closing) and Documents: Public File Search, Cloud Storage, Paste Sites, and Metadata Extraction](osint-resources/ch34.md).
+- [Documents and Images (Metadata, Search, and Reverse Image Analysis)](osint-resources/ch35.md).
+- [Image Search, Exif Data, and Photo Forensics for OSINT Investigations](osint-resources/ch36.md).
+- [Video Intelligence: YouTube Techniques, Metadata, Reverse Video Search, and Related Platforms](osint-resources/ch37.md).
+- [Video Intelligence and Domain Name Investigation](osint-resources/ch38.md).
+- [Domain Name Investigation Techniques and Tools](osint-resources/ch39.md).
+- [Domain Names (Continued): Threat Data, Breach Searches, Shortened URLs, Cloudflare, and IP Address Lookups](osint-resources/ch40.md).
+- [IP Address Investigation Tools and Government and Business Records](osint-resources/ch41.md).
+- [Government and Business Records, Vehicle and Asset Data, Criminal Information, and Virtual Currency Tracing](osint-resources/ch42.md).
+- [Advanced Linux Tools for OSINT: Internet Archive Automation, GHunt, Spiderfoot, and Recon-ng](osint-resources/ch43.md).
+- [Recon-ng Advanced Usage and Data Breaches and Leaks](osint-resources/ch44.md).
+- [Data Breaches and Leaked Credential Databases: Searching Stolen Records for Investigative Leads](osint-resources/ch45.md).
+- [Data Breaches and Leaks: Hashes, Breach Search, Open Databases, SQL Files, and Public Archives](osint-resources/ch46.md).
+- [Data Breaches, Leaks, and Public Data Sets (Ch. 28 Conclusion and Section III Introduction)](osint-resources/ch47.md).
+- [OSINT Investigative Methodology and Workflow](osint-resources/ch48.md).
+- [Capture, Collection, Analysis, and Target Flowcharts for OSINT Investigations](osint-resources/ch49.md).
+- [Documentation and Reporting for OSINT Investigations (Chapter 30, Part 2)](osint-resources/ch50.md).
+- [Documentation, Reporting, Policy, and Ethics for OSINT Investigations](osint-resources/ch51.md).
+- [Policy, Ethics, and Professional Development in OSINT](osint-resources/ch52.md).
+- [Conclusion and Index](osint-resources/ch53.md).
+
+## Handbook of Digital and Computational Research Methods
+
+- [Heterodox Research Practices in Digital and Computational SSH (Introduction)](digital-research-methods/ch01.md).
+- [Digital and Computational Approaches in Archaeology](digital-research-methods/ch02.md).
+- [The Digital Historian's Craft](digital-research-methods/ch03.md).
+- [Computational Anthropology: Methods, Cases, and Challenges](digital-research-methods/ch04.md).
+- [Agent-Based Modeling of Financial Markets in Economic Sociology](digital-research-methods/ch05.md).
+- [Four Guiding Principles for Rethinking Organizational Charts](digital-research-methods/ch06.md).
+- [The Digital Turn in Food Studies: Methods and Challenges](digital-research-methods/ch07.md).
+- [Combining Qualitative and Quantitative Methods in Behavioural Psychology for Complex Human-Environment Systems](digital-research-methods/ch08.md).
+- [Situating Digital Data in Media and Communication Research](digital-research-methods/ch09.md).
+- [Objectivity in/through Partial Perspectives](digital-research-methods/ch10.md).
+- [Bias in Machine Learning as a Multidimensional Problem](digital-research-methods/ch11.md).
+- [Online Groundedness: Web Data as a Basis for Social Research](digital-research-methods/ch12.md).
+- [Theoretical Heuristics in Digital Social Research](digital-research-methods/ch13.md).
+- [Beyond the Quant and Qual Divide](digital-research-methods/ch14.md).
+- [The Vanishing Micro/Macro Divide and the Politics of Computational Interactionism](digital-research-methods/ch15.md).
+- [Gatekeeping and the Digital Archive: New Access, New Biases](digital-research-methods/ch16.md).
+- [Representation and Visualization as Process in the Computational Turn](digital-research-methods/ch17.md).
+- [Mapping with Care: Data Feminist Principles for Participatory Visual Practices](digital-research-methods/ch18.md).
+- [Privacy in Digital and Computational Social Science and Humanities Research](digital-research-methods/ch19.md).
+- ["Making the Instruments of Social Sciences and Humanities" (Part III Introduction)](digital-research-methods/ch20.md).
+- [Toolmaking as Science: How DC Tools for SSH Are Made, Used, and Theory-Laden](digital-research-methods/ch21.md).
+- [Meet the DCSSH Toolmakers: Institutional Contexts and Challenges of Digital Research Tool Development](digital-research-methods/ch22.md).
+- [Why DCSSH Toolmakers Make Tools](digital-research-methods/ch23.md).
+- [The Lifecycle of DC Tools for the Social Sciences and Humanities](digital-research-methods/ch24.md).
+- [Valuing Toolmaking in Academia](digital-research-methods/ch25.md).
+- [In Defense of the Researcher-Toolmaker Figure](digital-research-methods/ch26.md).
+
+Total notes: 171.

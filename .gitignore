@@ -1,0 +1,15 @@
+archive/
+.venv/
+__pycache__/
+*.pyc
+
+# OS and tool artifacts
+.DS_Store
+.pytest_cache/
+.serena/
+.playwright-mcp/
+.requirements/
+
+# AI assistant artifacts
+session-log.md
+state.md
