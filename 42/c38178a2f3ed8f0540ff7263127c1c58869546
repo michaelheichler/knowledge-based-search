@@ -1,0 +1,34 @@
+server/tests/test_mcp_tools.py
+  s_ea6540018ad1f6::t_5682c26c2eaf28 119-123,129-137,143-165,169-173,177-179,181
+  s_ea6540018ad1f6::t_792c1e71a8cd1f 138-142,166,174-175
+  s_ea6540018ad1f6::t_dcfd82d6831300 206,209-223
+  s_ea6540018ad1f6::t_6affc74f638743 124-128
+  s_2f9574dd52a3bd::t_5694e933e2e29d 224
+server/mcp_server.py
+  s_ea6540018ad1f6::t_ac5c9e1f8beb7b 7,17-31,128-139,142,254-272,275-287
+  s_ea6540018ad1f6::t_7c70283374df10 4,273-274
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "42c38178a2f3ed8f0540ff7263127c1c58869546",
+  "prompts": {},
+  "sessions": {
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_ea6540018ad1f6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0a35-10b4-7d83-9e9c-7d558b12ab9c",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
