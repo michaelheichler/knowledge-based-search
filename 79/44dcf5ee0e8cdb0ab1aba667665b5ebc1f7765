@@ -1,0 +1,40 @@
+tasks/bugs.md
+  s_2f9574dd52a3bd::t_6aaec19b083fa1 13-16
+server/engines.py
+  s_b641e3e8e43094::t_72534b321ed08d 35,283-284
+  s_b641e3e8e43094::t_3434d108cc70e5 386-387,390-391,399,403-404
+  s_b641e3e8e43094::t_57434cc0a9e70c 36-44,57-75,252-258,261-282,285-325,358-361,398,400-402,405-406
+  s_b641e3e8e43094::t_1cfee7acf0d069 122-126,133,259-260
+tests/test_engines.py
+  s_b641e3e8e43094::t_1e5f4ca81cfa42 179-180,185-190
+  s_b641e3e8e43094::t_b4dc3ea91a65b2 197-198,210-211,213
+  s_b641e3e8e43094::t_9334f0fe38d381 202-203
+  s_b641e3e8e43094::t_7f8401db25d33e 145-156,158-170
+  s_b641e3e8e43094::t_c8b4119ae7879f 45,47-60
+  s_b641e3e8e43094::t_cd6ad01e969128 38-39,46,143,157
+  s_2f9574dd52a3bd::t_21766a737e4974 144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "7944dcf5ee0e8cdb0ab1aba667665b5ebc1f7765",
+  "prompts": {},
+  "sessions": {
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_b641e3e8e43094": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0a09-2fd2-70b3-8984-bd74a22178fe",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
