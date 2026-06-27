@@ -1,0 +1,22 @@
+server/mcp_server.py
+  s_432269449a29ac::t_d7f04b7122c382 113,115,143,146-147
+  s_432269449a29ac::t_45c0115ba8be8a 256-266
+server/tests/test_mcp_tools.py
+  s_432269449a29ac::t_3191f9f164912a 228-262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "f7e20978be07e2e77c00fd6027557183cb36d2ce",
+  "prompts": {},
+  "sessions": {
+    "s_432269449a29ac": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0a88-e18e-7250-af95-21189ba5cd73",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
