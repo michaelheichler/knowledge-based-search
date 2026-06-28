@@ -1,0 +1,20 @@
+benchmark/deep_context_bench.py
+  s_2f9574dd52a3bd::t_496b26b7f7914d 23
+  s_2f9574dd52a3bd::t_337edbe3afac2a 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0149a1c7a06dfe2738d460105adea68ff389b96c",
+  "prompts": {},
+  "sessions": {
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
