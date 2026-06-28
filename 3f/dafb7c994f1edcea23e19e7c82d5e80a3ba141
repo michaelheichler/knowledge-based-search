@@ -1,0 +1,23 @@
+claude-code/claude-settings.snippet.json
+  s_2f9574dd52a3bd::t_8a660ab747a097 9-19
+hooks/skill_gate.py
+  s_2f9574dd52a3bd::t_8579464fd10a41 1-76
+tests/test_skill_gate.py
+  s_2f9574dd52a3bd::t_0ad9631e4041af 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "3fdafb7c994f1edcea23e19e7c82d5e80a3ba141",
+  "prompts": {},
+  "sessions": {
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
