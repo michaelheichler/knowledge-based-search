@@ -6,6 +6,17 @@
     }
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__knowledge-based-search__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __KBS_DIR__/hooks/skill_gate.py"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup|resume|clear|compact",
