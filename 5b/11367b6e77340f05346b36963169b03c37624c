@@ -1,0 +1,29 @@
+benchmark/deep_context_bench.py
+  s_2f9574dd52a3bd::t_dfb12d7112e90b 1-34
+server/mcp_server.py
+  s_2f9574dd52a3bd::t_70a005bf22f678 385
+  s_2f9574dd52a3bd::t_c55569a915948c 171,173-175,177-178,180,189-237,239-254
+  s_2f9574dd52a3bd::t_afeafd633cebb7 167
+  s_2f9574dd52a3bd::t_4b22520150d5bd 15,81-95,166,168-170,172,176,179,181-188,238,427,447
+server/tests/test_mcp_tools.py
+  s_2f9574dd52a3bd::t_dd73036d6185aa 207
+server/tests/test_deep_context_search.py
+  s_2f9574dd52a3bd::t_056f05b06357e1 1-84,86-117
+  s_2f9574dd52a3bd::t_293170ab91f1bd 85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "5b11367b6e77340f05346b36963169b03c37624c",
+  "prompts": {},
+  "sessions": {
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
