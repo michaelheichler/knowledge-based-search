@@ -246,6 +246,31 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(merged[0]["date"], "2026-06-16")
 
 
+class UrlDateTests(unittest.TestCase):
+    def test_day_path(self):
+        self.assertEqual(engines._parse_url_date("https://www.theverge.com/2016/3/24/1130/post"), "2016-03-24")
+
+    def test_iso_path(self):
+        self.assertEqual(engines._parse_url_date("https://glaforge.dev/posts/2026-02-10/advanced-rag"), "2026-02-10")
+
+    def test_month_only_path(self):
+        self.assertEqual(engines._parse_url_date("https://arstechnica.com/it/2016/03/rage-quit"), "2016-03-01")
+
+    def test_rejects_impossible_date(self):
+        self.assertEqual(engines._parse_url_date("https://example.com/2020/15/40/x"), "")
+
+    def test_no_date_in_url(self):
+        self.assertEqual(engines._parse_url_date("https://example.com/blog/some-post"), "")
+
+    def test_snippet_date_preferred_over_url(self):
+        hit = engines.result("t", "https://example.com/2016/03/24/x", "Published 7 Dec 2025", "searxng", 1)
+        self.assertEqual(hit["date"], "2025-12-07")
+
+    def test_url_date_fills_when_snippet_has_none(self):
+        hit = engines.result("t", "https://example.com/2026/02/10/x", "no date here", "searxng", 1)
+        self.assertEqual(hit["date"], "2026-02-10")
+
+
 class SearchResilienceTests(unittest.TestCase):
     def test_search_survives_as_completed_timeout(self):
         from unittest import mock
