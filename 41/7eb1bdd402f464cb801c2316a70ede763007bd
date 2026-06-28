@@ -1,0 +1,24 @@
+tests/test_engines.py
+  s_f18b71cf448fab::t_10ba6f7f59ab3b 228,238
+server/rag.py
+  s_f18b71cf448fab::t_acac840c3e5903 76,212-215,234,237-244
+server/tests/test_rag.py
+  s_f18b71cf448fab::t_1702d33d7e4b0e 98
+  s_f18b71cf448fab::t_a5c6ad6996cdc1 101,103-105,108-111,113-116,119-126,132-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "417eb1bdd402f464cb801c2316a70ede763007bd",
+  "prompts": {},
+  "sessions": {
+    "s_f18b71cf448fab": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0d75-6bf4-74b2-81f5-3ddbc2cf1562",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
