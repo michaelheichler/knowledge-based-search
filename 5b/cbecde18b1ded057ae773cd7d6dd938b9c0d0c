@@ -1,0 +1,64 @@
+hooks/triggers.json
+  s_3d6d4504fd2a21::t_663faf4c2910b2 4
+hooks/session_start.py
+  s_3d6d4504fd2a21::t_663faf4c2910b2 10
+server/engines.py
+  s_fbbec36da2b23a::t_c48b7d920f450b 4,49-80,84-108
+  s_fbbec36da2b23a::t_465f52fd4ea564 400-401,442-445
+  s_fbbec36da2b23a::t_668742ad9e8513 3
+server/tests/test_rag.py
+  s_c774fd1fd112dc::t_75ba57c706d316 43,128-161
+  s_c774fd1fd112dc::t_8ccd65d557c40f 126
+  s_fbbec36da2b23a::t_be5aa879b200ea 99-125,127
+server/rag.py
+  s_c774fd1fd112dc::t_046b28437e2ce3 63,67,74-77,235-236,242
+  s_fbbec36da2b23a::t_2906ee0be010e3 213-218,232-234,237-241,243-244
+tests/test_engines.py
+  s_fbbec36da2b23a::t_5769de83f0aae8 82,216-246
+  s_2f9574dd52a3bd::t_ec2bd4f6c6d534 247
+server/mcp_server.py
+  s_3d6d4504fd2a21::t_663faf4c2910b2 37,49,61,70
+  s_fbbec36da2b23a::t_403ccc5e9d4035 200-202,212
+server/tests/test_mcp_tools.py
+  s_fbbec36da2b23a::t_6ec52e66ea287b 76-77,84-85,104,112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "5bcbecde18b1ded057ae773cd7d6dd938b9c0d0c",
+  "prompts": {},
+  "sessions": {
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_3d6d4504fd2a21": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0b63-3c9e-7593-a868-514b2eec6561",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_c774fd1fd112dc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0d2d-c65b-77b1-9f23-10197d0d3e98",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_fbbec36da2b23a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0b55-468d-75d1-8567-a041d7a707c7",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
