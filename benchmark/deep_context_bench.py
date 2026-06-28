@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark deep_context_aware_search latency.
-
-Run with real network access:
-    python3 benchmark/deep_context_bench.py
-"""
+"""Time deep_context_aware_search at each fetch_top_k, needs real network."""
 import os
 import sys
 import time
@@ -23,8 +19,8 @@ FETCH_TOP_K_VALUES = [0, 5, 20]
 def main():
     print("query                                          k    sec")
     for q in QUERIES:
-        mcp_server.CONTEXT_MEMORY.clear()
         for k in FETCH_TOP_K_VALUES:
+            mcp_server.CONTEXT_MEMORY.clear()
             t0 = time.perf_counter()
             mcp_server.deep_context_aware_search(q, fetch_top_k=k)
             print(f"{q[:44]:<45}{k:>2}{time.perf_counter()-t0:>7.2f}")
