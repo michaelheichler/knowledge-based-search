@@ -73,12 +73,16 @@ def test_quick_web_search_schema(stubs):
             "url": "https://example.com/a",
             "snippet": "Alpha overview and setup",
             "engine": "searxng",
+            "date": "",
+            "relevance": 0.0,
         },
         {
             "title": "Beta notes",
             "url": "https://example.com/b",
             "snippet": "Beta reference material",
             "engine": "duckduckgo",
+            "date": "",
+            "relevance": 0.0,
         },
     ]
     assert stubs["fetch"] == []
@@ -97,6 +101,7 @@ def test_web_search_schema_citations_and_token_bound(stubs):
             "snippet": "Alpha overview and setup",
             "source": "searxng",
             "date": "",
+            "relevance": 0.0,
         },
         {
             "title": "Beta notes",
@@ -104,6 +109,7 @@ def test_web_search_schema_citations_and_token_bound(stubs):
             "snippet": "Beta reference material",
             "source": "duckduckgo",
             "date": "",
+            "relevance": 0.0,
         },
     ]
 

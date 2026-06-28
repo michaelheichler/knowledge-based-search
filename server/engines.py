@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import concurrent.futures
+import contextlib
+import datetime
 import html
 import json
 import logging
@@ -44,10 +46,66 @@ _MOJEEK_SNIPPET = re.compile(
 )
 _BLOCKED = re.compile(r"captcha|unusual traffic|verify you are human|automated queries|our systems have detected", re.I)
 _LOG = logging.getLogger(__name__)
+_MONTHS = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+_DATE_PATTERNS = (
+    re.compile(r"\b(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\b"),
+    re.compile(r"\b(?P<day>\d{1,2})\s+(?P<month_name>[A-Za-z]{3,9})\s+(?P<year>\d{4})\b"),
+    re.compile(r"\b(?P<month_name>[A-Za-z]{3,9})\s+(?P<day>\d{1,2}),?\s+(?P<year>\d{4})\b"),
+    re.compile(r"\b(?P<day>\d{2})\.(?P<month>\d{2})\.(?P<year>\d{4})\b"),
+)
 
 
 def result(title, url, snippet, engine, rank):
-    return {"title": _clean(title), "url": url, "snippet": _clean(snippet), "engine": engine, "rank": rank}
+    cleaned_snippet = _clean(snippet)
+    return {
+        "title": _clean(title),
+        "url": url,
+        "snippet": cleaned_snippet,
+        "engine": engine,
+        "rank": rank,
+        "date": _parse_date(cleaned_snippet),
+    }
+
+
+def _parse_date(text):
+    matches = []
+    for pattern in _DATE_PATTERNS:
+        matches.extend((match.start(), match) for match in pattern.finditer(text or ""))
+    for position, match in sorted(matches, key=lambda item: item[0]):
+        groups = match.groupdict()
+        month = groups.get("month")
+        if groups.get("month_name"):
+            month = _MONTHS.get(groups["month_name"].lower())
+        if not month:
+            continue
+        with contextlib.suppress(ValueError):
+            return datetime.date(int(groups["year"]), int(month), int(groups["day"])).isoformat()
+    return ""
 
 
 def _clean(text):
@@ -339,6 +397,8 @@ def merge(result_lists, cap=20):
                 by_url[key] = {**hit, "engines": [hit["engine"]]}
             else:
                 existing["rank"] = min(existing["rank"], hit["rank"])
+                if not existing.get("date") and hit.get("date"):
+                    existing["date"] = hit["date"]
                 if hit["engine"] not in existing["engines"]:
                     existing["engines"].append(hit["engine"])
     ordered = sorted(by_url.values(), key=lambda hit: (hit["rank"], -len(hit["engines"])))
@@ -379,6 +439,10 @@ def demo():
     assert len(merged) == 2, merged
     top = merged[0]
     assert top["rank"] == 1 and set(top["engines"]) == {"searxng", "duckduckgo"}, top
+    assert _parse_date("16 Jun 2026") == "2026-06-16"
+    assert _parse_date("May 28, 2026") == "2026-05-28"
+    assert _parse_date("07.12.2025") == "2025-12-07"
+    assert _parse_date("no date here") == ""
     sample = '<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fok.com">Hit</a>' \
              '<a class="result__snippet" href="#">snip</a>'
     assert _parse_duckduckgo_html(sample)[0]["url"] == "https://ok.com", "ddg html decode failed"

@@ -34,7 +34,7 @@ _DOCUMENT_TOKENS = (
 TOOL_SCHEMAS = [
     {
         "name": "quick_web_search",
-        "description": "Search the web and rank snippets without fetching pages.",
+        "description": "Load the knowledge-based-search skill, then search the web and rank snippets without fetching pages.",
         "inputSchema": {
             "type": "object",
             "required": ["query"],
@@ -46,7 +46,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "web_search",
-        "description": "Search, fetch pages, rank chunks, and return a short sourced summary.",
+        "description": "Load the knowledge-based-search skill, then search, fetch pages, rank chunks, and return a short sourced summary.",
         "inputSchema": {
             "type": "object",
             "required": ["query"],
@@ -58,7 +58,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "get_content",
-        "description": "Fetch cleaned page content by result id or URL.",
+        "description": "Load the knowledge-based-search skill, then fetch cleaned page content by result id or URL.",
         "inputSchema": {
             "type": "object",
             "required": ["ref"],
@@ -67,7 +67,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "deep_research",
-        "description": "Expensive web search loop. True multi-step reasoning is the calling agent job.",
+        "description": "Load the knowledge-based-search skill, then run an expensive web search loop. True multi-step reasoning is the calling agent job.",
         "inputSchema": {
             "type": "object",
             "required": ["query"],
@@ -197,7 +197,9 @@ def _read_config(value):
 
 
 def _brief_result(hit):
-    return {key: hit.get(key, "") for key in ("title", "url", "snippet", "engine")}
+    result = {key: hit.get(key, "") for key in ("title", "url", "snippet", "engine", "date")}
+    result["relevance"] = hit.get("relevance", 0.0)
+    return result
 
 
 def _citation(hit):
@@ -207,6 +209,7 @@ def _citation(hit):
         "snippet": hit.get("snippet", ""),
         "source": hit.get("engine", ""),
         "date": hit.get("date", ""),
+        "relevance": hit.get("relevance", 0.0),
     }
 
 

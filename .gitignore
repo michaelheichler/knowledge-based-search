@@ -13,3 +13,4 @@ __pycache__/
 # AI assistant artifacts
 session-log.md
 state.md
+context-snapshot.json

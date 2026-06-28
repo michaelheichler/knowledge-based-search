@@ -79,6 +79,7 @@ class EngineTests(unittest.TestCase):
                     "snippet": "Alpha snippet",
                     "engine": "google",
                     "rank": 1,
+                    "date": "",
                 }
             ],
         )
@@ -211,6 +212,38 @@ class EngineTests(unittest.TestCase):
             engines.mojeek = original_mojeek
 
         self.assertEqual({hit["engine"] for hit in hits}, {"google", "bing", "startpage", "mojeek"})
+
+    def test_parse_date_formats(self):
+        self.assertEqual(engines._parse_date("16 Jun 2026"), "2026-06-16")
+        self.assertEqual(engines._parse_date("7 Dec 2025"), "2025-12-07")
+        self.assertEqual(engines._parse_date("May 28 2026"), "2026-05-28")
+        self.assertEqual(engines._parse_date("May 28, 2026"), "2026-05-28")
+        self.assertEqual(engines._parse_date("07.12.2025"), "2025-12-07")
+        self.assertEqual(engines._parse_date("2026-05-28"), "2026-05-28")
+        self.assertEqual(engines._parse_date("no date here"), "")
+
+    def test_parse_date_rejects_impossible_dates(self):
+        self.assertEqual(engines._parse_date("31 Feb 2026 then 7 Dec 2025"), "2025-12-07")
+
+    def test_date_order_newest_first_excludes_undated(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "server"))
+        import rag
+
+        results = [
+            {"date": "2025-12-07"},
+            {"date": ""},
+            {"date": "2026-06-16"},
+        ]
+
+        self.assertEqual(rag._date_order(results), [2, 0])
+
+    def test_merge_fills_empty_date_from_duplicate(self):
+        primary = [engines.result("A", "https://example.com/a", "no date", "searxng", 1)]
+        secondary = [engines.result("A2", "https://example.com/a/", "16 Jun 2026", "duckduckgo", 2)]
+
+        merged = engines.merge([primary, secondary])
+
+        self.assertEqual(merged[0]["date"], "2026-06-16")
 
 
 if __name__ == "__main__":

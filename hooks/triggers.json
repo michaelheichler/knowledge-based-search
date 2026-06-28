@@ -1,7 +1,7 @@
 {
   "_purpose": "Shared trigger vocabulary read by the UserPromptSubmit hook and referenced by the skill. One source of truth so a cue added here is not missed by either reader.",
   "method": {
-    "text": "Search method reminder. Use operators to aim the query. site: limits to a domain, filetype: to a format, intitle: and intext: place the term, quotes force an exact phrase, OR widens the net. The engines return different results, so a thin or off-target result means reformulate and run again, not stop. Cross-check a claim against two independent sources before you trust it, and check each source date. The note references/exposingtheinvisible/google-dorking.md has the full operator set.",
+    "text": "Search method reminder. Keep the knowledge-based-search skill loaded while searching. Use operators to aim the query. site: limits to a domain, filetype: to a format, intitle: and intext: place the term, quotes force an exact phrase, OR widens the net. The engines return different results, so a thin or off-target result means reformulate and run again, not stop. Cross-check a claim against two independent sources before you trust it, and check each source date. The note references/exposingtheinvisible/google-dorking.md has the full operator set.",
     "reason": "injected after each search tool call"
   },
   "categories": {

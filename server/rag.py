@@ -60,19 +60,21 @@ def rerank(query, docs, sock_path=None, ref_dir=None, host_argv=None, env=None):
 
 def rank(query, results):
     docs = [_doc_text(result) for result in results]
-    orders = [_bm25_order(query, docs)]
+    alignment_orders = [_bm25_order(query, docs)]
     vectors = embed([query] + docs)
     if vectors is not None:
         with contextlib.suppress(Exception):
-            orders.append(_dense_order(vectors))
+            alignment_orders.append(_dense_order(vectors))
     reranked = rerank(query, docs)
     if reranked is not None:
         rerank_order = []
         for row in reranked:
             with contextlib.suppress(Exception):
                 rerank_order.append(int(row["index"]))
-        orders.append(rerank_order)
-    return _by_order(results, _rrf(orders))
+        alignment_orders.append(rerank_order)
+    relevance_scores = dict(_rrf(alignment_orders))
+    ordered_scores = _rrf(alignment_orders + [_date_order(results)])
+    return _by_order(results, ordered_scores, relevance_scores)
 
 
 def _request_host(msg, sock_path, ref_dir, host_argv, env):
@@ -208,6 +210,12 @@ def _dense_order(vectors):
     return [index for index, score in scores]
 
 
+def _date_order(results):
+    dated = [(str(result.get("date", "")), index) for index, result in enumerate(results) if isinstance(result, dict) and result.get("date")]
+    dated.sort(key=lambda item: item[0], reverse=True)
+    return [index for date, index in dated]
+
+
 def _cosine(left, right):
     left_norm = float(np.linalg.norm(left))
     right_norm = float(np.linalg.norm(right))
@@ -221,8 +229,16 @@ def _rrf(rankings):
     for ranking in rankings:
         for position, index in enumerate(ranking):
             scores[index] = scores.get(index, 0.0) + 1.0 / (_RRF_K + position + 1)
-    return sorted(scores, key=lambda index: (-scores[index], index))
+    return sorted(scores.items(), key=lambda item: (-item[1], item[0]))
 
 
-def _by_order(results, order):
-    return [results[index] for index in order if 0 <= index < len(results)]
+def _by_order(results, ordered_scores, relevance_scores):
+    max_score = max(relevance_scores.values(), default=0.0)
+    ranked = []
+    for index, score in ordered_scores:
+        if 0 <= index < len(results):
+            result = results[index]
+            if isinstance(result, dict):
+                result["relevance"] = round(relevance_scores.get(index, 0.0) / max_score, 2) if max_score else 0.0
+            ranked.append(result)
+    return ranked

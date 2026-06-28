@@ -40,6 +40,7 @@ def test_rank_fuses_embed_rerank_and_bm25(monkeypatch):
     ranked = rag.rank("alpha", results)
 
     assert ranked == [results[2], results[0], results[1]]
+    assert max(result["relevance"] for result in ranked) == 1.0
     assert ("embed", ["alpha", "alpha one", "beta two", "gamma three"]) in calls
     assert ("rerank", "alpha", ["alpha one", "beta two", "gamma three"]) in calls
     assert any(call[0] == "index" for call in calls)
@@ -95,3 +96,66 @@ def test_rank_uses_rerank_when_embed_fails(monkeypatch):
     ranked = rag.rank("alpha", results)
 
     assert ranked == [results[0], results[2], results[1]]
+
+
+def test_rank_bm25_only_scores_dated_results(monkeypatch):
+    results = [
+        {"title": "alpha", "snippet": "one", "date": "2025-01-01"},
+        {"title": "beta", "snippet": "two", "date": ""},
+        {"title": "gamma", "snippet": "three", "date": "2026-01-01"},
+    ]
+
+    class FakeResponse:
+        documents = [[1, 0, 2]]
+
+    class FakeBM25:
+        def index(self, tokens, show_progress=False):
+            return None
+
+        def retrieve(self, query_tokens, k, show_progress=False):
+            return FakeResponse()
+
+    monkeypatch.setattr(rag, "embed", lambda texts, **kwargs: None)
+    monkeypatch.setattr(rag, "rerank", lambda query, docs, **kwargs: None)
+    monkeypatch.setattr(rag, "bm25s", types.SimpleNamespace(BM25=FakeBM25, tokenize=lambda value, show_progress=False: value))
+
+    ranked = rag.rank("beta", results)
+
+    assert ranked == [results[2], results[0], results[1]]
+    assert ranked[0]["date"] == "2026-01-01"
+    assert max(result["relevance"] for result in ranked) == 1.0
+    assert all("relevance" in result for result in ranked)
+
+
+def test_rank_relevance_scores_ignore_dates(monkeypatch):
+    dated_results = [
+        {"title": "alpha", "snippet": "one", "date": "2025-01-01"},
+        {"title": "beta", "snippet": "two", "date": "2026-01-01"},
+        {"title": "gamma", "snippet": "three", "date": "2024-01-01"},
+    ]
+    undated_results = [
+        {"title": result["title"], "snippet": result["snippet"]}
+        for result in dated_results
+    ]
+
+    class FakeResponse:
+        documents = [[0, 1, 2]]
+
+    class FakeBM25:
+        def index(self, tokens, show_progress=False):
+            return None
+
+        def retrieve(self, query_tokens, k, show_progress=False):
+            return FakeResponse()
+
+    monkeypatch.setattr(rag, "embed", lambda texts, **kwargs: None)
+    monkeypatch.setattr(rag, "rerank", lambda query, docs, **kwargs: None)
+    monkeypatch.setattr(rag, "bm25s", types.SimpleNamespace(BM25=FakeBM25, tokenize=lambda value, show_progress=False: value))
+
+    dated_ranked = rag.rank("alpha", dated_results)
+    undated_ranked = rag.rank("alpha", undated_results)
+
+    dated_relevance = {result["title"]: result["relevance"] for result in dated_ranked}
+    undated_relevance = {result["title"]: result["relevance"] for result in undated_ranked}
+
+    assert dated_relevance == undated_relevance
