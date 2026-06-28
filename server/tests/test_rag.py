@@ -95,36 +95,42 @@ def test_rank_uses_rerank_when_embed_fails(monkeypatch):
 
     ranked = rag.rank("alpha", results)
 
-    assert ranked == [results[0], results[2], results[1]]
+    assert ranked == [results[0], results[1], results[2]]
 
 
-def test_rank_bm25_only_scores_dated_results(monkeypatch):
+def test_rank_equal_relevance_uses_newer_date(monkeypatch):
     results = [
-        {"title": "alpha", "snippet": "one", "date": "2025-01-01"},
-        {"title": "beta", "snippet": "two", "date": ""},
-        {"title": "gamma", "snippet": "three", "date": "2026-01-01"},
+        {"title": "older", "snippet": "one", "date": "2025-01-01"},
+        {"title": "newer", "snippet": "two", "date": "2026-01-01"},
+        {"title": "lower", "snippet": "three", "date": "2027-01-01"},
     ]
 
-    class FakeResponse:
-        documents = [[1, 0, 2]]
-
-    class FakeBM25:
-        def index(self, tokens, show_progress=False):
-            return None
-
-        def retrieve(self, query_tokens, k, show_progress=False):
-            return FakeResponse()
-
+    monkeypatch.setattr(rag, "_bm25_order", lambda query, docs: [0, 1, 2])
+    monkeypatch.setattr(rag, "_rrf", lambda orders: [(0, 1.0), (1, 1.0), (2, 0.5)])
     monkeypatch.setattr(rag, "embed", lambda texts, **kwargs: None)
     monkeypatch.setattr(rag, "rerank", lambda query, docs, **kwargs: None)
-    monkeypatch.setattr(rag, "bm25s", types.SimpleNamespace(BM25=FakeBM25, tokenize=lambda value, show_progress=False: value))
 
     ranked = rag.rank("beta", results)
 
-    assert ranked == [results[2], results[0], results[1]]
-    assert ranked[0]["date"] == "2026-01-01"
-    assert max(result["relevance"] for result in ranked) == 1.0
-    assert all("relevance" in result for result in ranked)
+    assert ranked == [results[1], results[0], results[2]]
+    assert ranked[0]["relevance"] == ranked[1]["relevance"]
+
+
+def test_rank_higher_relevance_undated_beats_lower_recent(monkeypatch):
+    results = [
+        {"title": "strong", "snippet": "one"},
+        {"title": "recent", "snippet": "two", "date": "2026-01-01"},
+    ]
+
+    monkeypatch.setattr(rag, "_bm25_order", lambda query, docs: [0, 1])
+    monkeypatch.setattr(rag, "_rrf", lambda orders: [(0, 1.0), (1, 0.5)])
+    monkeypatch.setattr(rag, "embed", lambda texts, **kwargs: None)
+    monkeypatch.setattr(rag, "rerank", lambda query, docs, **kwargs: None)
+
+    ranked = rag.rank("beta", results)
+
+    assert ranked == [results[0], results[1]]
+    assert ranked[0]["relevance"] > ranked[1]["relevance"]
 
 
 def test_rank_relevance_scores_ignore_dates(monkeypatch):

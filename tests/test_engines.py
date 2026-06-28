@@ -225,7 +225,7 @@ class EngineTests(unittest.TestCase):
     def test_parse_date_rejects_impossible_dates(self):
         self.assertEqual(engines._parse_date("31 Feb 2026 then 7 Dec 2025"), "2025-12-07")
 
-    def test_date_order_newest_first_excludes_undated(self):
+    def test_date_key_sorts_recent_before_old_and_undated(self):
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "server"))
         import rag
 
@@ -235,7 +235,7 @@ class EngineTests(unittest.TestCase):
             {"date": "2026-06-16"},
         ]
 
-        self.assertEqual(rag._date_order(results), [2, 0])
+        self.assertEqual([rag._date_key(result) for result in results], [-20251207, 1, -20260616])
 
     def test_merge_fills_empty_date_from_duplicate(self):
         primary = [engines.result("A", "https://example.com/a", "no date", "searxng", 1)]

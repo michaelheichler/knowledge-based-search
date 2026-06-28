@@ -73,8 +73,7 @@ def rank(query, results):
                 rerank_order.append(int(row["index"]))
         alignment_orders.append(rerank_order)
     relevance_scores = dict(_rrf(alignment_orders))
-    ordered_scores = _rrf(alignment_orders + [_date_order(results)])
-    return _by_order(results, ordered_scores, relevance_scores)
+    return _by_order(results, relevance_scores)
 
 
 def _request_host(msg, sock_path, ref_dir, host_argv, env):
@@ -210,10 +209,10 @@ def _dense_order(vectors):
     return [index for index, score in scores]
 
 
-def _date_order(results):
-    dated = [(str(result.get("date", "")), index) for index, result in enumerate(results) if isinstance(result, dict) and result.get("date")]
-    dated.sort(key=lambda item: item[0], reverse=True)
-    return [index for date, index in dated]
+def _date_key(result):
+    date = result.get("date", "") if isinstance(result, dict) else ""
+    digits = date.replace("-", "")
+    return -int(digits) if digits.isdigit() else 1
 
 
 def _cosine(left, right):
@@ -232,13 +231,14 @@ def _rrf(rankings):
     return sorted(scores.items(), key=lambda item: (-item[1], item[0]))
 
 
-def _by_order(results, ordered_scores, relevance_scores):
+def _by_order(results, relevance_scores):
     max_score = max(relevance_scores.values(), default=0.0)
     ranked = []
-    for index, score in ordered_scores:
-        if 0 <= index < len(results):
-            result = results[index]
-            if isinstance(result, dict):
-                result["relevance"] = round(relevance_scores.get(index, 0.0) / max_score, 2) if max_score else 0.0
-            ranked.append(result)
-    return ranked
+    for index, result in enumerate(results):
+        score = relevance_scores.get(index, 0.0)
+        relevance = round(score / max_score, 2) if max_score else 0.0
+        if isinstance(result, dict):
+            result["relevance"] = relevance
+        ranked.append((relevance, _date_key(result), index, result))
+    ranked.sort(key=lambda item: (-item[0], item[1], item[2]))
+    return [item[3] for item in ranked]
