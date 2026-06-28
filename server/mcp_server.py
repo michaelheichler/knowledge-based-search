@@ -12,6 +12,7 @@ from fetch import fetch_clean
 
 DEFAULT_CONFIG = {"searxng_url": "https://endianness.de", "duckduckgo": True}
 RESULT_URLS = {}
+CONTEXT_MEMORY = {}
 _SUMMARY_MAX_WORDS = 1000
 _SUMMARY_MIN_WORDS = 500
 _DOCUMENT_TOKENS = (
@@ -74,6 +75,21 @@ TOOL_SCHEMAS = [
             "properties": {
                 "query": {"type": "string"},
                 "max_rounds": {"type": "integer", "default": 3, "minimum": 1, "maximum": 6},
+            },
+        },
+    },
+    {
+        "name": "deep_context_aware_search",
+        "description": "Load the knowledge-based-search skill, then search with context-aware ranking and session memory. Returns up to per_engine results per engine.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["query"],
+            "properties": {
+                "query": {"type": "string"},
+                "context": {"type": "string", "default": ""},
+                "max_rounds": {"type": "integer", "default": 3, "minimum": 1, "maximum": 6},
+                "per_engine": {"type": "integer", "default": 20, "minimum": 1, "maximum": 20},
+                "fetch_top_k": {"type": "integer", "default": 5, "minimum": 0, "maximum": 20},
             },
         },
     },
@@ -147,6 +163,95 @@ def deep_research(query: str, max_rounds: int = 3) -> dict:
     return {"summary": _cap_chars(summary, 700), "sections": sections, "citations": citations}
 
 
+
+def deep_context_aware_search(query: str, context: str = "", max_rounds: int = 3, per_engine: int = 20, fetch_top_k: int = 5) -> dict:
+    max_rounds = max(1, min(6, int(max_rounds)))
+    per_engine = max(1, min(20, int(per_engine)))
+    fetch_top_k = max(0, min(20, int(fetch_top_k)))
+    mem = CONTEXT_MEMORY.setdefault(context.strip() or query.strip(), {"seen_urls": set(), "issued_queries": []})
+    rank_query = query if not context.strip() else (query + " " + context)
+    pool = _gather_pool(query, load_config(), per_engine, max_rounds, mem)
+    kept, already_seen_suppressed = _suppress_seen(rag.rank(rank_query, pool), mem["seen_urls"])
+    labeled = [_label(hit) for hit in kept]
+    for hit in labeled:
+        mem["seen_urls"].add(engines._norm_url(hit["url"]))
+    summary, citations, result_ids = "", [], []
+    if fetch_top_k > 0:
+        summary, citations, result_ids = _context_fetch(labeled, rank_query, fetch_top_k)
+    return {
+        "query": query,
+        "context": context,
+        "results": labeled,
+        "already_seen_suppressed": already_seen_suppressed,
+        "summary": _cap_chars(summary, 1800),
+        "citations": citations,
+        "result_ids": result_ids,
+    }
+
+
+def _merge_pool(pool, new_hits):
+    seen = {engines._norm_url(hit["url"]) for hit in pool}
+    for hit in new_hits:
+        key = engines._norm_url(hit["url"])
+        if key not in seen:
+            pool.append(hit)
+            seen.add(key)
+    return pool
+
+
+def _gather_pool(query, config, per_engine, max_rounds, mem):
+    pool = engines.search(query, config, k=per_engine, cap=per_engine * 6)
+    if query not in mem["issued_queries"]:
+        mem["issued_queries"].append(query)
+    for sub_query in _reformulate(query, max_rounds - 1):
+        if sub_query in mem["issued_queries"]:
+            continue
+        before = {engines._norm_url(hit["url"]) for hit in pool}
+        mem["issued_queries"].append(sub_query)
+        _merge_pool(pool, engines.search(sub_query, config, k=per_engine, cap=per_engine * 6))
+        if not ({engines._norm_url(hit["url"]) for hit in pool} - before):
+            break
+    return pool
+
+
+def _suppress_seen(ranked, seen_urls, cap=60):
+    suppressed = 0
+    kept = []
+    for hit in ranked:
+        if engines._norm_url(hit["url"]) in seen_urls:
+            suppressed += 1
+            continue
+        kept.append(hit)
+        if len(kept) >= cap:
+            break
+    return kept, suppressed
+
+
+def _label(hit):
+    return {
+        "title": hit.get("title", ""),
+        "url": hit.get("url", ""),
+        "snippet": hit.get("snippet", ""),
+        "engines": hit.get("engines") or [hit.get("engine", "")],
+        "relevance": hit.get("relevance", 0.0),
+        "date": hit.get("date", ""),
+    }
+
+
+def _context_fetch(labeled, rank_query, fetch_top_k):
+    summary = ""
+    citations = []
+    result_ids = []
+    for hit in labeled[:fetch_top_k]:
+        url = hit.get("url", "")
+        if not url:
+            continue
+        content = _try_fetch(url, 32000)
+        citations.append({**_citation(hit), "source": (hit.get("engines") or [""])[0]})
+        result_ids.append(_store_result(url))
+        chunks = _chunks(hit, content)
+        summary += " " + _summary(rag.rank(rank_query, chunks) if chunks else [])
+    return summary.strip(), citations, result_ids
 def handle_json_rpc(request):
     req_id = request.get("id")
     try:
@@ -276,10 +381,8 @@ def _host(url):
 
 def _reformulate(query, limit):
     limit = max(0, int(limit))
-    if not limit:
-        return []
     original = query.strip()
-    if not original:
+    if not limit or not original:
         return []
     candidates = []
     words = original.split()
@@ -321,6 +424,7 @@ def _call_tool(name, arguments):
         "web_search": web_search,
         "get_content": get_content,
         "deep_research": deep_research,
+        "deep_context_aware_search": deep_context_aware_search,
     }
     if name not in tools:
         raise ValueError("Unknown tool")
@@ -340,6 +444,7 @@ def _run_sdk():
     server.tool(description=descriptions["web_search"])(web_search)
     server.tool(description=descriptions["get_content"])(get_content)
     server.tool(description=descriptions["deep_research"])(deep_research)
+    server.tool(description=descriptions["deep_context_aware_search"])(deep_context_aware_search)
     server.run()
     return None
 

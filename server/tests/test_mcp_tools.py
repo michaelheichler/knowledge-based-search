@@ -204,6 +204,7 @@ def test_protocol_tools_list_and_call(stubs):
         "web_search",
         "get_content",
         "deep_research",
+        "deep_context_aware_search",
     ]
     payload = json.loads(called["result"]["content"][0]["text"])
     assert payload["results"][0]["url"] == "https://example.com/a"
