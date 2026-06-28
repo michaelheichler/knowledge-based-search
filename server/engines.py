@@ -405,7 +405,7 @@ def merge(result_lists, cap=20):
     return ordered[:cap]
 
 
-def search(query, config, k=10, cap=20):
+def _build_tasks(query, config, k):
     tasks = {}
     if config.get("searxng_url"):
         tasks["searxng"] = lambda: searxng(query, config["searxng_url"], k)
@@ -419,55 +419,60 @@ def search(query, config, k=10, cap=20):
         tasks["startpage"] = lambda: startpage(query, k=k)
     if config.get("mojeek", True):
         tasks["mojeek"] = lambda: mojeek(query, k=k)
+    return tasks
+
+
+def search(query, config, k=10, cap=20):
+    tasks = _build_tasks(query, config, k)
     if not tasks:
         return []
     lists = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(tasks))) as pool:
         futures = {pool.submit(fn): name for name, fn in tasks.items()}
-        for future in concurrent.futures.as_completed(futures, timeout=_TIMEOUT + 2):
-            try:
-                lists.append(future.result())
-            except Exception:
-                lists.append([])
+        try:
+            for future in concurrent.futures.as_completed(futures, timeout=_TIMEOUT + 2):
+                try:
+                    lists.append(future.result())
+                except Exception:
+                    lists.append([])
+        except concurrent.futures.TimeoutError:
+            lists.extend(future.result() for future in futures if future.done() and not future.exception())
     return merge(lists, cap)
 
 
-def demo():
+def _demo_merge_and_dates():
     primary = [result("A", "https://x.com/p", "sa", "searxng", 1), result("B", "https://y.com", "sb", "searxng", 2)]
     secondary = [result("A2", "https://X.com/p/", "sb2", "duckduckgo", 3)]
     merged = merge([primary, secondary])
     assert len(merged) == 2, merged
-    top = merged[0]
-    assert top["rank"] == 1 and set(top["engines"]) == {"searxng", "duckduckgo"}, top
+    assert merged[0]["rank"] == 1 and set(merged[0]["engines"]) == {"searxng", "duckduckgo"}, merged[0]
     assert _parse_date("16 Jun 2026") == "2026-06-16"
     assert _parse_date("May 28, 2026") == "2026-05-28"
     assert _parse_date("07.12.2025") == "2025-12-07"
     assert _parse_date("no date here") == ""
-    sample = '<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fok.com">Hit</a>' \
-             '<a class="result__snippet" href="#">snip</a>'
+
+
+def _demo_parsers():
+    sample = '<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fok.com">Hit</a><a class="result__snippet" href="#">snip</a>'
     assert _parse_duckduckgo_html(sample)[0]["url"] == "https://ok.com", "ddg html decode failed"
-    lite = (
-        '<table><tr><td><a href="https://lite.duckduckgo.com/lite/">DuckDuckGo</a></td></tr>'
-        '<tr><td><a href="//duckduckgo.com/l/?uddg=https%3A%2F%2Flite.com">Lite</a></td></tr>'
-        '<tr><td class="result-snippet">lite <b>snip</b></td></tr></table>'
-    )
+    lite = '<table><tr><td><a href="https://lite.duckduckgo.com/lite/">DuckDuckGo</a></td></tr><tr><td><a href="//duckduckgo.com/l/?uddg=https%3A%2F%2Flite.com">Lite</a></td></tr><tr><td class="result-snippet">lite <b>snip</b></td></tr></table>'
     lite_hits = _parse_duckduckgo_lite(lite)
     assert len(lite_hits) == 1 and lite_hits[0]["snippet"] == "lite snip", "ddg lite parse failed"
     google_html = '<a href="/url?q=https%3A%2F%2Fg.com&sa=U"><h3>G</h3></a><div class="VwiC3b">gs</div>'
     assert _parse_google_html(google_html)[0]["url"] == "https://g.com", "google html parse failed"
-    google_json = '{"items":[{"title":"GJ","link":"https://gj.com","snippet":"gjs"}]}'
-    assert _parse_google_json(google_json)[0]["title"] == "GJ", "google json parse failed"
+    assert _parse_google_json('{"items":[{"title":"GJ","link":"https://gj.com","snippet":"gjs"}]}')[0]["title"] == "GJ", "google json parse failed"
     bing_html = '<li class="b_algo"><h2><a href="https://b.com">B</a></h2><div class="b_caption"><p>bs</p></div></li>'
     assert _parse_bing_html(bing_html)[0]["snippet"] == "bs", "bing parse failed"
-    startpage_html = (
-        '<style><a class="w-gl__result-title" href="https://bad.example">Bad</a></style>'
-        '<a class="w-gl__result-title" href="/sp/result?url=https%3A%2F%2Fs.com">.sx{color:red}S</a>'
-        '<p class="w-gl__description">ss</p>'
-    )
+    startpage_html = '<style><a class="w-gl__result-title" href="https://bad.example">Bad</a></style><a class="w-gl__result-title" href="/sp/result?url=https%3A%2F%2Fs.com">.sx{color:red}S</a><p class="w-gl__description">ss</p>'
     startpage_hits = _parse_startpage_html(startpage_html)
     assert len(startpage_hits) == 1 and startpage_hits[0]["title"] == "S", "startpage parse failed"
     mojeek_html = '<h2><a href="https://m.com">M</a></h2><p class="s">ms</p><a href="https://crumb.com">crumb</a>'
     assert _parse_mojeek_html(mojeek_html)[0]["url"] == "https://m.com", "mojeek parse failed"
+
+
+def demo():
+    _demo_merge_and_dates()
+    _demo_parsers()
     print("demo ok")
 
 

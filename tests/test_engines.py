@@ -246,5 +246,24 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(merged[0]["date"], "2026-06-16")
 
 
+class SearchResilienceTests(unittest.TestCase):
+    def test_search_survives_as_completed_timeout(self):
+        from unittest import mock
+
+        config = {"searxng_url": "x", "duckduckgo": False, "google": False, "bing": False, "startpage": False, "mojeek": False}
+        real = engines.concurrent.futures.as_completed
+
+        def flaky(futures, timeout=None):
+            for future in real(futures):
+                yield future
+            raise engines.concurrent.futures.TimeoutError("simulated")
+
+        with mock.patch.object(engines, "searxng", lambda *a, **k: [engines.result("A", "https://a.com", "s", "searxng", 1)]):
+            with mock.patch.object(engines.concurrent.futures, "as_completed", flaky):
+                hits = engines.search("q", config)
+
+        self.assertTrue(any(hit["url"] == "https://a.com" for hit in hits))
+
+
 if __name__ == "__main__":
     unittest.main()
