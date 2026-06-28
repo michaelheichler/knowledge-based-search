@@ -1,0 +1,31 @@
+benchmark/quality/test_score.py
+  s_2f9574dd52a3bd::t_f8e37cec755bb4 63-79
+  s_2f9574dd52a3bd::t_533e726d995fa1 1-49
+  s_2f9574dd52a3bd::t_194821200cbabc 50-62,80-87
+benchmark/quality/run_variants.py
+  s_2f9574dd52a3bd::t_838eab1eed824f 1,3-5,7-12,15-22,70,73-100,102-103,106-113,115-117,119-126
+  s_2f9574dd52a3bd::t_5fa41499897d22 2,6,13-14,23-38,40-41,52-56,58-60,62-69,71-72,101,104-105,114,118
+  s_2f9574dd52a3bd::t_1b6e787426ef18 39,42-51,57,61
+benchmark/quality/score.py
+  s_2f9574dd52a3bd::t_82707165c1dc15 1-100
+benchmark/quality/queries.json
+  s_2f9574dd52a3bd::t_b2ef228a58a802 1-49
+.gitignore
+  s_2f9574dd52a3bd::t_0f0da814c70c61 17-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "52031e2fbd26dc6600d41ec168b7c22b8b1cd9d5",
+  "prompts": {},
+  "sessions": {
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
