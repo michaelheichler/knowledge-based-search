@@ -1,0 +1,23 @@
+server/engines.py
+  s_2f9574dd52a3bd::t_9bd1d3822715bb 81-85,97,102-110
+  s_2f9574dd52a3bd::t_b4c4388f3cc8e4 88-89,101,113,129,133,138,142,152,161,174,183,192,215,237,246,262,271,296,316,328,333,355,372,389,402,408,426,443,461,473,491
+  s_2f9574dd52a3bd::t_ec79df423d3907 111-112
+tests/test_engines.py
+  s_2f9574dd52a3bd::t_cf377bf248d1e6 249-273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "c4bbc03900bb4052c396c73a3beafb9058d04a9f",
+  "prompts": {},
+  "sessions": {
+    "s_2f9574dd52a3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64681d58-9a08-4eee-bb6a-5b3578b57e15",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
