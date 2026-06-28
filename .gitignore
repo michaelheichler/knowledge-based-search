@@ -14,3 +14,5 @@ __pycache__/
 session-log.md
 state.md
 context-snapshot.json
+benchmark/quality/cache/
+benchmark/quality/runs/

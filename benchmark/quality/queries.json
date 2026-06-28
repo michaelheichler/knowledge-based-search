@@ -1,0 +1,49 @@
+{
+  "_purpose": "Quality suite for the optimize loop. 40 queries, 8 per category. gold_candidate marks queries whose correct answer is objectively checkable and must be verified by a real search before scoring, never invented.",
+  "queries": [
+    {"id": "osint-1", "category": "osint", "query": "who owns the domain endianness.de and where is it hosted", "intent": "registrant and hosting provider", "gold_candidate": true},
+    {"id": "osint-2", "category": "osint", "query": "original author of the npm package left-pad and their github account", "intent": "person behind a package", "gold_candidate": true},
+    {"id": "osint-3", "category": "osint", "query": "which company operates Mullvad VPN and in which country is it registered", "intent": "company and jurisdiction", "gold_candidate": true},
+    {"id": "osint-4", "category": "osint", "query": "parent company of DuckDuckGo and its US incorporation state", "intent": "corporate parent", "gold_candidate": true},
+    {"id": "osint-5", "category": "osint", "query": "whois creation date of anthropic.com", "intent": "domain registration date", "gold_candidate": true},
+    {"id": "osint-6", "category": "osint", "query": "who maintains the Python requests library and their public profile", "intent": "public maintainer identity", "gold_candidate": true},
+    {"id": "osint-7", "category": "osint", "query": "which organization runs the searx.be SearXNG instance", "intent": "operator of a service", "gold_candidate": false},
+    {"id": "osint-8", "category": "osint", "query": "registrant and host of the kit.exposingtheinvisible.org website", "intent": "site ownership and infrastructure", "gold_candidate": false},
+
+    {"id": "factcheck-1", "category": "factcheck", "query": "did Microsoft retire the Bing Search API in 2025 and on what date", "intent": "confirm a retirement date", "gold_candidate": true},
+    {"id": "factcheck-2", "category": "factcheck", "query": "did Brave Search remove its free API tier in 2026", "intent": "confirm a pricing change", "gold_candidate": true},
+    {"id": "factcheck-3", "category": "factcheck", "query": "did Python 3.13 ship an official free-threaded no-GIL build", "intent": "confirm a feature claim", "gold_candidate": true},
+    {"id": "factcheck-4", "category": "factcheck", "query": "confirm the release date of Claude Opus 4.8", "intent": "confirm a release date", "gold_candidate": true},
+    {"id": "factcheck-5", "category": "factcheck", "query": "is the claim that Rust stabilized async await in 2019 correct", "intent": "verify a historical claim", "gold_candidate": true},
+    {"id": "factcheck-6", "category": "factcheck", "query": "when did the EU AI Act enter into force", "intent": "verify a legal date", "gold_candidate": true},
+    {"id": "factcheck-7", "category": "factcheck", "query": "did OpenAI report a net loss above 20 billion dollars for 2025", "intent": "verify a financial figure", "gold_candidate": true},
+    {"id": "factcheck-8", "category": "factcheck", "query": "license of the jina-reranker-v3 model weights", "intent": "verify a license", "gold_candidate": true},
+
+    {"id": "recency-1", "category": "recency", "query": "latest stable Node.js version", "intent": "current version", "gold_candidate": true},
+    {"id": "recency-2", "category": "recency", "query": "current Claude Opus 4.8 price per million input tokens", "intent": "current price", "gold_candidate": true},
+    {"id": "recency-3", "category": "recency", "query": "latest released version of the tokio crate", "intent": "current version", "gold_candidate": true},
+    {"id": "recency-4", "category": "recency", "query": "latest stable PostgreSQL release", "intent": "current version", "gold_candidate": true},
+    {"id": "recency-5", "category": "recency", "query": "newest jina embeddings model and its dimension count", "intent": "current model", "gold_candidate": true},
+    {"id": "recency-6", "category": "recency", "query": "most recent OpenSSL security advisory in 2026", "intent": "recent CVE", "gold_candidate": false},
+    {"id": "recency-7", "category": "recency", "query": "latest Claude Code feature announced in 2026", "intent": "recent release", "gold_candidate": false},
+    {"id": "recency-8", "category": "recency", "query": "current latest version of the FastMCP python package", "intent": "current version", "gold_candidate": true},
+
+    {"id": "research-1", "category": "research", "query": "compare tokio async-std and smol for a high throughput network service", "intent": "tradeoff comparison", "gold_candidate": false},
+    {"id": "research-2", "category": "research", "query": "keyless self-hosted web search options in 2026", "intent": "landscape survey", "gold_candidate": false},
+    {"id": "research-3", "category": "research", "query": "jina-reranker-v3 versus bge-reranker retrieval quality", "intent": "model comparison", "gold_candidate": false},
+    {"id": "research-4", "category": "research", "query": "reciprocal rank fusion versus learned fusion tradeoffs", "intent": "method comparison", "gold_candidate": false},
+    {"id": "research-5", "category": "research", "query": "DuckDuckGo Startpage and Mojeek as keyless result sources compared", "intent": "source comparison", "gold_candidate": false},
+    {"id": "research-6", "category": "research", "query": "best local embedding models under 1B parameters for retrieval in 2026", "intent": "model survey", "gold_candidate": false},
+    {"id": "research-7", "category": "research", "query": "SQLite versus DuckDB for single machine analytics", "intent": "tool comparison", "gold_candidate": false},
+    {"id": "research-8", "category": "research", "query": "bm25s versus rank-bm25 speed and accuracy", "intent": "library comparison", "gold_candidate": false},
+
+    {"id": "dorking-1", "category": "dorking", "query": "openai.com annual or financial report pdf", "intent": "site plus filetype targeting", "gold_candidate": false},
+    {"id": "dorking-2", "category": "dorking", "query": "asyncio documentation on python.org", "intent": "site plus intitle targeting", "gold_candidate": false},
+    {"id": "dorking-3", "category": "dorking", "query": "reciprocal rank fusion research paper pdf", "intent": "filetype targeting", "gold_candidate": false},
+    {"id": "dorking-4", "category": "dorking", "query": "reddit discussions on keyless search APIs from 2026", "intent": "site plus recency targeting", "gold_candidate": false},
+    {"id": "dorking-5", "category": "dorking", "query": "pages comparing jina and cohere rerankers", "intent": "intitle or intext targeting", "gold_candidate": false},
+    {"id": "dorking-6", "category": "dorking", "query": "the exact phrase knowledge based search mcp on github", "intent": "exact phrase plus site", "gold_candidate": false},
+    {"id": "dorking-7", "category": "dorking", "query": "how to detect publicly exposed env files using search dorking, defensive guidance", "intent": "technique research, defensive", "gold_candidate": false},
+    {"id": "dorking-8", "category": "dorking", "query": "tokio rs tutorial pages on the official site", "intent": "site targeting", "gold_candidate": false}
+  ]
+}
