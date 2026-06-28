@@ -1,3 +1,4 @@
+import codecs
 import re
 import urllib.parse
 import urllib.request
@@ -94,6 +95,18 @@ def _clean_text(text):
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+def _charset(content_type):
+    match = re.search(r"charset\s*=\s*['\"]?([^;'\"\s]+)", content_type or "", re.I)
+    if not match:
+        return "utf-8"
+    charset = match.group(1)
+    try:
+        codecs.lookup(charset)
+    except LookupError:
+        return "utf-8"
+    return charset
+
+
 def fetch_clean(url, max_chars):
     if urllib.parse.urlsplit(url).path.lower().endswith(".pdf"):
         return ""
@@ -106,7 +119,7 @@ def fetch_clean(url, max_chars):
         body = response.read(min(max_chars * 4, 2_000_000))
         if body.startswith(b"%PDF-"):
             return ""
-        body = body.decode("utf-8", "replace")
+        body = body.decode(_charset(content_type), "replace")
     parser = _TextParser()
     parser.feed(body)
     return parser.best_text()[:max_chars]

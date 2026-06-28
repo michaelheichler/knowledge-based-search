@@ -57,6 +57,32 @@ def test_fetch_clean_prefers_article_over_page_chrome(monkeypatch):
     assert "Important list item survives too." in result
 
 
+def test_fetch_clean_uses_declared_charset(monkeypatch):
+    html = b"<html><body><main><p>caf\xe9 prices</p></main></body></html>"
+    monkeypatch.setattr(
+        fetch.urllib.request,
+        "urlopen",
+        lambda request, timeout: _Response(html, content_type="text/html; charset=iso-8859-1"),
+    )
+
+    result = fetch.fetch_clean("https://example.test/page", 1000)
+
+    assert "caf\u00e9 prices" in result
+
+
+def test_fetch_clean_falls_back_for_unknown_charset(monkeypatch):
+    html = "<html><body><main><p>caf\u00e9 prices</p></main></body></html>"
+    monkeypatch.setattr(
+        fetch.urllib.request,
+        "urlopen",
+        lambda request, timeout: _Response(html, content_type="text/html; charset=not-a-real-charset"),
+    )
+
+    result = fetch.fetch_clean("https://example.test/page", 1000)
+
+    assert "caf\u00e9 prices" in result
+
+
 def test_fetch_clean_returns_empty_for_pdf_magic_bytes(monkeypatch):
     monkeypatch.setattr(fetch.urllib.request, "urlopen", lambda request, timeout: _Response(b"%PDF-1.7\ntext"))
 
