@@ -1,5 +1,6 @@
 import contextlib
 import hashlib
+import importlib
 import importlib.util
 import json
 import os
@@ -7,8 +8,8 @@ import signal
 import socketserver
 import sys
 import threading
+import time
 
-_LOADER_DIR = "/Users/michael/dev/skills/skill-model-loader"
 _ENGLISH_MODELS = os.path.expanduser("~/.english-for-agents/models")
 _DEFAULT_SOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "kbs-rag.sock")
 _EMBED_DIR = os.environ.get(
@@ -18,12 +19,49 @@ _EMBED_DIR = os.environ.get(
 _JINA_DIR = os.environ.get("KBS_JINA_MLX_DIR", os.path.join(_ENGLISH_MODELS, "jina-reranker-v3-mlx"))
 _EMBED_TASK = os.environ.get("KBS_EMBED_TASK", "text-matching")
 _FAKE = os.environ.get("KBS_FAKE_MODEL") == "1"
+_CACHE_LIMIT_BYTES = int(
+    os.environ.get("KBS_MLX_CACHE_LIMIT_BYTES", str(512 * 1024 * 1024))
+)
+_IDLE_SECS = float(os.environ.get("KBS_RAG_IDLE_SECS", "600"))
+_IDLE_POLL_SECS = 5.0
 _model_lock = threading.Lock()
 _embedder = None
 _reranker = None
 
+
+def _set_cache_limit():
+    try:
+        import mlx.core as mx
+
+        mx.set_cache_limit(_CACHE_LIMIT_BYTES)
+    except Exception:
+        pass
+
+
+def _clear_mlx_cache():
+    try:
+        import mlx.core as mx
+
+        mx.clear_cache()
+    except Exception:
+        pass
+
+
+def _loader_dir():
+    return os.environ.get(
+        "KBS_LOADER_DIR",
+        os.path.join(
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            ),
+            "skill-model-loader",
+        ),
+    )
+
+
+_LOADER_DIR = _loader_dir()
 sys.path.insert(0, _LOADER_DIR)
-import refcount
+refcount = importlib.import_module("refcount")
 
 
 class _Handler(socketserver.StreamRequestHandler):
@@ -94,7 +132,9 @@ def _embed(texts):
     with _model_lock:
         model = _load_embedder()
         vectors = model(clean)
-        return vectors.tolist() if hasattr(vectors, "tolist") else vectors
+        result = vectors.tolist() if hasattr(vectors, "tolist") else vectors
+        _clear_mlx_cache()
+        return result
 
 
 def _rerank(query, documents):
@@ -105,7 +145,15 @@ def _rerank(query, documents):
         return []
     with _model_lock:
         raw = _load_reranker().rerank(str(query), docs)
-        return [{"index": int(row["index"]), "score": float(row.get("score", row.get("relevance_score", 0.0)))} for row in raw]
+        result = [
+            {
+                "index": int(row["index"]),
+                "score": float(row.get("score", row.get("relevance_score", 0.0))),
+            }
+            for row in raw
+        ]
+        _clear_mlx_cache()
+        return result
 
 
 def _fake_vector(text):
@@ -181,10 +229,37 @@ def _load_reranker():
     return _reranker
 
 
+def _idle_watchdog(server, ref_dir):
+    """After _IDLE_SECS with no attached client and no request in flight, clear the cache and shut down."""
+    counter = refcount.Refcount(ref_dir)
+    zero_since = None
+    while not getattr(server, "_shutting_down", False):
+        time.sleep(_IDLE_POLL_SECS)
+        if getattr(server, "_shutting_down", False):
+            return
+        if counter.live_count() != 0:
+            zero_since = None
+            continue
+        if zero_since is None:
+            zero_since = time.monotonic()
+            continue
+        if time.monotonic() - zero_since < _IDLE_SECS:
+            continue
+        if not _model_lock.acquire(blocking=False):
+            continue
+        try:
+            _clear_mlx_cache()
+        finally:
+            _model_lock.release()
+        _begin_shutdown(server)
+        return
+
+
 def _run(sock_path, ref_dir):
     with contextlib.suppress(OSError):
         os.unlink(sock_path)
     os.makedirs(os.path.dirname(sock_path), exist_ok=True)
+    _set_cache_limit()
     server = _Server(sock_path, ref_dir)
 
     def stop(sig, frame):
@@ -192,8 +267,10 @@ def _run(sock_path, ref_dir):
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    threading.Thread(target=_idle_watchdog, args=(server, ref_dir), daemon=True).start()
     server.serve_forever(poll_interval=0.2)
     server.server_close()
+    # AF_UNIX close() does not remove the bound path, so unlink it ourselves.
     with contextlib.suppress(OSError):
         os.unlink(sock_path)
 
