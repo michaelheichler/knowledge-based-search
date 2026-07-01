@@ -8,9 +8,11 @@ import rag
 
 def test_rank_fuses_embed_rerank_and_bm25(monkeypatch):
     calls = []
-    results = [{"title": "alpha", "snippet": "one"},
-               {"title": "beta", "snippet": "two"},
-               {"title": "gamma", "snippet": "three"}]
+    results = [
+        {"title": "alpha", "snippet": "one"},
+        {"title": "beta", "snippet": "two"},
+        {"title": "gamma", "snippet": "three"},
+    ]
 
     def fake_embed(texts, **kwargs):
         calls.append(("embed", texts))
@@ -18,7 +20,11 @@ def test_rank_fuses_embed_rerank_and_bm25(monkeypatch):
 
     def fake_rerank(query, docs, **kwargs):
         calls.append(("rerank", query, docs))
-        return [{"index": 2, "score": 9.0}, {"index": 0, "score": 8.0}, {"index": 1, "score": 7.0}]
+        return [
+            {"index": 2, "score": 9.0},
+            {"index": 0, "score": 8.0},
+            {"index": 1, "score": 7.0},
+        ]
 
     class FakeResponse:
         documents = [[1, 2, 0]]
@@ -32,7 +38,9 @@ def test_rank_fuses_embed_rerank_and_bm25(monkeypatch):
             calls.append(("retrieve", query_tokens, k, show_progress))
             return FakeResponse()
 
-    fake_bm25s = types.SimpleNamespace(BM25=FakeBM25, tokenize=lambda value, show_progress=False: value)
+    fake_bm25s = types.SimpleNamespace(
+        BM25=FakeBM25, tokenize=lambda value, show_progress=False: value
+    )
     monkeypatch.setattr(rag, "embed", fake_embed)
     monkeypatch.setattr(rag, "rerank", fake_rerank)
     monkeypatch.setattr(rag, "bm25s", fake_bm25s)
@@ -64,8 +72,16 @@ def test_rank_falls_back_to_bm25_only(monkeypatch):
             return FakeResponse()
 
     monkeypatch.setattr(rag, "embed", lambda texts, **kwargs: None)
-    monkeypatch.setattr(rag, "rerank", lambda query, docs, **kwargs: calls.append("rerank"))
-    monkeypatch.setattr(rag, "bm25s", types.SimpleNamespace(BM25=FakeBM25, tokenize=lambda value, show_progress=False: value))
+    monkeypatch.setattr(
+        rag, "rerank", lambda query, docs, **kwargs: calls.append("rerank")
+    )
+    monkeypatch.setattr(
+        rag,
+        "bm25s",
+        types.SimpleNamespace(
+            BM25=FakeBM25, tokenize=lambda value, show_progress=False: value
+        ),
+    )
 
     ranked = rag.rank("beta", results)
 
@@ -91,7 +107,13 @@ def test_rank_uses_rerank_when_embed_fails(monkeypatch):
 
     monkeypatch.setattr(rag, "embed", lambda texts, **kwargs: None)
     monkeypatch.setattr(rag, "rerank", fake_rerank)
-    monkeypatch.setattr(rag, "bm25s", types.SimpleNamespace(BM25=FakeBM25, tokenize=lambda value, show_progress=False: value))
+    monkeypatch.setattr(
+        rag,
+        "bm25s",
+        types.SimpleNamespace(
+            BM25=FakeBM25, tokenize=lambda value, show_progress=False: value
+        ),
+    )
 
     ranked = rag.rank("alpha", results)
 
@@ -156,12 +178,20 @@ def test_rank_relevance_scores_ignore_dates(monkeypatch):
 
     monkeypatch.setattr(rag, "embed", lambda texts, **kwargs: None)
     monkeypatch.setattr(rag, "rerank", lambda query, docs, **kwargs: None)
-    monkeypatch.setattr(rag, "bm25s", types.SimpleNamespace(BM25=FakeBM25, tokenize=lambda value, show_progress=False: value))
+    monkeypatch.setattr(
+        rag,
+        "bm25s",
+        types.SimpleNamespace(
+            BM25=FakeBM25, tokenize=lambda value, show_progress=False: value
+        ),
+    )
 
     dated_ranked = rag.rank("alpha", dated_results)
     undated_ranked = rag.rank("alpha", undated_results)
 
     dated_relevance = {result["title"]: result["relevance"] for result in dated_ranked}
-    undated_relevance = {result["title"]: result["relevance"] for result in undated_ranked}
+    undated_relevance = {
+        result["title"]: result["relevance"] for result in undated_ranked
+    }
 
     assert dated_relevance == undated_relevance

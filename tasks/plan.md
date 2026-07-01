@@ -10,7 +10,8 @@ and is testable), orders tasks by dependency, and gates each phase behind a chec
 ## Confirmed intent (from interview)
 
 - One repo at `/Users/michael/dev/skills/knowledge-based-search`.
-- Four MCP tools: `quick_web_search`, `web_search`, `deep_research`, `get_content`.
+- Five MCP tools: `quick_web_search`, `web_search`, `deep_research`,
+  `deep_context_aware_search`, `get_content`.
 - Triple-engine search, always-on merge (no fallback semantics). SearXNG primary when an
   instance address is set at install (default `https://endianness.de`), else google, duckduckgo,
   bing direct (degraded, no key, no Playwright).
@@ -31,7 +32,7 @@ and is testable), orders tasks by dependency, and gates each phase behind a chec
   em-dash or en-dash or spliced semicolon in any file.
 - Token discipline: lean JSON output, provenance fields (title, url, snippet, source, date), no
   "just in case" padding. Default `web_search` response stays near 500 to 1000 tokens.
-- Tool surface stays at four (3 to 6 is the agent sweet spot, library-confirmed).
+- Tool surface stays between 3 and 6 tools. Five is the current registered surface.
 - Stdlib first. SearXNG and DDG fetch over `urllib`/`httpx` already present, no Playwright.
 
 ## Verified facts that shape the build
@@ -52,22 +53,13 @@ and is testable), orders tasks by dependency, and gates each phase behind a chec
 
 ## Dependency graph
 
-```
-P0 scaffold
-   |
-P1 search core (engines + merge)  <--- the spine, everything ranks its output
-   |
-   +--> P2 RAG layer (model-loader embed/rerank + bm25s fusion + fallback)
-   |        |
-   |        +--> P3 MCP server + 4 tools (vertical, one tool at a time)
-   |                 |
-   |                 +--> P6 multi-target install (registers the server)
-   |                 +--> P7 tests + benchmark (defines "quick", embed on/off)
-   |
-P4 references build (sonnet workflow)   [independent of P1..P3, gated only by P0]
-   |
-P5 sidecar skill + hook  (consumes P4 references, points at P3 tools)
-```
+1. P0 scaffold comes first.
+2. P1 search core is the spine. Everything ranks its output.
+3. P2 RAG layer consumes P1 and feeds P3.
+4. P3 MCP server registers the five tools.
+5. P6 install and P7 tests depend on P3.
+6. P4 references build is independent of P1 through P3.
+7. P5 sidecar skill and hook consume P4 references and point at P3 tools.
 
 P4 is independent and can run in parallel with P1 to P3 (it is the long-running sonnet workflow).
 Kick it off early so summaries are ready when P5 needs them.
@@ -155,13 +147,13 @@ CHECKPOINT 2: a query flows search -> rag.rank -> summarize and returns a cited,
 token-bounded result, both with and without the model host. Decide here whether the reranker
 earns its place for web results (record the measurement).
 
-### P3. MCP server and the four tools
+### P3. MCP server and the five tools
 
 Build one tool at a time, each a complete vertical path (request to cited response).
 
 - **T3.1 MCP server skeleton.** A stdio MCP server registering the tool set, reading the config,
   holding the bm25 index in-process across calls.
-  - AC: server starts, lists four tools, handles a `tools/call`, shuts down on stdin EOF.
+  - AC: server starts, lists five tools, handles a `tools/call`, shuts down on stdin EOF.
   - V: stub MCP client lists tools and round-trips a no-op. Model-off.
 - **T3.2 `web_search`.** Full pipeline: merge engines, fetch top pages, chunk, embed, RAG-retrieve,
   rerank, summarize. Returns `{summary, citations:[{title,url,snippet,source,date}], result_ids}`.
@@ -187,8 +179,13 @@ Build one tool at a time, each a complete vertical path (request to cited respon
   - AC: bounded by `max_rounds`, every section cites sources present in the run, total cost logged.
   - V: integration test on a small query asserts bounded rounds, section-to-source integrity, and
     that it terminates.
+- **T3.6 `deep_context_aware_search`.** Context-aware broad search with session memory. Suppresses
+  already-seen URLs across calls for the same context and can fetch top ranked pages when requested.
+  - AC: bounded by `max_rounds`, suppresses previously seen normalized URLs, and returns labelled
+    engine provenance.
+  - V: integration test asserts repeated calls suppress already seen URLs and keep a bounded pool.
 
-CHECKPOINT 3: all four tools answer end to end against a live query with cited, bounded output.
+CHECKPOINT 3: all five tools answer end to end against a live query with cited, bounded output.
 
 ### P4. References build (sonnet workflow, runs early and parallel)
 
@@ -222,11 +219,11 @@ copies, summaries are derivative notes, record provenance).
   - AC: body under the skill length guidance, all deep knowledge behind `references/` pointers,
     description names concrete triggers (research, verify a claim, find who, OSINT, look up).
   - V: skill-creator trigger evals later. For now, a read-through confirms it routes rather than
-    inlines, and names the four tools with when-to-use-each.
+    inlines, and names the five tools with when-to-use-each.
 - **T5.2 Session-start hook.** A short start statement injected per runtime: a keyless web-search
   tool is available, prefer it over guessing, here is when to reach for each tool and how to drill
   down. Points at the skill for tradecraft.
-  - AC: statement is short (a few lines), names the four tools and the drill-down path, present for
+  - AC: statement is short (a few lines), names the five tools and the drill-down path, present for
     each runtime.
   - V: hook fires in a Claude Code session and the statement appears. Codex and Pi variants exist
     and are wired in their config.

@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 SERVER_NAME = "knowledge-based-search"
-PYTHON = "/Users/michael/dev/skills/skill-model-loader/.venv/bin/python"
+
+
+def resolve_python(repo):
+    configured = os.environ.get("KBS_PYTHON")
+    if configured:
+        return configured
+    sibling = repo.parent / "skill-model-loader" / ".venv" / "bin" / "python"
+    if sibling.exists():
+        return str(sibling)
+    raise SystemExit(
+        "Set KBS_PYTHON to the Python interpreter that can run knowledge-based-search"
+    )
 
 
 def read_json(path):
@@ -24,7 +36,7 @@ def render_snippet(path, repo):
     text = path.read_text(encoding="utf-8")
     values = {
         "__KBS_DIR__": str(repo),
-        "__KBS_PYTHON__": PYTHON,
+        "__KBS_PYTHON__": resolve_python(repo),
         "__KBS_SERVER__": str(repo / "server" / "mcp_server.py"),
     }
     for key, value in values.items():
@@ -49,6 +61,7 @@ def backup(path):
 
 
 def merge_lists(current, incoming):
+    """Incoming entries append after user entries so reruns keep stable order."""
     seen = {json.dumps(item, sort_keys=True) for item in current}
     for item in incoming:
         key = json.dumps(item, sort_keys=True)
@@ -85,7 +98,9 @@ def merge_hooks(settings, incoming_hooks):
         current_entries = hooks.get(event, [])
         if not isinstance(current_entries, list):
             current_entries = []
-        hooks[event] = [entry for entry in current_entries if not hook_entry_is_ours(entry)]
+        hooks[event] = [
+            entry for entry in current_entries if not hook_entry_is_ours(entry)
+        ]
         merge_lists(hooks[event], incoming_entries)
     return settings
 
@@ -110,9 +125,21 @@ def merge(config_path, snippet_path, repo, settings_path=None):
 def main(argv):
     home = Path.home()
     config_path = Path(argv[1]).expanduser() if len(argv) > 1 else home / ".claude.json"
-    snippet_path = Path(argv[2]).expanduser() if len(argv) > 2 else Path(__file__).with_name("claude-settings.snippet.json")
-    repo = Path(argv[3]).expanduser().resolve() if len(argv) > 3 else Path(__file__).resolve().parents[1]
-    settings_path = Path(argv[4]).expanduser() if len(argv) > 4 else home / ".claude" / "settings.json"
+    snippet_path = (
+        Path(argv[2]).expanduser()
+        if len(argv) > 2
+        else Path(__file__).with_name("claude-settings.snippet.json")
+    )
+    repo = (
+        Path(argv[3]).expanduser().resolve()
+        if len(argv) > 3
+        else Path(__file__).resolve().parents[1]
+    )
+    settings_path = (
+        Path(argv[4]).expanduser()
+        if len(argv) > 4
+        else home / ".claude" / "settings.json"
+    )
     merge(config_path, snippet_path, repo, settings_path)
     return 0
 

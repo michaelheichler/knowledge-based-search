@@ -4,19 +4,40 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_NAME="knowledge-based-search"
 SERVER_PY="$REPO/server/mcp_server.py"
-MCP_PY="/Users/michael/dev/skills/skill-model-loader/.venv/bin/python"
+MCP_PY="${KBS_PYTHON:-$REPO/../skill-model-loader/.venv/bin/python}"
 
 WANT_CLAUDE=auto
 WANT_CODEX=auto
 WANT_PI=auto
 ASSUME_YES=0
+EXPLICIT_TARGET=0
+
+select_target() {
+  if [ "$EXPLICIT_TARGET" = 0 ]; then
+    WANT_CLAUDE=0
+    WANT_CODEX=0
+    WANT_PI=0
+    EXPLICIT_TARGET=1
+  fi
+}
 
 for arg in "$@"; do
   case "$arg" in
-    --claude) WANT_CLAUDE=1 ;;
-    --codex) WANT_CODEX=1 ;;
-    --pi) WANT_PI=1 ;;
-    -y|--yes) ASSUME_YES=1 ;;
+    --claude)
+      select_target
+      WANT_CLAUDE=1
+      ;;
+    --codex)
+      select_target
+      WANT_CODEX=1
+      ;;
+    --pi)
+      select_target
+      WANT_PI=1
+      ;;
+    -y|--yes)
+      ASSUME_YES=1
+      ;;
     -h|--help)
       printf '%s\n' "Usage: ./install.sh [--claude] [--codex] [--pi] [-y]"
       exit 0
@@ -149,3 +170,5 @@ printf '%s\n' "MCP command: $MCP_PY $SERVER_PY"
 [ "$CLAUDE" = 1 ] && verify_claude
 [ "$CODEX" = 1 ] && verify_codex
 [ "$PI" = 1 ] && verify_pi
+
+exit 0

@@ -64,7 +64,9 @@ BLOCK_HTML = "<html><title>captcha</title><body>unusual traffic</body></html>"
 class EngineTests(unittest.TestCase):
     def test_google_parses_fixture(self):
         original_get = engines._get
-        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: GOOGLE_HTML
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: (
+            GOOGLE_HTML
+        )
         try:
             hits = engines.google("example", k=5)
         finally:
@@ -86,9 +88,13 @@ class EngineTests(unittest.TestCase):
 
     def test_google_custom_search_parses_fixture(self):
         original_get = engines._get
-        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: GOOGLE_JSON
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: (
+            GOOGLE_JSON
+        )
         try:
-            hits = engines.google("example", k=5, config={"google_api_key": "key", "google_cx": "cx"})
+            hits = engines.google(
+                "example", k=5, config={"google_api_key": "key", "google_cx": "cx"}
+            )
         finally:
             engines._get = original_get
 
@@ -109,7 +115,9 @@ class EngineTests(unittest.TestCase):
 
         engines._get = fake_get
         try:
-            hits = engines.google("example", k=5, config={"google_api_key": "key", "google_cx": "cx"})
+            hits = engines.google(
+                "example", k=5, config={"google_api_key": "key", "google_cx": "cx"}
+            )
         finally:
             engines._get = original_get
 
@@ -118,7 +126,9 @@ class EngineTests(unittest.TestCase):
 
     def test_bing_parses_fixture(self):
         original_get = engines._get
-        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: BING_HTML
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: (
+            BING_HTML
+        )
         try:
             hits = engines.bing("example", k=5)
         finally:
@@ -131,7 +141,9 @@ class EngineTests(unittest.TestCase):
 
     def test_duckduckgo_lite_parses_fixture(self):
         original_get = engines._get
-        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: DDG_LITE_HTML
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: (
+            DDG_LITE_HTML
+        )
         try:
             hits = engines.duckduckgo("example", k=5)
         finally:
@@ -143,9 +155,21 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(hits[0]["engine"], "duckduckgo")
         self.assertEqual(len(hits), 1)
 
+    def test_duckduckgo_protocol_relative_target_gets_https_url(self):
+        self.assertEqual(engines._ddg_target("//host.test/p"), "https://host.test/p")
+
+    def test_duckduckgo_lite_protocol_relative_target_gets_https_url(self):
+        body = '<table><tr><td><a href="//host.test/p">Host</a></td></tr><tr><td class="result-snippet">Snippet</td></tr></table>'
+
+        hits = engines._parse_duckduckgo_lite(body)
+
+        self.assertEqual(hits[0]["url"], "https://host.test/p")
+
     def test_startpage_parses_fixture(self):
         original_get = engines._get
-        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: STARTPAGE_HTML
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: (
+            STARTPAGE_HTML
+        )
         try:
             hits = engines.startpage("example", k=5)
         finally:
@@ -159,7 +183,9 @@ class EngineTests(unittest.TestCase):
 
     def test_mojeek_parses_fixture(self):
         original_get = engines._get
-        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: MOJEEK_HTML
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: (
+            MOJEEK_HTML
+        )
         try:
             hits = engines.mojeek("example", k=5)
         finally:
@@ -172,7 +198,9 @@ class EngineTests(unittest.TestCase):
 
     def test_block_pages_return_empty(self):
         original_get = engines._get
-        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: BLOCK_HTML
+        engines._get = lambda url, timeout=engines._TIMEOUT, data=None, headers=None: (
+            BLOCK_HTML
+        )
         try:
             with self.assertLogs("engines", level="WARNING") as logs:
                 self.assertEqual(engines.google("example"), [])
@@ -191,27 +219,87 @@ class EngineTests(unittest.TestCase):
             ],
         )
 
-    def test_search_wires_enabled_direct_engines(self):
+    def test_search_defaults_to_searxng_and_duckduckgo_only(self):
         original_google = engines.google
         original_bing = engines.bing
         original_duckduckgo = engines.duckduckgo
         original_startpage = engines.startpage
         original_mojeek = engines.mojeek
-        engines.google = lambda query, k=10, config=None: [engines.result("G", "https://g.example", "", "google", 1)]
-        engines.bing = lambda query, k=10: [engines.result("B", "https://b.example", "", "bing", 1)]
-        engines.duckduckgo = lambda query, k=10: []
-        engines.startpage = lambda query, **options: [engines.result("S", "https://s.example", "", "startpage", 1)]
-        engines.mojeek = lambda query, **options: [engines.result("M", "https://m.example", "", "mojeek", 1)]
+        original_searxng = engines.searxng
+        engines.searxng = lambda query, url, k=10: [
+            engines.result("X", "https://x.example", "", "searxng", 1)
+        ]
+        engines.google = lambda query, k=10, config=None: [
+            engines.result("G", "https://g.example", "", "google", 1)
+        ]
+        engines.bing = lambda query, k=10: [
+            engines.result("B", "https://b.example", "", "bing", 1)
+        ]
+        engines.duckduckgo = lambda query, k=10: [
+            engines.result("D", "https://d.example", "", "duckduckgo", 1)
+        ]
+        engines.startpage = lambda query, **options: [
+            engines.result("S", "https://s.example", "", "startpage", 1)
+        ]
+        engines.mojeek = lambda query, **options: [
+            engines.result("M", "https://m.example", "", "mojeek", 1)
+        ]
         try:
-            hits = engines.search("example", {}, k=2, cap=5)
+            hits = engines.search(
+                "example",
+                {"searxng_url": "https://search.test", "duckduckgo": True},
+                k=2,
+                cap=5,
+            )
         finally:
             engines.google = original_google
             engines.bing = original_bing
             engines.duckduckgo = original_duckduckgo
             engines.startpage = original_startpage
             engines.mojeek = original_mojeek
+            engines.searxng = original_searxng
 
-        self.assertEqual({hit["engine"] for hit in hits}, {"google", "bing", "startpage", "mojeek"})
+        self.assertEqual({hit["engine"] for hit in hits}, {"searxng", "duckduckgo"})
+
+    def test_search_wires_opted_in_direct_engines(self):
+        original_google = engines.google
+        original_bing = engines.bing
+        original_startpage = engines.startpage
+        original_mojeek = engines.mojeek
+        engines.google = lambda query, k=10, config=None: [
+            engines.result("G", "https://g.example", "", "google", 1)
+        ]
+        engines.bing = lambda query, k=10: [
+            engines.result("B", "https://b.example", "", "bing", 1)
+        ]
+        engines.startpage = lambda query, **options: [
+            engines.result("S", "https://s.example", "", "startpage", 1)
+        ]
+        engines.mojeek = lambda query, **options: [
+            engines.result("M", "https://m.example", "", "mojeek", 1)
+        ]
+        try:
+            hits = engines.search(
+                "example",
+                {
+                    "duckduckgo": False,
+                    "google": True,
+                    "bing": True,
+                    "startpage": True,
+                    "mojeek": True,
+                },
+                k=2,
+                cap=5,
+            )
+        finally:
+            engines.google = original_google
+            engines.bing = original_bing
+            engines.startpage = original_startpage
+            engines.mojeek = original_mojeek
+
+        self.assertEqual(
+            {hit["engine"] for hit in hits}, {"google", "bing", "startpage", "mojeek"}
+        )
 
     def test_parse_date_formats(self):
         self.assertEqual(engines._parse_date("16 Jun 2026"), "2026-06-16")
@@ -223,7 +311,9 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(engines._parse_date("no date here"), "")
 
     def test_parse_date_rejects_impossible_dates(self):
-        self.assertEqual(engines._parse_date("31 Feb 2026 then 7 Dec 2025"), "2025-12-07")
+        self.assertEqual(
+            engines._parse_date("31 Feb 2026 then 7 Dec 2025"), "2025-12-07"
+        )
 
     def test_date_key_sorts_recent_before_old_and_undated(self):
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "server"))
@@ -235,39 +325,76 @@ class EngineTests(unittest.TestCase):
             {"date": "2026-06-16"},
         ]
 
-        self.assertEqual([rag._date_key(result) for result in results], [-20251207, 1, -20260616])
+        self.assertEqual(
+            [rag._date_key(result) for result in results], [-20251207, 1, -20260616]
+        )
 
     def test_merge_fills_empty_date_from_duplicate(self):
-        primary = [engines.result("A", "https://example.com/a", "no date", "searxng", 1)]
-        secondary = [engines.result("A2", "https://example.com/a/", "16 Jun 2026", "duckduckgo", 2)]
+        primary = [
+            engines.result("A", "https://example.com/a", "no date", "searxng", 1)
+        ]
+        secondary = [
+            engines.result(
+                "A2", "https://example.com/a/", "16 Jun 2026", "duckduckgo", 2
+            )
+        ]
 
         merged = engines.merge([primary, secondary])
 
         self.assertEqual(merged[0]["date"], "2026-06-16")
 
+    def test_norm_url_sorts_query_params(self):
+        self.assertEqual(
+            engines.norm_url("https://example.com/path?b=2&a=1"),
+            engines.norm_url("https://example.com/path?a=1&b=2"),
+        )
+
 
 class UrlDateTests(unittest.TestCase):
     def test_day_path(self):
-        self.assertEqual(engines._parse_url_date("https://www.theverge.com/2016/3/24/1130/post"), "2016-03-24")
+        self.assertEqual(
+            engines._parse_url_date("https://www.theverge.com/2016/3/24/1130/post"),
+            "2016-03-24",
+        )
 
     def test_iso_path(self):
-        self.assertEqual(engines._parse_url_date("https://glaforge.dev/posts/2026-02-10/advanced-rag"), "2026-02-10")
+        self.assertEqual(
+            engines._parse_url_date(
+                "https://glaforge.dev/posts/2026-02-10/advanced-rag"
+            ),
+            "2026-02-10",
+        )
 
     def test_month_only_path(self):
-        self.assertEqual(engines._parse_url_date("https://arstechnica.com/it/2016/03/rage-quit"), "2016-03-01")
+        self.assertEqual(
+            engines._parse_url_date("https://arstechnica.com/it/2016/03/rage-quit"),
+            "2016-03-01",
+        )
 
     def test_rejects_impossible_date(self):
-        self.assertEqual(engines._parse_url_date("https://example.com/2020/15/40/x"), "")
+        self.assertEqual(
+            engines._parse_url_date("https://example.com/2020/15/40/x"), ""
+        )
 
     def test_no_date_in_url(self):
-        self.assertEqual(engines._parse_url_date("https://example.com/blog/some-post"), "")
+        self.assertEqual(
+            engines._parse_url_date("https://example.com/blog/some-post"), ""
+        )
 
     def test_snippet_date_preferred_over_url(self):
-        hit = engines.result("t", "https://example.com/2016/03/24/x", "Published 7 Dec 2025", "searxng", 1)
+        hit = engines.result(
+            "t",
+            "https://example.com/2016/03/24/x",
+            "Published 7 Dec 2025",
+            "searxng",
+            1,
+        )
         self.assertEqual(hit["date"], "2025-12-07")
 
     def test_url_date_fills_when_snippet_has_none(self):
-        hit = engines.result("t", "https://example.com/2026/02/10/x", "no date here", "searxng", 1)
+        hit = engines.result(
+            "t", "https://example.com/2026/02/10/x", "no date here", "searxng", 1
+        )
         self.assertEqual(hit["date"], "2026-02-10")
 
 
@@ -275,7 +402,14 @@ class SearchResilienceTests(unittest.TestCase):
     def test_search_survives_as_completed_timeout(self):
         from unittest import mock
 
-        config = {"searxng_url": "x", "duckduckgo": False, "google": False, "bing": False, "startpage": False, "mojeek": False}
+        config = {
+            "searxng_url": "x",
+            "duckduckgo": False,
+            "google": False,
+            "bing": False,
+            "startpage": False,
+            "mojeek": False,
+        }
         real = engines.concurrent.futures.as_completed
 
         def flaky(futures, timeout=None):
@@ -283,7 +417,11 @@ class SearchResilienceTests(unittest.TestCase):
                 yield future
             raise engines.concurrent.futures.TimeoutError("simulated")
 
-        with mock.patch.object(engines, "searxng", lambda *a, **k: [engines.result("A", "https://a.com", "s", "searxng", 1)]):
+        with mock.patch.object(
+            engines,
+            "searxng",
+            lambda *a, **k: [engines.result("A", "https://a.com", "s", "searxng", 1)],
+        ):
             with mock.patch.object(engines.concurrent.futures, "as_completed", flaky):
                 hits = engines.search("q", config)
 

@@ -45,7 +45,9 @@ def test_fetch_clean_prefers_article_over_page_chrome(monkeypatch):
     </html>
     """
 
-    monkeypatch.setattr(fetch.urllib.request, "urlopen", lambda request, timeout: _Response(html))
+    monkeypatch.setattr(
+        fetch.urllib.request, "urlopen", lambda request, timeout: _Response(html)
+    )
 
     result = fetch.fetch_clean("https://example.test/page", 1000)
 
@@ -62,7 +64,9 @@ def test_fetch_clean_uses_declared_charset(monkeypatch):
     monkeypatch.setattr(
         fetch.urllib.request,
         "urlopen",
-        lambda request, timeout: _Response(html, content_type="text/html; charset=iso-8859-1"),
+        lambda request, timeout: _Response(
+            html, content_type="text/html; charset=iso-8859-1"
+        ),
     )
 
     result = fetch.fetch_clean("https://example.test/page", 1000)
@@ -75,7 +79,9 @@ def test_fetch_clean_falls_back_for_unknown_charset(monkeypatch):
     monkeypatch.setattr(
         fetch.urllib.request,
         "urlopen",
-        lambda request, timeout: _Response(html, content_type="text/html; charset=not-a-real-charset"),
+        lambda request, timeout: _Response(
+            html, content_type="text/html; charset=not-a-real-charset"
+        ),
     )
 
     result = fetch.fetch_clean("https://example.test/page", 1000)
@@ -84,7 +90,11 @@ def test_fetch_clean_falls_back_for_unknown_charset(monkeypatch):
 
 
 def test_fetch_clean_returns_empty_for_pdf_magic_bytes(monkeypatch):
-    monkeypatch.setattr(fetch.urllib.request, "urlopen", lambda request, timeout: _Response(b"%PDF-1.7\ntext"))
+    monkeypatch.setattr(
+        fetch.urllib.request,
+        "urlopen",
+        lambda request, timeout: _Response(b"%PDF-1.7\ntext"),
+    )
 
     result = fetch.fetch_clean("https://example.test/file", 1000)
 
@@ -95,7 +105,9 @@ def test_fetch_clean_returns_empty_for_pdf_content_type(monkeypatch):
     monkeypatch.setattr(
         fetch.urllib.request,
         "urlopen",
-        lambda request, timeout: _Response("This body has readable words.", content_type="application/pdf"),
+        lambda request, timeout: _Response(
+            "This body has readable words.", content_type="application/pdf"
+        ),
     )
 
     result = fetch.fetch_clean("https://example.test/file", 1000)
@@ -110,5 +122,26 @@ def test_fetch_clean_skips_pdf_path_before_fetch(monkeypatch):
     monkeypatch.setattr(fetch.urllib.request, "urlopen", fail_urlopen)
 
     result = fetch.fetch_clean("https://example.test/file.pdf?download=1", 1000)
+
+    assert result == ""
+
+
+def test_fetch_clean_returns_empty_for_link_heavy_nav(monkeypatch):
+    html = """
+    <html>
+      <body>
+        <nav>
+          <a href="/a">Alpha menu</a>
+          <a href="/b">Beta menu</a>
+          <a href="/c">Gamma menu</a>
+        </nav>
+      </body>
+    </html>
+    """
+    monkeypatch.setattr(
+        fetch.urllib.request, "urlopen", lambda request, timeout: _Response(html)
+    )
+
+    result = fetch.fetch_clean("https://example.test/page", 1000)
 
     assert result == ""

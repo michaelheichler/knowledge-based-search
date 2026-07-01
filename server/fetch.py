@@ -7,7 +7,18 @@ from html.parser import HTMLParser
 _UA = "Mozilla/5.0 (compatible knowledge-based-search/0.1)"
 _BLOCK_TAGS = {"div", "main", "article", "section"}
 _BREAK_TAGS = {"br", "p", "li", "h1", "h2", "h3", "h4", "h5", "h6"}
-_SKIP_TAGS = {"aside", "footer", "form", "header", "nav", "noscript", "script", "style", "svg", "template"}
+_SKIP_TAGS = {
+    "aside",
+    "footer",
+    "form",
+    "header",
+    "nav",
+    "noscript",
+    "script",
+    "style",
+    "svg",
+    "template",
+}
 _USEFUL_TAGS = {"p", "li"}
 
 
@@ -19,7 +30,13 @@ class _TextParser(HTMLParser):
         self.link_depth = 0
         self.skip = []
         self.useful_depth = 0
-        self.whole_page = {"tag": "body", "parts": [], "chars": 0, "link_chars": 0, "useful_chars": 0}
+        self.whole_page = {
+            "tag": "body",
+            "parts": [],
+            "chars": 0,
+            "link_chars": 0,
+            "useful_chars": 0,
+        }
 
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
@@ -33,7 +50,15 @@ class _TextParser(HTMLParser):
         if tag == "a":
             self.link_depth += 1
         if tag in _BLOCK_TAGS:
-            self.current.append({"tag": tag, "parts": [], "chars": 0, "link_chars": 0, "useful_chars": 0})
+            self.current.append(
+                {
+                    "tag": tag,
+                    "parts": [],
+                    "chars": 0,
+                    "link_chars": 0,
+                    "useful_chars": 0,
+                }
+            )
         if tag in _USEFUL_TAGS:
             self.useful_depth += 1
         if tag in _BREAK_TAGS:
@@ -65,8 +90,12 @@ class _TextParser(HTMLParser):
             self._append(text)
 
     def best_text(self):
-        viable_blocks = [block for block in self.blocks + self.current if _score(block) >= 0]
+        viable_blocks = [
+            block for block in self.blocks + self.current if _score(block) >= 0
+        ]
         best = max(viable_blocks, key=_score) if viable_blocks else self.whole_page
+        if best["chars"] and best["link_chars"] * 2 >= best["chars"]:
+            return ""
         return _clean_text(" ".join(best["parts"]))
 
     def _append(self, text):
@@ -112,7 +141,9 @@ def fetch_clean(url, max_chars):
         return ""
     request = urllib.request.Request(url, headers={"User-Agent": _UA})
     with urllib.request.urlopen(request, timeout=10) as response:
-        header_reader = getattr(response, "getheader", lambda name, default=None: default)
+        header_reader = getattr(
+            response, "getheader", lambda name, default=None: default
+        )
         content_type = header_reader("Content-Type", "text/html")
         if "html" not in (content_type or "").lower():
             return ""

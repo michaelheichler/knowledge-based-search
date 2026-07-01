@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import json
+import os
 import sys
 
 SKILL_NAME = "knowledge-based-search"
+_TRANSCRIPT_CACHE = {}
 DENY_REASON = (
     "Load the knowledge-based-search skill with the Skill tool first, then reformulate the "
     "query with its method and run the search again. This gate fires until the skill is loaded "
@@ -35,12 +37,18 @@ def should_block(event):
     if not path:
         return False
     try:
+        stamp = os.stat(path).st_mtime_ns
+        cached = _TRANSCRIPT_CACHE.get(path)
+        if cached and cached[0] == stamp:
+            return not cached[1]
         with open(path, encoding="utf-8") as handle:
             for line in handle:
                 if SKILL_NAME in line and _line_loads_skill(line):
+                    _TRANSCRIPT_CACHE[path] = (stamp, True)
                     return False
     except OSError:
         return False
+    _TRANSCRIPT_CACHE[path] = (stamp, False)
     return True
 
 
@@ -64,8 +72,32 @@ def main():
 
 
 def demo():
-    loaded = json.dumps({"message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": SKILL_NAME}}]}})
-    decoy = json.dumps({"message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": "interview-me", "args": SKILL_NAME}}]}})
+    loaded = json.dumps(
+        {
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Skill",
+                        "input": {"skill": SKILL_NAME},
+                    }
+                ]
+            }
+        }
+    )
+    decoy = json.dumps(
+        {
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Skill",
+                        "input": {"skill": "interview-me", "args": SKILL_NAME},
+                    }
+                ]
+            }
+        }
+    )
     assert _line_loads_skill(loaded)
     assert not _line_loads_skill(decoy)
     assert deny_output()["hookSpecificOutput"]["permissionDecision"] == "deny"

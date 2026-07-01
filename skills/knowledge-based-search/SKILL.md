@@ -11,8 +11,8 @@ description: >-
   "latest", "current", "look up", "research", "verify", "fact-check", "who is",
   "trace", a year, or a version number, even when the user does not say "search".
   It drives the keyless web-search MCP (quick_web_search, web_search,
-  deep_research, get_content) and routes to distilled OSINT and research
-  tradecraft.
+  deep_research, deep_context_aware_search, get_content) and routes to distilled
+  OSINT and research tradecraft.
 ---
 
 # Knowledge-Based Search
@@ -28,15 +28,15 @@ prices, releases, events, people, and current status all drift. Answering them f
 memory is how stale answers slip through. When unsure whether a fact is current, run
 `quick_web_search` rather than guess.
 
-For stable knowledge about research and investigation method, check the book library
-(`mcp__library`) and the notes in `references/` first. For anything current or external,
-search the web first. The best answers draw on both.
+For stable knowledge about research and investigation method, check the notes in
+`references/` first. Also check the book library if `mcp__library` is available. For
+anything current or external, search the web first. The best answers draw on both.
 
 When this skill is invoked, run a search before answering any current or external question, the skill exists to search, not to answer from memory.
 
 ## Choosing a tool
 
-Four tools, a depth ladder from cheap to thorough:
+Five tools, a depth ladder from cheap to thorough:
 
 - `quick_web_search(query)` - fast lookup, ranked links and snippets. Use to confirm
   one current fact, a version, a date, or a name.
@@ -46,6 +46,9 @@ Four tools, a depth ladder from cheap to thorough:
 - `deep_research(query)` - bounded multi-round investigation. Decomposes the
   question, searches across sub-queries, returns a structured cited report. Use for
   thorough investigation, comparison across many sources, or an OSINT profile.
+- `deep_context_aware_search(query, context)` - context-aware multi-round search
+  with session memory. Use when you need broad recall across engines and want
+  already-seen URLs suppressed in later calls.
 - `get_content(result_id_or_url)` - open one source in full, condensed against your
   query. Use to read one result from a prior search without running a whole
   `deep_research`.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """UserPromptSubmit hook: inject a search nudge when the prompt matches a trigger."""
+
 import json
 import sys
 
@@ -24,7 +25,16 @@ def main():
     nudge = nudge_for(_prompt(event))
     if not nudge:
         return
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": nudge}}))
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": nudge,
+                }
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

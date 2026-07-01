@@ -1,9 +1,19 @@
 import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import * as fs from "node:fs";
 import * as path from "node:path";
 
-const run = promisify(execFile);
-const ROOT = path.resolve(__dirname, "../../..");
+function findRoot(): string {
+  if (process.env.KBS_DIR) return path.resolve(process.env.KBS_DIR);
+  let current = __dirname;
+  for (;;) {
+    if (fs.existsSync(path.join(current, "hooks", "session_start.py"))) return current;
+    const parent = path.dirname(current);
+    if (parent === current) throw new Error("Set KBS_DIR to the knowledge-based-search repo");
+    current = parent;
+  }
+}
+
+const ROOT = findRoot();
 const HOOKS = path.join(ROOT, "hooks");
 
 async function pythonHook(script: string, input: unknown): Promise<string | undefined> {
@@ -49,7 +59,7 @@ export default function (pi: any) {
     const stdout = await pythonHook("session_start.py", event ?? {});
     const primer = contextFromHook(stdout);
     if (!primer) return undefined;
-    return { systemPrompt: `${event.systemPrompt}\n\n${primer}` };
+    return { systemPrompt: `${event?.systemPrompt ?? ""}\n\n${primer}` };
   });
 
   pi.on("prompt", async (event: any) => {

@@ -21,6 +21,7 @@ Status: in development. See `tasks/plan.md` for the build plan and `tasks/todo.m
 - `quick_web_search` fast lookup, rerank, summarized.
 - `web_search` full pipeline, embed plus RAG plus rerank, cited output.
 - `deep_research` bounded multi-round research, structured cited report.
+- `deep_context_aware_search` context-aware broad search with session memory.
 - `get_content` drill down into one source by result id or url.
 
 ## Design rules

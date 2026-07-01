@@ -14,10 +14,27 @@ import numpy as np
 _CONNECT_TIMEOUT = 10.0
 _REQUEST_TIMEOUT = 120.0
 _DEFAULT_SOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "kbs-rag.sock")
-_LOADER_PY = "/Users/michael/dev/skills/skill-model-loader/.venv/bin/python"
 _HOST = os.path.join(os.path.dirname(__file__), "rag_host.py")
 _spawn_lock = threading.Lock()
 _RRF_K = 60
+
+
+def _loader_dir():
+    return os.environ.get(
+        "KBS_LOADER_DIR",
+        os.path.join(
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            ),
+            "skill-model-loader",
+        ),
+    )
+
+
+def _loader_python():
+    return os.environ.get(
+        "KBS_PYTHON", os.path.join(_loader_dir(), ".venv", "bin", "python")
+    )
 
 
 def default_sock_path():
@@ -93,12 +110,12 @@ def _connect_or_spawn(sock_path, ref_dir, host_argv, env):
         lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX)
-            conn = _poll_for_host(sock_path, stop_if_absent=True)
+            conn = _poll_for_host(sock_path, stop_if_absent=False)
             if conn is not None:
                 return conn
             with contextlib.suppress(OSError):
                 os.remove(sock_path)
-            argv = list(host_argv) if host_argv else [_LOADER_PY, _HOST]
+            argv = list(host_argv) if host_argv else [_loader_python(), _HOST]
             subprocess.Popen(
                 argv + [sock_path, ref_dir],
                 start_new_session=True,
@@ -149,7 +166,9 @@ def _request(sock_path, msg, timeout=_REQUEST_TIMEOUT):
 
 def _stale_path(sock_path):
     try:
-        return os.path.exists(sock_path) and not stat.S_ISSOCK(os.stat(sock_path).st_mode)
+        return os.path.exists(sock_path) and not stat.S_ISSOCK(
+            os.stat(sock_path).st_mode
+        )
     except OSError:
         return False
 
@@ -176,7 +195,9 @@ def _doc_text(result):
     if isinstance(result, str):
         return result
     if isinstance(result, dict):
-        return " ".join(str(result.get(key, "")) for key in ("title", "snippet", "url")).strip()
+        return " ".join(
+            str(result.get(key, "")) for key in ("title", "snippet", "url")
+        ).strip()
     return str(result)
 
 
@@ -186,15 +207,27 @@ def _bm25_order(query, docs):
     try:
         retriever = bm25s.BM25()
         retriever.index(bm25s.tokenize(docs, show_progress=False), show_progress=False)
-        response = retriever.retrieve(bm25s.tokenize([query], show_progress=False), k=len(docs), show_progress=False)
+        response = retriever.retrieve(
+            bm25s.tokenize([query], show_progress=False),
+            k=len(docs),
+            show_progress=False,
+        )
         return _coerce_indices(response)
     except Exception:
         return list(range(len(docs)))
 
 
 def _coerce_indices(response):
-    documents = response[0] if isinstance(response, tuple) else getattr(response, "documents", response)
-    first = documents[0] if len(documents) and isinstance(documents[0], (list, tuple, np.ndarray)) else documents
+    documents = (
+        response[0]
+        if isinstance(response, tuple)
+        else getattr(response, "documents", response)
+    )
+    first = (
+        documents[0]
+        if len(documents) and isinstance(documents[0], (list, tuple, np.ndarray))
+        else documents
+    )
     return [int(index) for index in first]
 
 

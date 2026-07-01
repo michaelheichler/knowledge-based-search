@@ -20,31 +20,53 @@ _DDG_RESULT = re.compile(
     r'result__snippet"[^>]*>(?P<snippet>.*?)</a>',
     re.DOTALL,
 )
-_DDG_LITE_LINK = re.compile(r'<a[^>]+href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>', re.DOTALL)
-_DDG_LITE_SNIPPET = re.compile(r'<td[^>]+class="[^"]*result-snippet[^"]*"[^>]*>(?P<snippet>.*?)</td>', re.DOTALL)
-_GOOGLE_LINK = re.compile(r'<a[^>]+href="(?P<href>[^"]+)"[^>]*>\s*<h3[^>]*>(?P<title>.*?)</h3>', re.DOTALL)
-_GOOGLE_SNIPPET = re.compile(r'<div[^>]+class="[^"]*\bVwiC3b\b[^"]*"[^>]*>(?P<snippet>.*?)</div>', re.DOTALL)
-_BING_BLOCK = re.compile(r'<li[^>]+class="[^"]*\bb_algo\b[^"]*"[^>]*>(?P<body>.*?)</li>', re.DOTALL)
-_BING_LINK = re.compile(r'<h2[^>]*>\s*<a[^>]+href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>', re.DOTALL)
-_BING_CAPTION = re.compile(r'<div[^>]+class="[^"]*\bb_caption\b[^"]*"[^>]*>(?P<body>.*?)</div>', re.DOTALL)
-_BING_SNIPPET = re.compile(r'<p[^>]*>(?P<snippet>.*?)</p>', re.DOTALL)
+_DDG_LITE_LINK = re.compile(
+    r'<a[^>]+href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>', re.DOTALL
+)
+_DDG_LITE_SNIPPET = re.compile(
+    r'<td[^>]+class="[^"]*result-snippet[^"]*"[^>]*>(?P<snippet>.*?)</td>', re.DOTALL
+)
+_GOOGLE_LINK = re.compile(
+    r'<a[^>]+href="(?P<href>[^"]+)"[^>]*>\s*<h3[^>]*>(?P<title>.*?)</h3>', re.DOTALL
+)
+_GOOGLE_SNIPPET = re.compile(
+    r'<div[^>]+class="[^"]*\bVwiC3b\b[^"]*"[^>]*>(?P<snippet>.*?)</div>', re.DOTALL
+)
+_BING_BLOCK = re.compile(
+    r'<li[^>]+class="[^"]*\bb_algo\b[^"]*"[^>]*>(?P<body>.*?)</li>', re.DOTALL
+)
+_BING_LINK = re.compile(
+    r'<h2[^>]*>\s*<a[^>]+href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>', re.DOTALL
+)
+_BING_CAPTION = re.compile(
+    r'<div[^>]+class="[^"]*\bb_caption\b[^"]*"[^>]*>(?P<body>.*?)</div>', re.DOTALL
+)
+_BING_SNIPPET = re.compile(r"<p[^>]*>(?P<snippet>.*?)</p>", re.DOTALL)
 _BING_LEGACY_RESULT = re.compile(
     r'<li[^>]+class="[^"]*\bb_algo\b[^"]*"[^>]*>.*?'
     r'<h2[^>]*>\s*<a[^>]+href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>.*?</h2>.*?'
-    r'<p[^>]*>(?P<snippet>.*?)</p>',
+    r"<p[^>]*>(?P<snippet>.*?)</p>",
     re.DOTALL,
 )
-_STARTPAGE_LINK = re.compile(r'<a\b(?P<attrs>[^>]*)>(?P<title>.*?)</a>(?P<tail>.*?)(?=<a\b|\Z)', re.DOTALL)
+_STARTPAGE_LINK = re.compile(
+    r"<a\b(?P<attrs>[^>]*)>(?P<title>.*?)</a>(?P<tail>.*?)(?=<a\b|\Z)", re.DOTALL
+)
 _STARTPAGE_SNIPPET = re.compile(
     r'<(?:p|div)[^>]+class="[^"]*(?:w-gl__description|description|result-desc)[^"]*"[^>]*>(?P<snippet>.*?)</(?:p|div)>',
     re.DOTALL,
 )
-_MOJEEK_RESULT = re.compile(r'<h2[^>]*>\s*<a(?P<attrs>[^>]*)>(?P<title>.*?)</a>\s*</h2>(?P<tail>.*?)(?=<h2|\Z)', re.DOTALL)
+_MOJEEK_RESULT = re.compile(
+    r"<h2[^>]*>\s*<a(?P<attrs>[^>]*)>(?P<title>.*?)</a>\s*</h2>(?P<tail>.*?)(?=<h2|\Z)",
+    re.DOTALL,
+)
 _MOJEEK_SNIPPET = re.compile(
     r'<p[^>]+class="[^"]*(?:s|snippet|result-summary)[^"]*"[^>]*>(?P<snippet>.*?)</p>',
     re.DOTALL,
 )
-_BLOCKED = re.compile(r"captcha|unusual traffic|verify you are human|automated queries|our systems have detected", re.I)
+_BLOCKED = re.compile(
+    r"captcha|unusual traffic|verify you are human|automated queries|our systems have detected",
+    re.I,
+)
 _LOG = logging.getLogger(__name__)
 _MONTHS = {
     "jan": 1,
@@ -74,8 +96,12 @@ _MONTHS = {
 }
 _DATE_PATTERNS = (
     re.compile(r"\b(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\b"),
-    re.compile(r"\b(?P<day>\d{1,2})\s+(?P<month_name>[A-Za-z]{3,9})\s+(?P<year>\d{4})\b"),
-    re.compile(r"\b(?P<month_name>[A-Za-z]{3,9})\s+(?P<day>\d{1,2}),?\s+(?P<year>\d{4})\b"),
+    re.compile(
+        r"\b(?P<day>\d{1,2})\s+(?P<month_name>[A-Za-z]{3,9})\s+(?P<year>\d{4})\b"
+    ),
+    re.compile(
+        r"\b(?P<month_name>[A-Za-z]{3,9})\s+(?P<day>\d{1,2}),?\s+(?P<year>\d{4})\b"
+    ),
     re.compile(r"\b(?P<day>\d{2})\.(?P<month>\d{2})\.(?P<year>\d{4})\b"),
 )
 _URL_DATE_PATTERNS = (
@@ -122,7 +148,9 @@ def _parse_date(text) -> str:
         if not month:
             continue
         with contextlib.suppress(ValueError):
-            return datetime.date(int(groups["year"]), int(month), int(groups["day"])).isoformat()
+            return datetime.date(
+                int(groups["year"]), int(month), int(groups["day"])
+            ).isoformat()
     return ""
 
 
@@ -167,17 +195,26 @@ def searxng(query, base, k=10, timeout=_TIMEOUT) -> list:
     hits = []
     for rank, row in enumerate(payload.get("results", [])[:k], 1):
         if row.get("url"):
-            hits.append(result(row.get("title", ""), row["url"], row.get("content", ""), "searxng", rank))
+            hits.append(
+                result(
+                    row.get("title", ""),
+                    row["url"],
+                    row.get("content", ""),
+                    "searxng",
+                    rank,
+                )
+            )
     return hits
 
 
 def _ddg_target(href) -> str:
+    href = html.unescape(href)
     if "uddg=" in href:
         query = urllib.parse.urlparse(href).query
         target = urllib.parse.parse_qs(query).get("uddg", [None])[0]
         if target:
             return target
-    return href if href.startswith("http") else "https:" + href
+    return urllib.parse.urljoin("https://duckduckgo.com", href)
 
 
 def _parse_duckduckgo_html(body, k=10) -> list:
@@ -185,7 +222,15 @@ def _parse_duckduckgo_html(body, k=10) -> list:
     for rank, match in enumerate(_DDG_RESULT.finditer(body), 1):
         if rank > k:
             break
-        hits.append(result(match["title"], _ddg_target(match["href"]), match["snippet"], "duckduckgo", rank))
+        hits.append(
+            result(
+                match["title"],
+                _ddg_target(match["href"]),
+                match["snippet"],
+                "duckduckgo",
+                rank,
+            )
+        )
     return hits
 
 
@@ -203,7 +248,10 @@ def _parse_duckduckgo_lite(body, k=10) -> list:
             continue
         if title.lower() in {"next page", "previous page"}:
             continue
-        next_start = next((other.start() for other in matches if other.start() > match.start()), len(body))
+        next_start = next(
+            (other.start() for other in matches if other.start() > match.start()),
+            len(body),
+        )
         snippet_match = _DDG_LITE_SNIPPET.search(body, match.end(), next_start)
         snippet = snippet_match["snippet"] if snippet_match else ""
         hits.append(result(title, target, snippet, "duckduckgo", len(hits) + 1))
@@ -237,7 +285,9 @@ def duckduckgo(query, k=10, timeout=_TIMEOUT) -> list:
 def _google_target(href) -> str:
     href = html.unescape(href)
     if href.startswith("/url?"):
-        target = urllib.parse.parse_qs(urllib.parse.urlparse(href).query).get("q", [None])[0]
+        target = urllib.parse.parse_qs(urllib.parse.urlparse(href).query).get(
+            "q", [None]
+        )[0]
         if target:
             return target
     return href
@@ -250,7 +300,10 @@ def _parse_google_html(body, k=10) -> list:
         target = _google_target(match["href"])
         if not target.startswith("http"):
             continue
-        next_start = next((other.start() for other in matches if other.start() > match.start()), len(body))
+        next_start = next(
+            (other.start() for other in matches if other.start() > match.start()),
+            len(body),
+        )
         snippet_match = _GOOGLE_SNIPPET.search(body, match.end(), next_start)
         snippet = snippet_match["snippet"] if snippet_match else ""
         hits.append(result(match["title"], target, snippet, "google", len(hits) + 1))
@@ -264,7 +317,15 @@ def _parse_google_json(body, k=10) -> list:
     hits = []
     for item in payload.get("items", [])[:k]:
         if item.get("link"):
-            hits.append(result(item.get("title", ""), item["link"], item.get("snippet", ""), "google", len(hits) + 1))
+            hits.append(
+                result(
+                    item.get("title", ""),
+                    item["link"],
+                    item.get("snippet", ""),
+                    "google",
+                    len(hits) + 1,
+                )
+            )
     return hits
 
 
@@ -279,12 +340,22 @@ def google(query, k=10, timeout=_TIMEOUT, config=None) -> list:
             }
         )
         try:
-            return _parse_google_json(_get(f"https://customsearch.googleapis.com/customsearch/v1?{params}", timeout), k)
+            return _parse_google_json(
+                _get(
+                    f"https://customsearch.googleapis.com/customsearch/v1?{params}",
+                    timeout,
+                ),
+                k,
+            )
         except (OSError, ValueError, TypeError):
             pass
     params = urllib.parse.urlencode({"q": query, "num": k})
     try:
-        body = _get(f"https://www.google.com/search?{params}", timeout, headers={"Cookie": "CONSENT=YES+"})
+        body = _get(
+            f"https://www.google.com/search?{params}",
+            timeout,
+            headers={"Cookie": "CONSENT=YES+"},
+        )
     except OSError:
         return []
     if _BLOCKED.search(body):
@@ -298,10 +369,20 @@ def _parse_bing_html(body, k=10) -> list:
     for block_match in _BING_BLOCK.finditer(body):
         link_match = _BING_LINK.search(block_match["body"])
         caption_match = _BING_CAPTION.search(block_match["body"])
-        snippet_match = _BING_SNIPPET.search(caption_match["body"]) if caption_match else None
+        snippet_match = (
+            _BING_SNIPPET.search(caption_match["body"]) if caption_match else None
+        )
         if link_match:
             snippet = snippet_match["snippet"] if snippet_match else ""
-            hits.append(result(link_match["title"], html.unescape(link_match["href"]), snippet, "bing", len(hits) + 1))
+            hits.append(
+                result(
+                    link_match["title"],
+                    html.unescape(link_match["href"]),
+                    snippet,
+                    "bing",
+                    len(hits) + 1,
+                )
+            )
         if len(hits) >= k:
             break
     if hits:
@@ -309,7 +390,15 @@ def _parse_bing_html(body, k=10) -> list:
     for rank, match in enumerate(_BING_LEGACY_RESULT.finditer(body), 1):
         if rank > k:
             break
-        hits.append(result(match["title"], html.unescape(match["href"]), match["snippet"], "bing", rank))
+        hits.append(
+            result(
+                match["title"],
+                html.unescape(match["href"]),
+                match["snippet"],
+                "bing",
+                rank,
+            )
+        )
     return hits
 
 
@@ -332,7 +421,12 @@ def _clean_startpage_title(title) -> str:
 
 def _parse_startpage_html(body, limit=10) -> list:
     hits = []
-    scrubbed_body = re.sub(r"<(?:style|script)\b[^>]*>.*?</(?:style|script)>", "", body, flags=re.DOTALL | re.I)
+    scrubbed_body = re.sub(
+        r"<(?:style|script)\b[^>]*>.*?</(?:style|script)>",
+        "",
+        body,
+        flags=re.DOTALL | re.I,
+    )
     for match in _STARTPAGE_LINK.finditer(scrubbed_body):
         attrs = match["attrs"]
         class_name = _attr(attrs, "class")
@@ -360,7 +454,9 @@ def startpage(query, timeout=_TIMEOUT, **options) -> list:
         "Accept-Language": "en-US,en",
     }
     try:
-        body = _get(f"https://www.startpage.com/sp/search?{params}", timeout, headers=headers)
+        body = _get(
+            f"https://www.startpage.com/sp/search?{params}", timeout, headers=headers
+        )
     except OSError:
         return []
     if _BLOCKED.search(body):
@@ -399,17 +495,23 @@ def mojeek(query, timeout=_TIMEOUT, **options) -> list:
     return _parse_mojeek_html(body, limit)
 
 
-def _norm_url(url) -> str:
+def norm_url(url) -> str:
     parts = urllib.parse.urlsplit(url.lower())
     path = parts.path.rstrip("/")
-    return f"{parts.netloc}{path}?{parts.query}" if parts.query else f"{parts.netloc}{path}"
+    query = urllib.parse.urlencode(
+        sorted(urllib.parse.parse_qsl(parts.query, keep_blank_values=True))
+    )
+    return f"{parts.netloc}{path}?{query}" if query else f"{parts.netloc}{path}"
+
+
+_norm_url = norm_url
 
 
 def merge(result_lists, cap=20) -> list:
     by_url = {}
     for hits in result_lists:
         for hit in hits:
-            key = _norm_url(hit["url"])
+            key = norm_url(hit["url"])
             existing = by_url.get(key)
             if existing is None:
                 by_url[key] = {**hit, "engines": [hit["engine"]]}
@@ -419,7 +521,9 @@ def merge(result_lists, cap=20) -> list:
                     existing["date"] = hit["date"]
                 if hit["engine"] not in existing["engines"]:
                     existing["engines"].append(hit["engine"])
-    ordered = sorted(by_url.values(), key=lambda hit: (hit["rank"], -len(hit["engines"])))
+    ordered = sorted(
+        by_url.values(), key=lambda hit: (hit["rank"], -len(hit["engines"]))
+    )
     return ordered[:cap]
 
 
@@ -429,13 +533,13 @@ def _build_tasks(query, config, k) -> dict:
         tasks["searxng"] = lambda: searxng(query, config["searxng_url"], k)
     if config.get("duckduckgo", True):
         tasks["duckduckgo"] = lambda: duckduckgo(query, k)
-    if config.get("google", True):
+    if config.get("google", False):
         tasks["google"] = lambda: google(query, k, config=config)
-    if config.get("bing", True):
+    if config.get("bing", False):
         tasks["bing"] = lambda: bing(query, k)
-    if config.get("startpage", True):
+    if config.get("startpage", False):
         tasks["startpage"] = lambda: startpage(query, k=k)
-    if config.get("mojeek", True):
+    if config.get("mojeek", False):
         tasks["mojeek"] = lambda: mojeek(query, k=k)
     return tasks
 
@@ -448,22 +552,34 @@ def search(query, config, k=10, cap=20) -> list:
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(tasks))) as pool:
         futures = {pool.submit(fn): name for name, fn in tasks.items()}
         try:
-            for future in concurrent.futures.as_completed(futures, timeout=_TIMEOUT + 2):
+            for future in concurrent.futures.as_completed(
+                futures, timeout=_TIMEOUT + 2
+            ):
                 try:
                     lists.append(future.result())
                 except Exception:
                     lists.append([])
         except concurrent.futures.TimeoutError:
-            lists.extend(future.result() for future in futures if future.done() and not future.exception())
+            lists.extend(
+                future.result()
+                for future in futures
+                if future.done() and not future.exception()
+            )
     return merge(lists, cap)
 
 
 def _demo_merge_and_dates() -> None:
-    primary = [result("A", "https://x.com/p", "sa", "searxng", 1), result("B", "https://y.com", "sb", "searxng", 2)]
+    primary = [
+        result("A", "https://x.com/p", "sa", "searxng", 1),
+        result("B", "https://y.com", "sb", "searxng", 2),
+    ]
     secondary = [result("A2", "https://X.com/p/", "sb2", "duckduckgo", 3)]
     merged = merge([primary, secondary])
     assert len(merged) == 2, merged
-    assert merged[0]["rank"] == 1 and set(merged[0]["engines"]) == {"searxng", "duckduckgo"}, merged[0]
+    assert merged[0]["rank"] == 1 and set(merged[0]["engines"]) == {
+        "searxng",
+        "duckduckgo",
+    }, merged[0]
     assert _parse_date("16 Jun 2026") == "2026-06-16"
     assert _parse_date("May 28, 2026") == "2026-05-28"
     assert _parse_date("07.12.2025") == "2025-12-07"
@@ -472,20 +588,35 @@ def _demo_merge_and_dates() -> None:
 
 def _demo_parsers() -> None:
     sample = '<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fok.com">Hit</a><a class="result__snippet" href="#">snip</a>'
-    assert _parse_duckduckgo_html(sample)[0]["url"] == "https://ok.com", "ddg html decode failed"
+    assert _parse_duckduckgo_html(sample)[0]["url"] == "https://ok.com", (
+        "ddg html decode failed"
+    )
     lite = '<table><tr><td><a href="https://lite.duckduckgo.com/lite/">DuckDuckGo</a></td></tr><tr><td><a href="//duckduckgo.com/l/?uddg=https%3A%2F%2Flite.com">Lite</a></td></tr><tr><td class="result-snippet">lite <b>snip</b></td></tr></table>'
     lite_hits = _parse_duckduckgo_lite(lite)
-    assert len(lite_hits) == 1 and lite_hits[0]["snippet"] == "lite snip", "ddg lite parse failed"
+    assert len(lite_hits) == 1 and lite_hits[0]["snippet"] == "lite snip", (
+        "ddg lite parse failed"
+    )
     google_html = '<a href="/url?q=https%3A%2F%2Fg.com&sa=U"><h3>G</h3></a><div class="VwiC3b">gs</div>'
-    assert _parse_google_html(google_html)[0]["url"] == "https://g.com", "google html parse failed"
-    assert _parse_google_json('{"items":[{"title":"GJ","link":"https://gj.com","snippet":"gjs"}]}')[0]["title"] == "GJ", "google json parse failed"
+    assert _parse_google_html(google_html)[0]["url"] == "https://g.com", (
+        "google html parse failed"
+    )
+    assert (
+        _parse_google_json(
+            '{"items":[{"title":"GJ","link":"https://gj.com","snippet":"gjs"}]}'
+        )[0]["title"]
+        == "GJ"
+    ), "google json parse failed"
     bing_html = '<li class="b_algo"><h2><a href="https://b.com">B</a></h2><div class="b_caption"><p>bs</p></div></li>'
     assert _parse_bing_html(bing_html)[0]["snippet"] == "bs", "bing parse failed"
     startpage_html = '<style><a class="w-gl__result-title" href="https://bad.example">Bad</a></style><a class="w-gl__result-title" href="/sp/result?url=https%3A%2F%2Fs.com">.sx{color:red}S</a><p class="w-gl__description">ss</p>'
     startpage_hits = _parse_startpage_html(startpage_html)
-    assert len(startpage_hits) == 1 and startpage_hits[0]["title"] == "S", "startpage parse failed"
+    assert len(startpage_hits) == 1 and startpage_hits[0]["title"] == "S", (
+        "startpage parse failed"
+    )
     mojeek_html = '<h2><a href="https://m.com">M</a></h2><p class="s">ms</p><a href="https://crumb.com">crumb</a>'
-    assert _parse_mojeek_html(mojeek_html)[0]["url"] == "https://m.com", "mojeek parse failed"
+    assert _parse_mojeek_html(mojeek_html)[0]["url"] == "https://m.com", (
+        "mojeek parse failed"
+    )
 
 
 def demo() -> None:

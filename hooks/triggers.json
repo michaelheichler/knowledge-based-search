@@ -8,8 +8,8 @@
     "recency": {
       "route": "quick_web_search",
       "reason": "the request asks for current information and training data ages",
-      "words": ["latest", "current", "currently", "today", "as of now", "right now", "newest", "up to date", "up-to-date", "recent", "recently", "this year", "this month", "nowadays", "changelog", "release notes", "new version"],
-      "patterns": ["\\b20[2-9][0-9]\\b", "\\bv\\d+\\.\\d+"]
+      "words": ["latest", "current", "currently", "today", "newest", "up to date", "up-to-date", "recent", "recently", "this year", "this month", "nowadays", "changelog", "release notes", "new version"],
+      "patterns": ["\\bas of (now|today)\\b", "(?<!all )\\bright now\\b", "\\b20[2-9][0-9]\\b", "\\bv\\d+\\.\\d+"]
     },
     "research": {
       "route": "web_search",
@@ -25,10 +25,11 @@
   "library_first": {
     "reason": "owned book sources cover research and OSINT method and should be checked alongside the web",
     "tool": "mcp__library",
-    "words": ["method", "methodology", "how to investigate", "how to research", "tradecraft", "verify a claim", "fact-check", "fact check", "source evaluation"]
+    "words": ["method", "methodology", "how to investigate", "how to research", "tradecraft", "fact-check", "fact check", "source evaluation"],
+    "patterns": ["\\bverify (a|the|this) claim\\b"]
   },
   "negative_context": {
     "reason": "local-scope requests need the codebase, not the web",
-    "words": ["my code", "this code", "this repo", "this file", "the function above", "the snippet", "my project", "in this codebase", "the class above", "this function"]
+    "words": ["my code", "this code", "this repo", "this file", "the function above", "the snippet", "my project", "in this codebase", "the class above", "this function", "code review", "git diff", "current diff", "dirty diff", "uncommitted diff", "whole-current-diff", "working tree", "worktree"]
   }
 }
