@@ -1,0 +1,21 @@
+server/rag_host.py
+  s_b395cfd0853bb2::t_6e364d79ecf39d 260-265
+  s_b395cfd0853bb2::t_8214d1ed777a46 174
+  s_b395cfd0853bb2::t_137f5a90130dc4 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "9989ddec9261ac600389af79f80201f9d18cb9b5",
+  "prompts": {},
+  "sessions": {
+    "s_b395cfd0853bb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2f29f1a6-3547-4157-a5f2-1cfbedc39d7e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
