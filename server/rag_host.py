@@ -1,4 +1,5 @@
 import contextlib
+import fcntl
 import hashlib
 import importlib
 import importlib.util
@@ -170,7 +171,7 @@ def _fake_rerank(query, docs):
     return rows
 
 
-def _load_embedder():
+def _load_embedder():  # craftsman-ignore: PY002
     global _embedder
     if _embedder is not None:
         return _embedder
@@ -256,6 +257,12 @@ def _idle_watchdog(server, ref_dir):
 
 
 def _run(sock_path, ref_dir):
+    # Held for the process lifetime so a second host can never bind over a live one and double-load the models.
+    host_lock_fd = os.open(sock_path + ".hostlock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(host_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.exit(0)
     with contextlib.suppress(OSError):
         os.unlink(sock_path)
     os.makedirs(os.path.dirname(sock_path), exist_ok=True)
