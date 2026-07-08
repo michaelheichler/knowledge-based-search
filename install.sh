@@ -167,11 +167,13 @@ ensure_kbs_python() {
 
 write_kbs_wrapper() {
 	local python_bin="$1"
-	cat >"$BIN_DIR/kbs" <<EOF
+	local target="$BIN_DIR/kbs"
+	rm -f "$target"
+	cat >"$target" <<EOF
 #!/usr/bin/env bash
 exec "$python_bin" "$KBS_BIN" "\$@"
 EOF
-	chmod +x "$BIN_DIR/kbs"
+	chmod +x "$target"
 }
 
 install_kbs_bin() {
