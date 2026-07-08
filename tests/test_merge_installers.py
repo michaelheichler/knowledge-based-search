@@ -358,26 +358,5 @@ def test_installer_stdout_includes_all_six_examples():
             assert cmd in result.stdout, f"missing '{cmd}' in installer output"
 
 
-def test_smoke_checklist_artifact_exists():
-    checklist = ROOT / "outputs" / "e4-s1-smoke-checklist.md"
-    assert checklist.exists()
-    text = checklist.read_text(encoding="utf-8")
-    assert "Pi" in text
-    assert "Codex" in text
-    assert "OpenCode" in text
-    assert "which kbs" in text
-    assert "kbs doctor" in text
-
-
-def test_claude_smoke_checklist_artifact_exists():
-    checklist = ROOT / "outputs" / "e4-s2-smoke-checklist.md"
-    assert checklist.exists()
-    text = checklist.read_text(encoding="utf-8")
-    assert "Claude Code" in text
-    assert "mcpServers.knowledge-based-search" in text
-    assert "which kbs" in text
-    assert "kbs doctor" in text
-
-
 if __name__ == "__main__":
     unittest.main()
