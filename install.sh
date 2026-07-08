@@ -5,6 +5,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_NAME="knowledge-based-search"
 KBS_BIN="$REPO/bin/kbs"
 BIN_DIR="${KBS_BIN_DIR:-$HOME/.local/bin}"
+VENV_DIR="${KBS_VENV_DIR:-$REPO/.venv}"
 
 WANT_CLAUDE=auto
 WANT_CODEX=auto
@@ -146,14 +147,41 @@ Verify any fact that can change since training before stating it.
 INSTRUCTIONS
 }
 
+python_has_requirements() {
+	python3 - <<'PY' >/dev/null 2>&1
+import bm25s
+import numpy
+import pypdf
+PY
+}
+
+ensure_kbs_python() {
+	if python_has_requirements; then
+		printf '%s\n' "python3"
+		return 0
+	fi
+	python3 -m venv "$VENV_DIR"
+	"$VENV_DIR/bin/python" -m pip install -r "$REPO/requirements.txt" >&2
+	printf '%s\n' "$VENV_DIR/bin/python"
+}
+
+write_kbs_wrapper() {
+	local python_bin="$1"
+	cat >"$BIN_DIR/kbs" <<EOF
+#!/usr/bin/env bash
+exec "$python_bin" "$KBS_BIN" "\$@"
+EOF
+	chmod +x "$BIN_DIR/kbs"
+}
+
 install_kbs_bin() {
 	if [ ! -f "$KBS_BIN" ]; then
 		printf '%s\n' "bin/kbs not found at $KBS_BIN, skipping PATH install" >&2
 		return 0
 	fi
 	mkdir -p "$BIN_DIR"
-	ln -snf "$KBS_BIN" "$BIN_DIR/kbs"
-	printf '%s\n' "Linked kbs to $BIN_DIR/kbs"
+	write_kbs_wrapper "$(ensure_kbs_python)"
+	printf '%s\n' "Installed kbs wrapper at $BIN_DIR/kbs"
 }
 
 install_opencode() {
