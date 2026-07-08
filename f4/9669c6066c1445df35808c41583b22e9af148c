@@ -1,0 +1,19 @@
+server/refcount.py
+  s_196fb75843a8ca::t_d18a6b2ac845f1 1-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f49669c6066c1445df35808c41583b22e9af148c",
+  "prompts": {},
+  "sessions": {
+    "s_196fb75843a8ca": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f3e77-eab3-7b58-8554-4f9f5b97d05a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
