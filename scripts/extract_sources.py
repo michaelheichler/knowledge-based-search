@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa
 """Extract the source books to per-chapter text units plus a manifest for the summary workflow."""
+
 import json
 import os
 import re
@@ -72,7 +73,9 @@ def _parse_html(html):
 def _epub_units(path):
     units = []
     with zipfile.ZipFile(path) as zf:
-        docs = sorted(n for n in zf.namelist() if n.lower().endswith((".xhtml", ".html", ".htm")))
+        docs = sorted(
+            n for n in zf.namelist() if n.lower().endswith((".xhtml", ".html", ".htm"))
+        )
         for name in docs:
             title, text = _parse_html(zf.read(name).decode("utf-8", "replace"))
             text = text.strip()
@@ -83,7 +86,9 @@ def _epub_units(path):
 
 def _pdf_pages(path):
     try:
-        out = subprocess.run(["pdftotext", "-q", path, "-"], capture_output=True, timeout=300)
+        out = subprocess.run(
+            ["pdftotext", "-q", path, "-"], capture_output=True, timeout=300
+        )
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.decode("utf-8", "replace").split("\f")
     except (OSError, subprocess.SubprocessError):
@@ -107,7 +112,9 @@ def _outline_spans(path):
                 continue
             title = getattr(item, "title", "") or ""
             if _OUTLINE_KEEP.match(title):
-                found.append((title.strip()[:120], reader.get_destination_page_number(item)))
+                found.append(
+                    (title.strip()[:120], reader.get_destination_page_number(item))
+                )
         return found
 
     try:
@@ -117,8 +124,14 @@ def _outline_spans(path):
 
 
 def _fixed_units(text):
-    chunks = [text[i : i + _FIXED_UNIT_CHARS] for i in range(0, len(text), _FIXED_UNIT_CHARS)]
-    return [(f"section {i + 1}", chunk.strip()) for i, chunk in enumerate(chunks) if chunk.strip()]
+    chunks = [
+        text[i : i + _FIXED_UNIT_CHARS] for i in range(0, len(text), _FIXED_UNIT_CHARS)
+    ]
+    return [
+        (f"section {i + 1}", chunk.strip())
+        for i, chunk in enumerate(chunks)
+        if chunk.strip()
+    ]
 
 
 def _pdf_units(path):

@@ -15,7 +15,10 @@ GROUPS = [
     ("exposingtheinvisible", "Exposing the Invisible, The Kit (primary source)"),
     ("osint-techniques", "OSINT Techniques (Bazzell, Edison)"),
     ("osint-resources", "Open Source Intelligence Techniques, Resources (Bazzell)"),
-    ("digital-research-methods", "Handbook of Digital and Computational Research Methods"),
+    (
+        "digital-research-methods",
+        "Handbook of Digital and Computational Research Methods",
+    ),
 ]
 
 
