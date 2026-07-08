@@ -1,0 +1,21 @@
+scripts/extract_sources.py
+  s_196fb75843a8ca::t_c6ad2e2eaa33da 4,76-78,89-91,115-117,127-134
+scripts/generate_index.py
+  s_196fb75843a8ca::t_ce273c53442083 18-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "53a7f9fc19ae7fca848e773480fa3207e0154b2d",
+  "prompts": {},
+  "sessions": {
+    "s_196fb75843a8ca": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f3e77-eab3-7b58-8554-4f9f5b97d05a",
+        "model": "unknown"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
