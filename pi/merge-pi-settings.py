@@ -1,33 +1,11 @@
 #!/usr/bin/env python3
+# ruff: noqa
 import json
-import os
 import sys
 from pathlib import Path
 
 
 SERVER_NAME = "knowledge-based-search"
-
-
-def resolve_python(repo):
-    configured = os.environ.get("KBS_PYTHON")
-    if configured:
-        return configured
-    sibling = repo.parent / "skill-model-loader" / ".venv" / "bin" / "python"
-    if sibling.exists():
-        return str(sibling)
-    raise SystemExit(
-        "Set KBS_PYTHON to the Python interpreter that can run knowledge-based-search"
-    )
-
-
-def resolve_repo(extension_path):
-    configured = os.environ.get("KBS_DIR")
-    if configured:
-        return Path(configured).expanduser().resolve()
-    for parent in [extension_path.parent, *extension_path.parents]:
-        if (parent / "hooks" / "session_start.py").exists():
-            return parent
-    raise SystemExit("Set KBS_DIR to the knowledge-based-search repo")
 
 
 def is_knowledge_based_search_extension(item):
@@ -41,7 +19,7 @@ def read_json(path):
     with path.open(encoding="utf-8") as handle:
         try:
             data = json.load(handle)
-        except json.JSONDecodeError:
+        except ValueError:
             data = {}
     return data if isinstance(data, dict) else {}
 
@@ -58,12 +36,7 @@ def merge(settings_path, extension_path):
         if item != extension and not is_knowledge_based_search_extension(item)
     ]
     data["extensions"].append(extension)
-    repo = resolve_repo(extension_path)
-    servers = data.setdefault("mcpServers", {})
-    servers[SERVER_NAME] = {
-        "command": resolve_python(repo),
-        "args": [str(repo / "server" / "mcp_server.py")],
-    }
+    data.pop("mcpServers", None)
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return data

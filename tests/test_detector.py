@@ -6,10 +6,10 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
-from detector import load_triggers, nudge_for
-from method_inject import hook_output
-from session_start import PRIMER
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
+from detector import load_triggers, nudge_for  # type: ignore[import-not-found]
+from method_inject import hook_output  # type: ignore[import-not-found]
+from session_start import PRIMER  # type: ignore[import-not-found]
 
 TRIGGERS = load_triggers()
 
@@ -18,7 +18,7 @@ class DetectorTests(unittest.TestCase):
     def test_recency_routes_quick(self):
         self.assertTrue(
             nudge_for("what is the latest version of pydantic", TRIGGERS).startswith(
-                "Load the knowledge-based-search skill, then use quick_web_search"
+                "Load the knowledge-based-search skill, then use kbs quick"
             )
         )
 
@@ -26,14 +26,12 @@ class DetectorTests(unittest.TestCase):
         self.assertIsNotNone(nudge_for("what changed in python in 2026", TRIGGERS))
 
     def test_deep_routes_deep_research(self):
-        self.assertIn(
-            "deep_research", nudge_for("do a deep dive on this company", TRIGGERS)
-        )
+        self.assertIn("kbs deep", nudge_for("do a deep dive on this company", TRIGGERS))
 
     def test_research_routes_web_search(self):
         result = nudge_for("research the current state of vector databases", TRIGGERS)
         self.assertIsNotNone(result)
-        self.assertIn("web_search", result)
+        self.assertIn("kbs search", result)
 
     def test_local_scope_suppresses(self):
         self.assertIsNone(nudge_for("refactor the function above in my code", TRIGGERS))
@@ -55,7 +53,7 @@ class DetectorTests(unittest.TestCase):
                 os.environ.pop("KBS_LIBRARY_MCP", None)
             else:
                 os.environ["KBS_LIBRARY_MCP"] = old
-        self.assertIn("web_search", result)
+        self.assertIn("kbs search", result)
         self.assertIn("mcp__library", result)
 
     def test_method_cue_skips_absent_library(self):
@@ -107,8 +105,18 @@ class DetectorTests(unittest.TestCase):
         self.assertIn("Use operators", hook["additionalContext"])
 
     def test_post_tool_method_output_mentions_search_tool(self):
-        hook = hook_output(TRIGGERS, {"tool_name": "web_search"})["hookSpecificOutput"]
+        hook = hook_output(
+            TRIGGERS,
+            {"tool_name": "Bash", "tool_input": {"command": "kbs search test"}},
+        )["hookSpecificOutput"]
         self.assertIn("Cite", hook["additionalContext"])
+
+    def test_post_tool_method_output_ignores_kbs_substrings(self):
+        hook = hook_output(
+            TRIGGERS,
+            {"tool_name": "Bash", "tool_input": {"command": "echo kbs"}},
+        )["hookSpecificOutput"]
+        self.assertNotIn("Cite each sourced claim", hook["additionalContext"])
 
     def test_primer_marks_library_tool_optional(self):
         self.assertIn("if mcp__library is available", PRIMER)

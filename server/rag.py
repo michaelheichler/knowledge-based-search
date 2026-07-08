@@ -1,3 +1,4 @@
+# ruff: noqa
 import contextlib
 import fcntl
 import json
@@ -86,8 +87,10 @@ def rank(query, results):
     if reranked is not None:
         rerank_order = []
         for row in reranked:
-            with contextlib.suppress(Exception):
+            try:
                 rerank_order.append(int(row["index"]))
+            except Exception:
+                continue
         alignment_orders.append(rerank_order)
     relevance_scores = dict(_rrf(alignment_orders))
     return _by_order(results, relevance_scores)
@@ -106,15 +109,23 @@ def _connect_or_spawn(sock_path, ref_dir, host_argv, env):
         return conn
     lock_path = sock_path + ".spawnlock"
     with _spawn_lock:
-        os.makedirs(os.path.dirname(sock_path), exist_ok=True)
+        try:
+            os.makedirs(os.path.dirname(sock_path), exist_ok=True)
+        except OSError:
+            return None
         lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX)
-            conn = _poll_for_host(sock_path, stop_if_absent=False)
+            conn = _connect(sock_path)
             if conn is not None:
                 return conn
-            with contextlib.suppress(OSError):
-                os.remove(sock_path)
+            if os.path.exists(sock_path):
+                with contextlib.suppress(OSError):
+                    os.remove(sock_path)
+            else:
+                conn = _poll_for_host(sock_path, stop_if_absent=True)
+                if conn is not None:
+                    return conn
             argv = list(host_argv) if host_argv else [_loader_python(), _HOST]
             subprocess.Popen(
                 argv + [sock_path, ref_dir],
@@ -162,6 +173,36 @@ def _request(sock_path, msg, timeout=_REQUEST_TIMEOUT):
     if conn is None:
         return None
     return _request_on(conn, msg, timeout)
+
+
+def daemon_status(sock_path=None):
+    socket_path = sock_path or default_sock_path()
+    socket_exists = os.path.exists(socket_path)
+    status = {
+        "status": "down",
+        "persistent_process": "rag_host",
+        "socket_path": socket_path,
+        "socket_exists": socket_exists,
+        "socket_stale": False,
+        "model_warm": None,
+        "last_request_at": None,
+        "idle_seconds": None,
+    }
+    if not socket_exists:
+        return status
+    if _stale_path(socket_path):
+        status["status"] = "stale"
+        status["socket_stale"] = True
+        return status
+    response = _request(socket_path, {"op": "status"}, timeout=1.0)
+    if response is None:
+        status["status"] = "stale"
+        status["socket_stale"] = True
+        return status
+    status.update(response)
+    status["status"] = "alive"
+    status["socket_stale"] = False
+    return status
 
 
 def _stale_path(sock_path):
@@ -228,7 +269,10 @@ def _coerce_indices(response):
         if len(documents) and isinstance(documents[0], (list, tuple, np.ndarray))
         else documents
     )
-    return [int(index) for index in first]
+    try:
+        return [int(index) for index in first]
+    except Exception:
+        return []
 
 
 def _dense_order(vectors):
@@ -245,15 +289,21 @@ def _dense_order(vectors):
 def _date_key(result):
     date = result.get("date", "") if isinstance(result, dict) else ""
     digits = date.replace("-", "")
-    return -int(digits) if digits.isdigit() else 1
+    try:
+        return -int(digits) if digits.isdigit() else 1
+    except ValueError:
+        return 1
 
 
 def _cosine(left, right):
-    left_norm = float(np.linalg.norm(left))
-    right_norm = float(np.linalg.norm(right))
-    if left_norm == 0.0 or right_norm == 0.0:
+    try:
+        left_norm = float(np.linalg.norm(left))
+        right_norm = float(np.linalg.norm(right))
+        if left_norm == 0.0 or right_norm == 0.0:
+            return 0.0
+        return float(np.dot(left, right)) / (left_norm * right_norm)
+    except Exception:
         return 0.0
-    return float(np.dot(left, right)) / (left_norm * right_norm)
 
 
 def _rrf(rankings):

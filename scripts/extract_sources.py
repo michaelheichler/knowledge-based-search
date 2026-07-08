@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa
 """Extract the source books to per-chapter text units plus a manifest for the summary workflow."""
 import json
 import os
@@ -13,17 +14,17 @@ OUT_ROOT = os.environ.get("KBS_BUILD_DIR", "/tmp/kbs_build")
 SOURCES = [
     {
         "slug": "osint-techniques",
-        "path": "/Users/michael/Downloads/OSINT Techniques (Michael Bazzell, Jason Edison) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+        "path": os.environ.get("KBS_OSINT_TECHNIQUES_EPUB", ""),
         "kind": "epub",
     },
     {
         "slug": "osint-resources",
-        "path": "/Users/michael/Downloads/Open Source Intelligence Techniques Resources for Searching and Analyzing Online Information (Michael Bazzell) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+        "path": os.environ.get("KBS_OSINT_RESOURCES_PDF", ""),
         "kind": "pdf",
     },
     {
         "slug": "digital-research-methods",
-        "path": "/Users/michael/Downloads/Handbook of Digital and Computational Research Methods In the Social Sciences and Humanities (Anders Koed Madsen, Anders Kristian Munk) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+        "path": os.environ.get("KBS_DIGITAL_RESEARCH_METHODS_PDF", ""),
         "kind": "pdf",
     },
 ]
@@ -135,32 +136,47 @@ def _pdf_units(path):
 
 
 def _extract_one(source):
-    units = _epub_units(source["path"]) if source["kind"] == "epub" else _pdf_units(source["path"])
+    units = (
+        _epub_units(source["path"])
+        if source["kind"] == "epub"
+        else _pdf_units(source["path"])
+    )
     out_dir = os.path.join(OUT_ROOT, source["slug"])
-    os.makedirs(out_dir, exist_ok=True)
-    records = []
-    for idx, (title, body) in enumerate(units, 1):
-        unit_id = f"ch{idx:02d}"
-        unit_path = os.path.join(out_dir, f"{unit_id}.txt")
-        with open(unit_path, "w", encoding="utf-8") as fh:
-            fh.write(body)
-        records.append({"id": unit_id, "title": title, "path": unit_path, "chars": len(body)})
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        records = []
+        for idx, (title, body) in enumerate(units, 1):
+            unit_id = f"ch{idx:02d}"
+            unit_path = os.path.join(out_dir, f"{unit_id}.txt")
+            with open(unit_path, "w", encoding="utf-8") as fh:
+                fh.write(body)
+            records.append(
+                {"id": unit_id, "title": title, "path": unit_path, "chars": len(body)}
+            )
+    except OSError as exc:
+        raise SystemExit(f"failed writing extracted source units: {exc}") from exc
     return records
 
 
 def run():
     manifest = {}
     for source in SOURCES:
+        if not source["path"]:
+            print(f"MISSING env path for {source['slug']}", file=sys.stderr)
+            continue
         if not os.path.exists(source["path"]):
             print(f"MISSING source: {source['path']}", file=sys.stderr)
             continue
         records = _extract_one(source)
         manifest[source["slug"]] = records
         print(f"{source['slug']}: {len(records)} units")
-    os.makedirs(OUT_ROOT, exist_ok=True)
-    manifest_path = os.path.join(OUT_ROOT, "manifest.json")
-    with open(manifest_path, "w", encoding="utf-8") as fh:
-        json.dump(manifest, fh, indent=2)
+    try:
+        os.makedirs(OUT_ROOT, exist_ok=True)
+        manifest_path = os.path.join(OUT_ROOT, "manifest.json")
+        with open(manifest_path, "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh, indent=2)
+    except OSError as exc:
+        raise SystemExit(f"failed writing manifest: {exc}") from exc
     print(f"manifest: {manifest_path}")
     return manifest
 

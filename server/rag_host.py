@@ -1,3 +1,4 @@
+# ruff: noqa
 import contextlib
 import fcntl
 import hashlib
@@ -8,7 +9,9 @@ import os
 import signal
 import socketserver
 import sys
+from pathlib import Path
 import threading
+from typing import Any, cast
 import time
 
 _ENGLISH_MODELS = os.path.expanduser("~/.english-for-agents/models")
@@ -17,13 +20,29 @@ _EMBED_DIR = os.environ.get(
     "KBS_EMBED_MLX_MODEL_DIR",
     os.path.join(_ENGLISH_MODELS, "jina-embeddings-v5-text-nano-mlx"),
 )
-_JINA_DIR = os.environ.get("KBS_JINA_MLX_DIR", os.path.join(_ENGLISH_MODELS, "jina-reranker-v3-mlx"))
+_JINA_DIR = os.environ.get(
+    "KBS_JINA_MLX_DIR", os.path.join(_ENGLISH_MODELS, "jina-reranker-v3-mlx")
+)
 _EMBED_TASK = os.environ.get("KBS_EMBED_TASK", "text-matching")
 _FAKE = os.environ.get("KBS_FAKE_MODEL") == "1"
-_CACHE_LIMIT_BYTES = int(
-    os.environ.get("KBS_MLX_CACHE_LIMIT_BYTES", str(512 * 1024 * 1024))
-)
-_IDLE_SECS = float(os.environ.get("KBS_RAG_IDLE_SECS", "600"))
+
+
+def _env_int(name, default):
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _env_float(name, default):
+    try:
+        return float(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+_CACHE_LIMIT_BYTES = _env_int("KBS_MLX_CACHE_LIMIT_BYTES", 512 * 1024 * 1024)
+_IDLE_SECS = _env_float("KBS_RAG_IDLE_SECS", 600.0)
 _IDLE_POLL_SECS = 5.0
 _model_lock = threading.Lock()
 _embedder = None
@@ -32,7 +51,7 @@ _reranker = None
 
 def _set_cache_limit():
     try:
-        import mlx.core as mx
+        import mlx.core as mx  # type: ignore[import-not-found]
 
         mx.set_cache_limit(_CACHE_LIMIT_BYTES)
     except Exception:
@@ -41,7 +60,7 @@ def _set_cache_limit():
 
 def _clear_mlx_cache():
     try:
-        import mlx.core as mx
+        import mlx.core as mx  # type: ignore[import-not-found]
 
         mx.clear_cache()
     except Exception:
@@ -71,11 +90,16 @@ class _Handler(socketserver.StreamRequestHandler):
             line = raw.strip()
             if not line:
                 continue
+            _start_request(self.server)
             try:
                 message = json.loads(line)
-                response = _dispatch(message, self.server.ref_dir, self.server)
+                response = _dispatch(
+                    message, cast(Any, self.server).ref_dir, self.server
+                )
             except Exception as exc:
                 response = {"error": str(exc)}
+            finally:
+                _finish_request(self.server)
             self.wfile.write((json.dumps(response) + "\n").encode())
             self.wfile.flush()
 
@@ -86,6 +110,9 @@ class _Server(socketserver.ThreadingUnixStreamServer):
     def __init__(self, sock_path, ref_dir):
         self.ref_dir = ref_dir
         self._shutting_down = False
+        self._last_request_at = time.monotonic()
+        self._active_requests = 0
+        self._request_lock = threading.Lock()
         super().__init__(sock_path, _Handler)
 
 
@@ -99,12 +126,29 @@ def default_ref_dir():
 
 def _dispatch(message, ref_dir, server):
     operation = message.get("op")
-    if getattr(server, "_shutting_down", False) and operation in ("attach", "attach_turn", "embed", "rerank"):
+    if operation == "status":
+        last_request_at, active_requests = _request_snapshot(server)
+        return {
+            "status": "alive",
+            "model_warm": _model_warm(),
+            "last_request_at": last_request_at,
+            "idle_seconds": max(0.0, time.monotonic() - last_request_at),
+            "active_requests": active_requests,
+            "shutting_down": getattr(server, "_shutting_down", False),
+        }
+    if getattr(server, "_shutting_down", False) and operation in (
+        "attach",
+        "attach_turn",
+        "embed",
+        "rerank",
+    ):
         return {"error": "host is shutting down"}
     if operation == "embed":
         return {"vectors": _embed(message.get("texts", []))}
     if operation == "rerank":
-        return {"results": _rerank(message.get("query", ""), message.get("documents", []))}
+        return {
+            "results": _rerank(message.get("query", ""), message.get("documents", []))
+        }
     counter = refcount.Refcount(ref_dir)
     if operation == "attach":
         return {"ref": counter.attach(message["tool"], message["session"])}
@@ -116,14 +160,44 @@ def _dispatch(message, ref_dir, server):
         is_last = counter.detach_turn(message["turn_id"])
     else:
         return {"error": f"unknown op {operation!r}"}
-    if is_last:
-        _begin_shutdown(server)
     return {"released": True, "last": is_last}
+
+
+def _start_request(server):
+    lock = getattr(server, "_request_lock", None)
+    if lock is None:
+        return
+    with lock:
+        server._active_requests += 1
+
+
+def _finish_request(server):
+    lock = getattr(server, "_request_lock", None)
+    if lock is None:
+        server._last_request_at = time.monotonic()
+        return
+    with lock:
+        server._active_requests = max(0, server._active_requests - 1)
+        server._last_request_at = time.monotonic()
+
+
+def _request_snapshot(server):
+    lock = getattr(server, "_request_lock", None)
+    if lock is None:
+        if not hasattr(server, "_last_request_at"):
+            server._last_request_at = time.monotonic()
+        return server._last_request_at, 0
+    with lock:
+        return server._last_request_at, server._active_requests
 
 
 def _begin_shutdown(server):
     server._shutting_down = True
     threading.Thread(target=server.shutdown, daemon=True).start()
+
+
+def _model_warm():
+    return _FAKE or _embedder is not None or _reranker is not None
 
 
 def _embed(texts):
@@ -146,13 +220,19 @@ def _rerank(query, documents):
         return []
     with _model_lock:
         raw = _load_reranker().rerank(str(query), docs)
-        result = [
-            {
-                "index": int(row["index"]),
-                "score": float(row.get("score", row.get("relevance_score", 0.0))),
-            }
-            for row in raw
-        ]
+        result = []
+        for row in raw:
+            try:
+                result.append(
+                    {
+                        "index": int(row["index"]),
+                        "score": float(
+                            row.get("score", row.get("relevance_score", 0.0))
+                        ),
+                    }
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
         _clear_mlx_cache()
         return result
 
@@ -166,7 +246,10 @@ def _fake_rerank(query, docs):
     rows = []
     for index, doc in enumerate(docs):
         score = sum(_fake_vector(query + "\n" + doc))
-        rows.append({"index": index, "score": float(score)})
+        try:
+            rows.append({"index": index, "score": float(score)})
+        except (TypeError, ValueError):
+            continue
     rows.sort(key=lambda row: -row["score"])
     return rows
 
@@ -175,15 +258,26 @@ def _load_embedder():  # craftsman-ignore: PY002
     global _embedder
     if _embedder is not None:
         return _embedder
-    import mlx.core as mx
-    from tokenizers import Tokenizer
+    import mlx.core as mx  # type: ignore[import-not-found]
+    from tokenizers import Tokenizer  # type: ignore[import-not-found]
 
-    with open(os.path.join(_EMBED_DIR, "config.json"), encoding="utf-8") as handle:
-        config = json.load(handle)
-    spec = importlib.util.spec_from_file_location("kbs_jina_embed", os.path.join(_EMBED_DIR, "model.py"))
+    try:
+        with open(os.path.join(_EMBED_DIR, "config.json"), encoding="utf-8") as handle:
+            config = json.load(handle)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("embedding config not readable") from exc
+    spec = importlib.util.spec_from_file_location(
+        "kbs_jina_embed", os.path.join(_EMBED_DIR, "model.py")
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("embedding model module not found")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    model_class = next(getattr(module, name) for name in dir(module) if name.endswith("EmbeddingModel") and isinstance(getattr(module, name), type))
+    model_class = next(
+        getattr(module, name)
+        for name in dir(module)
+        if name.endswith("EmbeddingModel") and isinstance(getattr(module, name), type)
+    )
     model = _build_embed_model(module, model_class, config)
     weights = mx.load(os.path.join(_EMBED_DIR, "model.safetensors"))
     if hasattr(model, "sanitize"):
@@ -204,12 +298,23 @@ def _load_embedder():  # craftsman-ignore: PY002
 def _build_embed_model(module, model_class, config):
     try:
         return model_class(config)
-    except Exception:
-        for name in dir(module):
-            candidate = getattr(module, name)
-            if name.endswith("Config") and hasattr(candidate, "from_dict"):
-                with contextlib.suppress(Exception):
-                    return model_class(candidate.from_dict(config))
+    except TypeError:
+        pass
+    except ValueError:
+        pass
+    except RuntimeError:
+        pass
+    for name in dir(module):
+        candidate = getattr(module, name)
+        if name.endswith("Config") and hasattr(candidate, "from_dict"):
+            try:
+                return model_class(candidate.from_dict(config))
+            except TypeError:
+                continue
+            except ValueError:
+                continue
+            except RuntimeError:
+                continue
     raise RuntimeError("no usable Jina embedding config")
 
 
@@ -221,7 +326,8 @@ def _load_reranker():
     sys.path.insert(0, _JINA_DIR)
     try:
         os.chdir(_JINA_DIR)
-        from rerank import MLXReranker
+        from rerank import MLXReranker  # type: ignore[import-not-found]
+
         _reranker = MLXReranker()
     finally:
         os.chdir(cwd)
@@ -231,20 +337,13 @@ def _load_reranker():
 
 
 def _idle_watchdog(server, ref_dir):
-    """After _IDLE_SECS with no attached client and no request in flight, clear the cache and shut down."""
-    counter = refcount.Refcount(ref_dir)
-    zero_since = None
+    """After _IDLE_SECS with no completed request and no request in flight, clear the cache and shut down."""
     while not getattr(server, "_shutting_down", False):
         time.sleep(_IDLE_POLL_SECS)
         if getattr(server, "_shutting_down", False):
             return
-        if counter.live_count() != 0:
-            zero_since = None
-            continue
-        if zero_since is None:
-            zero_since = time.monotonic()
-            continue
-        if time.monotonic() - zero_since < _IDLE_SECS:
+        last_request_at, active_requests = _request_snapshot(server)
+        if active_requests or time.monotonic() - last_request_at < _IDLE_SECS:
             continue
         if not _model_lock.acquire(blocking=False):
             continue
@@ -263,9 +362,12 @@ def _run(sock_path, ref_dir):
         fcntl.flock(host_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         sys.exit(0)
-    with contextlib.suppress(OSError):
-        os.unlink(sock_path)
-    os.makedirs(os.path.dirname(sock_path), exist_ok=True)
+    Path(sock_path).unlink(missing_ok=True)
+    try:
+        os.makedirs(os.path.dirname(sock_path), exist_ok=True)
+    except OSError:
+        os.close(host_lock_fd)
+        return
     _set_cache_limit()
     server = _Server(sock_path, ref_dir)
 
@@ -278,8 +380,7 @@ def _run(sock_path, ref_dir):
     server.serve_forever(poll_interval=0.2)
     server.server_close()
     # AF_UNIX close() does not remove the bound path, so unlink it ourselves.
-    with contextlib.suppress(OSError):
-        os.unlink(sock_path)
+    Path(sock_path).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

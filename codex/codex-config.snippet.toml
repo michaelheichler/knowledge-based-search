@@ -1,8 +1,4 @@
 # >>> knowledge-based-search >>>
-[mcp_servers.knowledge-based-search]
-command = "__KBS_PYTHON__"
-args = ["__KBS_SERVER__"]
-
 [[hooks.SessionStart]]
 matcher = "startup|resume|clear|compact"
 [[hooks.SessionStart.hooks]]

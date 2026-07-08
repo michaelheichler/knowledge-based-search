@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa
 """Checks for the PreToolUse skill-load gate."""
 
 import json
@@ -6,25 +7,25 @@ import os
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
-import skill_gate
-from skill_gate import should_block, _line_loads_skill, SKILL_NAME
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
+import skill_gate  # type: ignore[import-not-found]
+from skill_gate import SKILL_NAME, _line_loads_skill, should_block  # type: ignore[import-not-found]
 
 
 def _transcript(lines):
-    handle = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         "w", suffix=".jsonl", delete=False, encoding="utf-8"
-    )
-    for line in lines:
-        handle.write(line + "\n")
-    handle.close()
-    return handle.name
+    ) as handle:
+        for line in lines:
+            handle.write(line + "\n")
+        return handle.name
 
 
 class SkillGateTests(unittest.TestCase):
-    def test_blocks_when_skill_never_loaded(self):
+    def test_blocks_kbs_when_skill_never_loaded(self):
         path = _transcript(
             [
                 json.dumps(
@@ -43,7 +44,42 @@ class SkillGateTests(unittest.TestCase):
             ]
         )
         self.addCleanup(os.unlink, path)
-        self.assertTrue(should_block({"transcript_path": path}))
+        self.assertTrue(
+            should_block(
+                {
+                    "transcript_path": path,
+                    "tool_name": "Bash",
+                    "tool_input": {"command": "kbs search current docs"},
+                }
+            )
+        )
+
+    def test_allows_non_kbs_bash_without_skill(self):
+        path = _transcript([])
+        self.addCleanup(os.unlink, path)
+        self.assertFalse(
+            should_block(
+                {
+                    "transcript_path": path,
+                    "tool_name": "Bash",
+                    "tool_input": {"command": "ls"},
+                }
+            )
+        )
+
+    def test_allows_kbs_substrings_that_are_not_commands(self):
+        path = _transcript([])
+        self.addCleanup(os.unlink, path)
+        for command in ["echo kbs", "cat /tmp/kbs-backup", "makbs search"]:
+            self.assertFalse(
+                should_block(
+                    {
+                        "transcript_path": path,
+                        "tool_name": "Bash",
+                        "tool_input": {"command": command},
+                    }
+                )
+            )
 
     def test_allows_when_skill_loaded(self):
         path = _transcript(
@@ -93,13 +129,19 @@ class SkillGateTests(unittest.TestCase):
             opened.append(args[0])
             return real_open(*args, **kwargs)
 
+        event = {
+            "transcript_path": path,
+            "tool_name": "Bash",
+            "tool_input": {"command": "kbs quick pydantic"},
+        }
+
         with mock.patch("builtins.open", counting_open):
-            self.assertFalse(should_block({"transcript_path": path}))
-            self.assertFalse(should_block({"transcript_path": path}))
+            self.assertFalse(should_block(event))
+            self.assertFalse(should_block(event))
 
         self.assertEqual(opened, [path])
 
-    def test_skill_name_in_other_skill_args_does_not_pass(self):
+    def test_skill_name_in_other_skill_args_does_not_load_gate(self):
         decoy = json.dumps(
             {
                 "message": {
@@ -113,23 +155,39 @@ class SkillGateTests(unittest.TestCase):
                 }
             }
         )
-        self.assertFalse(_line_loads_skill(decoy))
+        loaded = json.dumps(
+            {
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Skill",
+                            "input": {"skill": SKILL_NAME},
+                        }
+                    ]
+                }
+            }
+        )
 
-    def test_mcp_tool_name_does_not_pass(self):
+        assert not _line_loads_skill(decoy)
+        assert _line_loads_skill(loaded)
+
+    def test_non_skill_tool_name_does_not_load_gate(self):
         line = json.dumps(
             {
                 "message": {
                     "content": [
                         {
                             "type": "tool_use",
-                            "name": "mcp__knowledge-based-search__web_search",
-                            "input": {"query": "x"},
+                            "name": "Bash",
+                            "input": {"command": "kbs search x"},
                         }
                     ]
                 }
             }
         )
-        self.assertFalse(_line_loads_skill(line))
+
+        assert not _line_loads_skill(line)
 
     def test_fails_open_on_missing_path(self):
         self.assertFalse(should_block({}))

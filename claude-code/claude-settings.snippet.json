@@ -1,14 +1,8 @@
 {
-  "mcpServers": {
-    "knowledge-based-search": {
-      "command": "__KBS_PYTHON__",
-      "args": ["__KBS_SERVER__"]
-    }
-  },
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "mcp__knowledge-based-search__.*",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
@@ -40,7 +34,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__knowledge-based-search__.*",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",

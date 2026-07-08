@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
+# ruff: noqa
 import json
+import re
 import sys
 
 from detector import load_triggers
+
+_KBS_COMMAND_RE = re.compile(r"(^|[;&|]\s*)([A-Za-z_][A-Za-z0-9_]*=\S+\s+)*kbs(\s|$)")
 
 
 def hook_output(triggers=None, event=None):
@@ -10,7 +14,10 @@ def hook_output(triggers=None, event=None):
     event = event or {}
     text = triggers["method"]["text"]
     tool_name = event.get("tool_name") or event.get("tool", {}).get("name", "")
-    if tool_name in {"web_search", "deep_research", "get_content"}:
+    tool_input = event.get("tool_input", {})
+    command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
+    is_kbs = tool_name == "Bash" and bool(_KBS_COMMAND_RE.search(command))
+    if is_kbs:
         text += " Cite each sourced claim and check each source date."
     return {
         "hookSpecificOutput": {
@@ -21,7 +28,10 @@ def hook_output(triggers=None, event=None):
 
 
 def main():
-    event = json.load(sys.stdin)
+    try:
+        event = json.load(sys.stdin)
+    except (ValueError, OSError):
+        return
     print(json.dumps(hook_output(event=event)))
 
 

@@ -1,3 +1,6 @@
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 export const meta = {
   name: 'kbs-references-rebuild',
   description: 'Broad faithful summary of every chapter and section, one summarizer plus one validator per unit, website first then each book in order',
@@ -9,8 +12,9 @@ export const meta = {
   ],
 }
 
-const REF_ROOT = '/Users/michael/dev/skills/knowledge-based-search/skills/knowledge-based-search/references'
-const BUILD_ROOT = '/tmp/kbs_build'
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const REF_ROOT = resolve(REPO_ROOT, 'skills/knowledge-based-search/references')
+const BUILD_ROOT = process.env.KBS_BUILD_DIR || '/tmp/kbs_build'
 const BASE = 'https://kit.exposingtheinvisible.org/en/'
 
 const WEBSITE = [

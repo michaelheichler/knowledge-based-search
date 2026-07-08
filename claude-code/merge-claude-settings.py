@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
+# ruff: noqa
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,39 +9,24 @@ from pathlib import Path
 SERVER_NAME = "knowledge-based-search"
 
 
-def resolve_python(repo):
-    configured = os.environ.get("KBS_PYTHON")
-    if configured:
-        return configured
-    sibling = repo.parent / "skill-model-loader" / ".venv" / "bin" / "python"
-    if sibling.exists():
-        return str(sibling)
-    raise SystemExit(
-        "Set KBS_PYTHON to the Python interpreter that can run knowledge-based-search"
-    )
-
-
 def read_json(path):
     if not path.exists():
         return {}
     with path.open(encoding="utf-8") as handle:
         try:
             data = json.load(handle)
-        except json.JSONDecodeError:
+        except ValueError:
             data = {}
     return data if isinstance(data, dict) else {}
 
 
 def render_snippet(path, repo):
     text = path.read_text(encoding="utf-8")
-    values = {
-        "__KBS_DIR__": str(repo),
-        "__KBS_PYTHON__": resolve_python(repo),
-        "__KBS_SERVER__": str(repo / "server" / "mcp_server.py"),
-    }
-    for key, value in values.items():
-        text = text.replace(key, value)
-    return json.loads(text)
+    text = text.replace("__KBS_DIR__", str(repo))
+    try:
+        return json.loads(text)
+    except ValueError as exc:
+        raise SystemExit(f"invalid Claude settings snippet {path}: {exc}") from exc
 
 
 def hook_entry_is_ours(entry):
@@ -92,6 +77,16 @@ def remove_our_hooks(data):
     return data
 
 
+def remove_kbs_server_config(data):
+    mcp_servers = data.get("mcpServers")
+    if not isinstance(mcp_servers, dict):
+        return data
+    mcp_servers.pop(SERVER_NAME, None)
+    if not mcp_servers:
+        data.pop("mcpServers", None)
+    return data
+
+
 def merge_hooks(settings, incoming_hooks):
     hooks = settings.setdefault("hooks", {})
     for event, incoming_entries in incoming_hooks.items():
@@ -112,6 +107,7 @@ def merge(config_path, snippet_path, repo, settings_path=None):
     settings = read_json(settings_path)
     config_snippet = {key: value for key, value in snippet.items() if key != "hooks"}
     remove_our_hooks(config)
+    remove_kbs_server_config(config)
     deep_merge(config, config_snippet)
     merge_hooks(settings, snippet.get("hooks", {}))
     config_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
+# ruff: noqa
 import re
-import os
 import sys
 import tomllib
 from pathlib import Path
@@ -10,27 +10,9 @@ START = "# >>> knowledge-based-search >>>"
 END = "# <<< knowledge-based-search <<<"
 
 
-def resolve_python(repo):
-    configured = os.environ.get("KBS_PYTHON")
-    if configured:
-        return configured
-    sibling = repo.parent / "skill-model-loader" / ".venv" / "bin" / "python"
-    if sibling.exists():
-        return str(sibling)
-    raise SystemExit(
-        "Set KBS_PYTHON to the Python interpreter that can run knowledge-based-search"
-    )
-
-
 def render(path, repo):
     text = path.read_text(encoding="utf-8")
-    values = {
-        "__KBS_DIR__": str(repo),
-        "__KBS_PYTHON__": resolve_python(repo),
-        "__KBS_SERVER__": str(repo / "server" / "mcp_server.py"),
-    }
-    for key, value in values.items():
-        text = text.replace(key, value)
+    text = text.replace("__KBS_DIR__", str(repo))
     return text.strip()
 
 

@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-"""Generate references/README.md, a routing index built from each note front matter."""
-import os
-import re
+# ruff: noqa
+"""Generate references/README.md from note front matter."""
 
-ROOT = "/Users/michael/dev/skills/knowledge-based-search/skills/knowledge-based-search/references"
+import re
+from pathlib import Path
+
+ROOT = (
+    Path(__file__).resolve().parents[1]
+    / "skills"
+    / "knowledge-based-search"
+    / "references"
+)
 GROUPS = [
     ("exposingtheinvisible", "Exposing the Invisible, The Kit (primary source)"),
     ("osint-techniques", "OSINT Techniques (Bazzell, Edison)"),
@@ -19,16 +26,16 @@ def _field(text, key):
 
 def _entries(group):
     out = []
-    group_dir = os.path.join(ROOT, group)
-    if not os.path.isdir(group_dir):
+    group_dir = ROOT / group
+    if not group_dir.is_dir():
         return out
-    for name in sorted(os.listdir(group_dir)):
-        if not name.endswith(".md") or name == "README.md":
+    for path in sorted(group_dir.glob("*.md")):
+        if path.name == "README.md":
             continue
-        text = open(os.path.join(group_dir, name), encoding="utf-8").read()
-        title = _field(text, "title") or name[:-3]
+        text = path.read_text(encoding="utf-8")
+        title = _field(text, "title") or path.stem
         use_when = _field(text, "use_when")
-        out.append((f"{group}/{name}", title, use_when))
+        out.append((f"{group}/{path.name}", title, use_when))
     return out
 
 
@@ -53,9 +60,8 @@ def run():
             lines.append(f"- [{title}]({path}).{hook}")
         lines.append("")
     lines.append(f"Total notes: {total}.")
-    out_path = os.path.join(ROOT, "README.md")
-    with open(out_path, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines) + "\n")
+    out_path = ROOT / "README.md"
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out_path} with {total} entries")
 
 

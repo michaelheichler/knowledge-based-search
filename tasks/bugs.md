@@ -1,27 +1,21 @@
 # Bug and reliability list
 
-Found during the post-build debug sweep on 2026-06-27. Verified live unless marked otherwise.
-
 ## Open
 
-### B1. MCP tools do not surface mid-session
-`claude mcp list` shows `knowledge-based-search ✔ Connected`, but the tools are absent from the running session because Claude loads MCP tools at session start and the server was registered after this session began. Not a code defect. Verify the in-Claude tool path from a fresh session. The server logic works (direct `quick_web_search` call returned ranked results live).
+- No known blocking bugs after the CLI migration.
+- Public SearXNG instances can be rate-limited or intermittent. Keep direct keyless engines as degraded fallbacks and prefer a reliable SearXNG instance when available.
 
-### B2. Single flaky SearXNG source, fixed by direct engines
-endianness.de is a public instance, rate-limited and intermittent. One probe returned only google plus startpage, a later probe had every backend time out or get suspended. The kindly MCP rides the same SearXNG and returned garbage (Google homepage, an unrelated blog) for an API-pricing query, confirming the instance is the weak link. Fixed: direct google, bing, duckduckgo scrapers added so SearXNG is one source among several. Live result on "openai news": duckduckgo lite returned 5 hits, merged total 9 with searxng. DuckDuckGo plus SearXNG is the working keyless stack.
+## Closed
 
-### B4. Google and Bing keyless scraping is blocked, Startpage solves the Google gap
-Verified live 2026-06-27. Google returns an enablejs plus challenge page (requires JavaScript, no header tweak recovers it). Bing returns a captcha challenge regardless of headers. So keyless google and bing return [] right now. The fix for Google is Startpage, which serves Google results as plain HTML with no JS wall. Added startpage and mojeek engines, both verified live (5 hits each, clean titles). Google direct still has the optional Custom Search key path. Bing has no key option (API retired) and stays as best-effort. Playwright would render the JS but the owner ruled it out.
+- KBS no longer depends on a runtime MCP server.
+- Claude Code, Codex, Pi, and OpenCode now receive instructions or hooks that call `kbs` through the shell.
+- The deleted adapter is no longer imported by tests or benchmarks.
+- Context memory is file-backed through `server/state.py`; the dead in-process context dict was removed.
 
-Engine probe results (live 2026-06-27, query "openai news"): working keyless are duckduckgo lite, searxng, startpage, mojeek. Blocked are ecosia (403), brave (cloudflare), yandex, google udm14 and gbv1, bing, and the public searx instances tried. Brave free API tier was removed February 2026, now metered with a live card.
+## Verification
 
-## Resolved or closed
-
-### B3. Codex health "Unsupported" is not a failure
-The "Unsupported" label is the Auth column in `codex mcp list`, not Status. Status is `enabled`, identical to all 9 Codex servers (serena, lad, kindly, etc.). It means no OAuth or bearer auth, correct for a stdio server. No action.
-
-## Engine API landscape (verified live 2026-06-27)
-
-- Bing Search API retired August 11 2025, all instances decommissioned, no new keys. Only Microsoft path is Grounding with Bing Search in Azure AI Foundry (full Azure lock-in). Keyless HTML scraping is the only option for bing.
-- Google Custom Search JSON API still exists, free tier about 100 queries per day then paid. Reliable keyed path. Optional config keys `google_api_key` plus `google_cx` enable it, else scrape google.com. (Free-tier number from prior knowledge, not re-verified this session.)
-- DuckDuckGo has no web-results API, only the Instant Answer API which returns no result lists. Keyless scraping of the html or lite endpoint is the only option.
+```sh
+uv run --with pytest --with bm25s --with numpy --with pypdf pytest tests/ server/tests/ -q
+bash -n install.sh
+./bin/kbs doctor --json
+```

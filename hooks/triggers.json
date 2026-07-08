@@ -6,18 +6,18 @@
   },
   "categories": {
     "recency": {
-      "route": "quick_web_search",
+      "route": "kbs quick",
       "reason": "the request asks for current information and training data ages",
       "words": ["latest", "current", "currently", "today", "newest", "up to date", "up-to-date", "recent", "recently", "this year", "this month", "nowadays", "changelog", "release notes", "new version"],
       "patterns": ["\\bas of (now|today)\\b", "(?<!all )\\bright now\\b", "\\b20[2-9][0-9]\\b", "\\bv\\d+\\.\\d+"]
     },
     "research": {
-      "route": "web_search",
+      "route": "kbs search",
       "reason": "the answer should be sourced and current, not recalled from memory",
       "words": ["research", "look up", "look into", "find sources", "find information on", "investigate", "compare", "state of the art", "current state of", "survey of", "background on", "documentation for", "what are the options for", "who makes", "pricing of"]
     },
     "deep": {
-      "route": "deep_research",
+      "route": "kbs deep",
       "reason": "the request needs a thorough, multi-source investigation",
       "words": ["deep dive", "deep research", "thoroughly investigate", "full report", "comprehensive report", "osint", "who is", "trace", "background check", "due diligence", "profile of", "everything about", "dig into"]
     }

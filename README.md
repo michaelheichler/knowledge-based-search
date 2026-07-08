@@ -1,31 +1,72 @@
 # knowledge-based-search
 
-A keyless, self-hosted web-search package for coding agents (Claude Code, Codex, Pi). It runs
-triple-engine search (SearXNG primary, duckduckgo, bing, google), ranks results with a local
-RAG layer (jina embeddings plus reranker plus bm25, no API key), and returns compact cited
-output. It ships with a sidecar skill that teaches search and investigation tradecraft distilled
-from one website and three books.
+Keyless web search for coding agents through one shell command: `kbs`.
 
-Status: in development. See `tasks/plan.md` for the build plan and `tasks/todo.md` for progress.
+The package gives Claude Code, Codex, Pi, and OpenCode a shared search path without an MCP server. Agents call `kbs` through their normal shell tool, and the CLI returns compact, cited output.
+
+## Commands
+
+```sh
+kbs quick <query>      # one fast fact, ranked links and snippets
+kbs search <query>     # full search pipeline, cited summary
+kbs get <url>          # open one source in full
+kbs deep <query>       # bounded multi-round cited report
+kbs context <query>    # context-aware search with session memory
+kbs doctor             # check config, daemon, PATH, and examples
+```
+
+Use `--json` on any command for machine-readable output.
 
 ## Components
 
-- `server/` the MCP server, search engines, and the RAG client.
-- `skills/knowledge-based-search/` the sidecar skill (how to search and investigate).
-- `references/` tradecraft summaries built from the website and books.
-- `claude-code/`, `codex/`, `pi/` per-runtime install layouts.
-- `install.sh` the multi-target installer.
+- `bin/kbs`: executable entry point.
+- `server/cli.py`: argument parsing, rendering, exit codes, and doctor output.
+- `server/search_core.py`: transport-free search, content fetch, deep research, and context search.
+- `server/state.py`: session-scoped context memory.
+- `server/rag.py` and `server/rag_host.py`: optional local ranking daemon with bm25 fallback.
+- `hooks/`: runtime reminders that nudge agents toward `kbs` when a prompt needs current sources.
+- `skills/knowledge-based-search/`: agent-facing method guide and reference notes.
+- `claude-code/`, `codex/`, `pi/`, `opencode/`: runtime wiring.
 
-## Tools
+## Install
 
-- `quick_web_search` fast lookup, rerank, summarized.
-- `web_search` full pipeline, embed plus RAG plus rerank, cited output.
-- `deep_research` bounded multi-round research, structured cited report.
-- `deep_context_aware_search` context-aware broad search with session memory.
-- `get_content` drill down into one source by result id or url.
+```sh
+./install.sh --claude --codex --pi --opencode -y
+```
 
-## Design rules
+The installer:
 
-Keyless end to end. No hosted API, no Playwright. SearXNG strongly recommended (the direct
-google and bing path is a labelled degraded mode). RAG runs through a machine-level model host so
-the models load once across runtimes.
+- writes `server/config.json` with the SearXNG URL,
+- links `bin/kbs` into `${KBS_BIN_DIR:-$HOME/.local/bin}`,
+- backs up existing runtime config before editing it,
+- installs the skill or instruction file for each selected runtime,
+- installs hooks where the runtime supports them,
+- prints the exact agent instruction block.
+
+Make sure the bin directory is on `PATH`. For zsh on Linux, a common choice is:
+
+```sh
+printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> ~/.zshenv
+```
+
+## Configuration
+
+Default config lives in `server/config.json`:
+
+```json
+{"searxng_url": "https://endianness.de", "duckduckgo": true}
+```
+
+Override at runtime with `KBS_CONFIG`, either as JSON or as a path to a JSON file.
+
+Context memory defaults to `~/.cache/knowledge-based-search/state.json`. Override with `KBS_STATE_FILE`.
+
+## Development
+
+```sh
+uv run --with pytest --with bm25s --with numpy --with pypdf pytest tests/ server/tests/ -q
+bash -n install.sh
+./bin/kbs doctor --json
+```
+
+No MCP server remains in the runtime path. The old adapter was removed after the CLI path was proven for all supported runtimes.

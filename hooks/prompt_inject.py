@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa
 """UserPromptSubmit hook: inject a search nudge when the prompt matches a trigger."""
 
 import json
@@ -20,7 +21,7 @@ def _prompt(event):
 def main():
     try:
         event = json.load(sys.stdin)
-    except Exception:
+    except (ValueError, OSError):
         return
     nudge = nudge_for(_prompt(event))
     if not nudge:

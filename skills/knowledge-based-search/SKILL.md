@@ -10,8 +10,8 @@ description: >-
   tracing an identity, email, username, or domain). Trigger it on cues like
   "latest", "current", "look up", "research", "verify", "fact-check", "who is",
   "trace", a year, or a version number, even when the user does not say "search".
-  It drives the keyless web-search MCP (quick_web_search, web_search,
-  deep_research, deep_context_aware_search, get_content) and routes to distilled
+  It drives the keyless `kbs` CLI (`kbs quick`, `kbs search`,
+  `kbs deep`, `kbs context`, `kbs get <url>`) and routes to distilled
   OSINT and research tradecraft.
 ---
 
@@ -26,7 +26,7 @@ lives in `references/`, loaded on demand.
 Verify any fact that can change since training before you state it. Versions, APIs,
 prices, releases, events, people, and current status all drift. Answering them from
 memory is how stale answers slip through. When unsure whether a fact is current, run
-`quick_web_search` rather than guess.
+`kbs quick` rather than guess.
 
 For stable knowledge about research and investigation method, check the notes in
 `references/` first. Also check the book library if `mcp__library` is available. For
@@ -34,26 +34,26 @@ anything current or external, search the web first. The best answers draw on bot
 
 When this skill is invoked, run a search before answering any current or external question, the skill exists to search, not to answer from memory.
 
-## Choosing a tool
+## Choosing a command
 
-Five tools, a depth ladder from cheap to thorough:
+Five commands, a depth ladder from cheap to thorough:
 
-- `quick_web_search(query)` - fast lookup, ranked links and snippets. Use to confirm
+- `kbs quick <query>` - fast lookup, ranked links and snippets. Use to confirm
   one current fact, a version, a date, or a name.
-- `web_search(query)` - full pipeline (fetch, embed, rerank, summarize). Returns a
-  cited summary plus `result_ids`. Use when the answer needs reading sources, not
+- `kbs search <query>` - full pipeline (fetch, embed, rerank, summarize). Returns a
+  cited summary plus result refs. Use when the answer needs reading sources, not
   just a link.
-- `deep_research(query)` - bounded multi-round investigation. Decomposes the
+- `kbs deep <query>` - bounded multi-round investigation. Decomposes the
   question, searches across sub-queries, returns a structured cited report. Use for
   thorough investigation, comparison across many sources, or an OSINT profile.
-- `deep_context_aware_search(query, context)` - context-aware multi-round search
-  with session memory. Use when you need broad recall across engines and want
-  already-seen URLs suppressed in later calls.
-- `get_content(result_id_or_url)` - open one source in full, condensed against your
+- `kbs context <query> --context <text> --session <id>` - context-aware multi-round
+  search with session memory. Use when you need broad recall across engines and
+  want already-seen URLs suppressed in later calls.
+- `kbs get <url-or-ref>` - open one source in full, condensed against your
   query. Use to read one result from a prior search without running a whole
-  `deep_research`.
+  `kbs deep`.
 
-Start cheap. Escalate only when the cheaper tool leaves the question open.
+Start cheap. Escalate only when the cheaper command leaves the question open.
 
 ## Query craft
 
