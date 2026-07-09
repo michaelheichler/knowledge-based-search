@@ -1,0 +1,68 @@
+server/search_core.py
+  s_247bf15a5c11d7::t_9453a44e4d1ce1 90
+  s_3f7709b50539b7::t_6a1a092f3ff7ae 88
+  s_8022c324417cde::t_1d60d072c4d845 119-120
+  s_247bf15a5c11d7::t_af3eb463228e9a 82,86-87,89,91-98
+  s_247bf15a5c11d7::t_07941468f3fcff 99-100
+tests/test_search_core.py
+  s_8022c324417cde::t_04b9cd3bd9f08d 211-237
+  s_247bf15a5c11d7::t_698923e3dee736 238-369
+  s_247bf15a5c11d7::t_405ec70ec607dd 370
+tests/test_engines.py
+  s_8022c324417cde::t_b8b20301076159 304-335
+server/engines.py
+  s_fff9e0eedfc803::t_39316b749611bf 534-552,557-559,571,585-595,597-604
+  s_fff9e0eedfc803::t_02145bbea7d58c 563-570,584
+  s_0ab71feffd27d1::t_910fe37badb1d9 9
+  s_fff9e0eedfc803::t_b2584c159eb874 320,347,351,353,641
+  s_fff9e0eedfc803::t_95a87e28c9a056 126-132,138-141,156-158
+  s_fff9e0eedfc803::t_d464e3a085bf17 596
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "1f36ebc1256107d889f2d1a94a4dcc15be8b2c10",
+  "prompts": {},
+  "sessions": {
+    "s_0ab71feffd27d1": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f4305-3e3b-74f2-9273-11e932b9e96d",
+        "model": "glm-5.2"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_247bf15a5c11d7": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f4307-5d02-7cb1-a8df-e411bbe24609",
+        "model": "glm-5.2"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_3f7709b50539b7": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f4529-158f-754d-9a13-8bb8da67291a",
+        "model": "glm-5.2"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_8022c324417cde": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f4301-32a6-78ea-92d1-f887b27de543",
+        "model": "glm-5.2"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_fff9e0eedfc803": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f42f4-7495-7c40-afa5-f95732b1f105",
+        "model": "glm-5.2"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
