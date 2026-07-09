@@ -1,0 +1,21 @@
+pi/prompts/search.md
+  s_7e841e9cc9c881::t_a5eeded45926f9 1-18
+install.sh
+  s_7e841e9cc9c881::t_6f49c77c3b53e8 129,132-133,135-136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "51be9982aacebd2475401aec5146a42391eee44b",
+  "prompts": {},
+  "sessions": {
+    "s_7e841e9cc9c881": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f4532-250d-7408-ab72-a2f4a45a0a52",
+        "model": "glm-5.2"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
