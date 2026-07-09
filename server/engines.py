@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import concurrent.futures
-import contextlib
 import datetime
 import html
 import json
@@ -8,6 +6,7 @@ import logging
 import re
 import urllib.parse
 import urllib.request
+import concurrent.futures
 
 BROWSER_UA = (
     "Mozilla/5.0 (X11 Linux x86_64) "
@@ -124,15 +123,22 @@ def result(title, url, snippet, engine, rank) -> dict:
     }
 
 
+def _safe_iso_date(year, month, day="1") -> str:
+    try:
+        return datetime.date(int(year), int(month), int(day)).isoformat()
+    except (ValueError, TypeError):
+        return ""
+
+
 def _parse_url_date(url) -> str:
     for pattern in _URL_DATE_PATTERNS:
         match = pattern.search(url or "")
         if not match:
             continue
-        groups = match.groups()
-        day = int(groups[2]) if len(groups) > 2 else 1
-        with contextlib.suppress(ValueError):
-            return datetime.date(int(groups[0]), int(groups[1]), day).isoformat()
+        day = match.group(3) if pattern.groups > 2 else "1"
+        iso = _safe_iso_date(match.group(1), match.group(2), day)
+        if iso:
+            return iso
     return ""
 
 
@@ -147,10 +153,9 @@ def _parse_date(text) -> str:
             month = _MONTHS.get(groups["month_name"].lower())
         if not month:
             continue
-        with contextlib.suppress(ValueError):
-            return datetime.date(
-                int(groups["year"]), int(month), int(groups["day"])
-            ).isoformat()
+        iso = _safe_iso_date(groups["year"], month, groups["day"])
+        if iso:
+            return iso
     return ""
 
 
@@ -312,8 +317,7 @@ def _parse_google_html(body, k=10) -> list:
     return hits
 
 
-def _parse_google_json(body, k=10) -> list:
-    payload = json.loads(body)
+def _parse_google_json(payload, k=10) -> list:
     hits = []
     for item in payload.get("items", [])[:k]:
         if item.get("link"):
@@ -340,13 +344,13 @@ def google(query, k=10, timeout=_TIMEOUT, config=None) -> list:
             }
         )
         try:
-            return _parse_google_json(
+            payload = json.loads(
                 _get(
                     f"https://customsearch.googleapis.com/customsearch/v1?{params}",
                     timeout,
-                ),
-                k,
+                )
             )
+            return _parse_google_json(payload, k)
         except (OSError, ValueError, TypeError):
             pass
     params = urllib.parse.urlencode({"q": query, "num": k})
@@ -527,27 +531,44 @@ def merge(result_lists, cap=20) -> list:
     return ordered[:cap]
 
 
+def _direct_callables(query, config, k) -> dict:
+    return {
+        "duckduckgo": lambda: duckduckgo(query, k),
+        "google": lambda: google(query, k, config=config),
+        "bing": lambda: bing(query, k),
+        "startpage": lambda: startpage(query, k=k),
+        "mojeek": lambda: mojeek(query, k=k),
+    }
+
+
+_DIRECT_DEFAULTS = {
+    "duckduckgo": True,
+    "google": False,
+    "bing": False,
+    "startpage": False,
+    "mojeek": False,
+}
+
+
 def _build_tasks(query, config, k) -> dict:
     tasks = {}
     if config.get("searxng_url"):
         tasks["searxng"] = lambda: searxng(query, config["searxng_url"], k)
-    if config.get("duckduckgo", True):
-        tasks["duckduckgo"] = lambda: duckduckgo(query, k)
-    if config.get("google", False):
-        tasks["google"] = lambda: google(query, k, config=config)
-    if config.get("bing", False):
-        tasks["bing"] = lambda: bing(query, k)
-    if config.get("startpage", False):
-        tasks["startpage"] = lambda: startpage(query, k=k)
-    if config.get("mojeek", False):
-        tasks["mojeek"] = lambda: mojeek(query, k=k)
+    for name, thunk in _direct_callables(query, config, k).items():
+        if config.get(name, _DIRECT_DEFAULTS[name]):
+            tasks[name] = thunk
     return tasks
 
 
-def search(query, config, k=10, cap=20) -> list:
-    tasks = _build_tasks(query, config, k)
-    if not tasks:
-        return []
+def _ready_results(futures) -> list:
+    return [
+        future.result()
+        for future in futures
+        if future.done() and not future.exception()
+    ]
+
+
+def _run_tasks(tasks) -> list:
     lists = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(tasks))) as pool:
         futures = {pool.submit(fn): name for name, fn in tasks.items()}
@@ -560,12 +581,27 @@ def search(query, config, k=10, cap=20) -> list:
                 except Exception:
                     lists.append([])
         except concurrent.futures.TimeoutError:
-            lists.extend(
-                future.result()
-                for future in futures
-                if future.done() and not future.exception()
-            )
-    return merge(lists, cap)
+            lists.extend(_ready_results(futures))
+    return lists
+
+
+def search(query, config, k=10, cap=20) -> list:
+    tasks = _build_tasks(query, config, k)
+    if not tasks:
+        return []
+    lists = _run_tasks(tasks)
+    hits = merge(lists, cap)
+    if hits:
+        return hits
+    # Fall back to non-enabled direct engines when the enabled set returns nothing.
+    fallback = {
+        name: thunk
+        for name, thunk in _direct_callables(query, config, k).items()
+        if name not in tasks
+    }
+    if not fallback:
+        return hits
+    return merge(lists + _run_tasks(fallback), cap)
 
 
 def _demo_merge_and_dates() -> None:
@@ -602,7 +638,7 @@ def _demo_parsers() -> None:
     )
     assert (
         _parse_google_json(
-            '{"items":[{"title":"GJ","link":"https://gj.com","snippet":"gjs"}]}'
+            {"items": [{"title": "GJ", "link": "https://gj.com", "snippet": "gjs"}]}
         )[0]["title"]
         == "GJ"
     ), "google json parse failed"

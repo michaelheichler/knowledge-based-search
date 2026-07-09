@@ -301,6 +301,38 @@ class EngineTests(unittest.TestCase):
             {hit["engine"] for hit in hits}, {"google", "bing", "startpage", "mojeek"}
         )
 
+    def test_search_falls_back_to_non_enabled_engines_when_enabled_empty(self):
+        original_searxng = engines.searxng
+        original_duckduckgo = engines.duckduckgo
+        original_google = engines.google
+        original_bing = engines.bing
+        original_startpage = engines.startpage
+        original_mojeek = engines.mojeek
+        engines.searxng = lambda query, url, k=10: []
+        engines.duckduckgo = lambda query, k=10: []
+        engines.google = lambda query, k=10, config=None: []
+        engines.bing = lambda query, k=10: []
+        engines.startpage = lambda query, **options: []
+        engines.mojeek = lambda query, **options: [
+            engines.result("M", "https://m.example", "ms", "mojeek", 1)
+        ]
+        try:
+            hits = engines.search(
+                "example",
+                {"searxng_url": "https://search.test", "duckduckgo": True},
+                k=2,
+                cap=5,
+            )
+        finally:
+            engines.searxng = original_searxng
+            engines.duckduckgo = original_duckduckgo
+            engines.google = original_google
+            engines.bing = original_bing
+            engines.startpage = original_startpage
+            engines.mojeek = original_mojeek
+
+        self.assertEqual({hit["engine"] for hit in hits}, {"mojeek"})
+
     def test_parse_date_formats(self):
         self.assertEqual(engines._parse_date("16 Jun 2026"), "2026-06-16")
         self.assertEqual(engines._parse_date("7 Dec 2025"), "2025-12-07")

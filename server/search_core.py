@@ -79,8 +79,23 @@ def get_content(ref: str) -> dict:
 
 def deep_research(query: str, config, max_rounds: int = 3) -> dict:
     return _deep_research(
-        query, max_rounds, lambda sub_query: web_search(sub_query, config)
+        query, max_rounds, lambda sub_query: _deep_search(sub_query, config)
     )
+
+
+def _deep_search(sub_query, config):
+    response = web_search(sub_query, config)
+    if response.get("citations") or (response.get("summary") or "").strip():
+        return response
+    # Snippet fallback when web_search finds no sources.
+    results = quick_web_search(sub_query, config, num_results=5).get("results", [])
+    if not results:
+        return response
+    return {
+        "summary": _cap_chars(_summary(results), _SUMMARY_MAX_CHARS),
+        "citations": [_citation(result) for result in results],
+        "result_ids": [],
+    }
 
 
 def _deep_research(query: str, max_rounds: int, search):
@@ -101,6 +116,8 @@ def _deep_research(query: str, max_rounds: int, search):
         for index, item in enumerate(searches)
     ]
     summary = _summary_text([item["summary"] for item in searches])
+    if not summary and citations:
+        summary = _summary(citations)
     return {
         "summary": _cap_chars(summary, _SUMMARY_MAX_CHARS),
         "sections": sections,
