@@ -1,0 +1,29 @@
+install.sh
+  s_5c4348df498b92::t_42b96e0bf683b3 14,24,47-50,55,200-210,213,258,260,273
+pi/merge-pi-settings.py
+  s_5c4348df498b92::t_e09fbfa4d5b10e 39-43
+codex/merge-codex-config.py
+  s_5c4348df498b92::t_bada3194ac0646 26-35,37-50,53
+  s_5c4348df498b92::t_956d3948272187 36
+README.md
+  s_5c4348df498b92::t_27631d42189530 5,29,34
+tests/test_merge_installers.py
+  s_5c4348df498b92::t_ac38e74eb80141 237-306,431-491
+  s_5c4348df498b92::t_dac4a4f1628bc6 492-493
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6b9e3d10d83e64e8c5dbe52c425a72e27418343c",
+  "prompts": {},
+  "sessions": {
+    "s_5c4348df498b92": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f4605-287d-7dc8-8249-9ae09c949316",
+        "model": "glm-5.2"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
