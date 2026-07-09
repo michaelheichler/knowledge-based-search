@@ -126,10 +126,14 @@ install_codex() {
 install_pi() {
 	local cfg="$HOME/.pi/agent/settings.json"
 	local ext="$REPO/pi/extensions/knowledge-based-search/index.ts"
-	mkdir -p "$HOME/.pi/agent"
+	mkdir -p "$HOME/.pi/agent" "$HOME/.pi/agent/skills" "$HOME/.pi/agent/prompts"
 	backup "$cfg"
 	python3 "$REPO/pi/merge-pi-settings.py" "$cfg" "$ext"
+	ln -snf "$REPO/skills/knowledge-based-search" "$HOME/.pi/agent/skills/knowledge-based-search"
+	cp "$REPO/pi/prompts/search.md" "$HOME/.pi/agent/prompts/search.md"
 	printf '%s\n' "Pi extension registered"
+	printf '%s\n' "Pi skill linked"
+	printf '%s\n' "Pi /search prompt installed"
 }
 
 kbs_instructions() {
