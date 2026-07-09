@@ -234,6 +234,76 @@ class MergeInstallerTests(unittest.TestCase):
 
         self.assertIn('event?.systemPrompt ?? ""', text)
 
+    def test_codex_merge_strips_stale_unfenced_kbs_mcp_table(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as td:
+            cfg = Path(td) / "config.toml"
+            cfg.write_text(
+                '[mcp_servers.knowledge-based-search]\n'
+                'command = "python3"\n'
+                'args = ["/old/server/mcp_server.py"]\n'
+                '\n'
+                '[mcp_servers.other]\n'
+                'command = "x"\n',
+                encoding="utf-8",
+            )
+            args = [
+                ROOT / "codex" / "merge-codex-config.py",
+                cfg,
+                ROOT / "codex" / "codex-config.snippet.toml",
+                ROOT,
+            ]
+            run_script(*args)
+            text = cfg.read_text(encoding="utf-8")
+            self.assertNotIn("[mcp_servers.knowledge-based-search]", text)
+            self.assertNotIn("mcp_server.py", text)
+            self.assertIn("[mcp_servers.other]", text)
+            self.assertIn('command = "x"', text)
+
+    def test_codex_merge_strips_stale_quoted_kbs_mcp_table(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as td:
+            cfg = Path(td) / "config.toml"
+            cfg.write_text(
+                '[mcp_servers."knowledge-based-search"]\n'
+                'command = "python3"\n'
+                'args = ["/old/server/mcp_server.py"]\n'
+                '\n'
+                '[mcp_servers.other]\n'
+                'command = "x"\n',
+                encoding="utf-8",
+            )
+            args = [
+                ROOT / "codex" / "merge-codex-config.py",
+                cfg,
+                ROOT / "codex" / "codex-config.snippet.toml",
+                ROOT,
+            ]
+            run_script(*args)
+            text = cfg.read_text(encoding="utf-8")
+            self.assertNotIn('mcp_servers."knowledge-based-search"', text)
+            self.assertNotIn("mcp_server.py", text)
+            self.assertIn("[mcp_servers.other]", text)
+
+    def test_pi_merge_preserves_unrelated_mcp_servers(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as td:
+            cfg = Path(td) / "settings.json"
+            cfg.write_text(
+                json.dumps(
+                    {
+                        "extensions": [],
+                        "mcpServers": {
+                            "knowledge-based-search": {"command": "old"},
+                            "other": {"command": "x"},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            ext = ROOT / "pi" / "extensions" / "knowledge-based-search" / "index.ts"
+            run_script(ROOT / "pi" / "merge-pi-settings.py", cfg, ext)
+            data = read_json(cfg)
+            self.assertNotIn("knowledge-based-search", data["mcpServers"])
+            self.assertEqual(data["mcpServers"], {"other": {"command": "x"}})
+
 
 def test_install_explicit_codex_target_skips_claude_auto_detection():
     assert (ROOT / "install.sh").exists()
@@ -356,6 +426,69 @@ def test_installer_stdout_includes_all_six_examples():
             "kbs doctor",
         ]:
             assert cmd in result.stdout, f"missing '{cmd}' in installer output"
+
+
+def _setup_zed_install(td, existing_agents=True):
+    home = Path(td) / "home"
+    repo = Path(td) / "repo"
+    home.mkdir()
+    repo.mkdir()
+    if existing_agents:
+        agents_dir = home / ".config" / "zed"
+        agents_dir.mkdir(parents=True)
+        (agents_dir / "AGENTS.md").write_text("old instructions\n", encoding="utf-8")
+    (repo / "server").mkdir()
+    (repo / "bin").mkdir()
+    (repo / "bin" / "kbs").write_text(
+        "#!/usr/bin/env python3\nprint('stub')\n", encoding="utf-8"
+    )
+    (repo / "install.sh").write_text(
+        (ROOT / "install.sh").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["KBS_BIN_DIR"] = str(Path(td) / "bin")
+    return home, repo, env
+
+
+def test_install_zed_creates_instruction_file():
+    with tempfile.TemporaryDirectory(dir="/tmp") as td:
+        home, repo, env = _setup_zed_install(td)
+        subprocess.run(
+            ["bash", str(repo / "install.sh"), "--zed", "-y"],
+            check=True,
+            cwd=repo,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        agents_md = home / ".config" / "zed" / "AGENTS.md"
+        backups = list(agents_md.parent.glob("AGENTS.md.kbs.*.bak"))
+        assert agents_md.exists()
+        assert len(backups) == 1
+        assert backups[0].read_text(encoding="utf-8") == "old instructions\n"
+        content = agents_md.read_text(encoding="utf-8")
+        assert "kbs quick" in content
+        assert "kbs search" in content
+        assert "kbs doctor" in content
+
+
+def test_install_zcode_alias_writes_zed_instructions():
+    with tempfile.TemporaryDirectory(dir="/tmp") as td:
+        home, repo, env = _setup_zed_install(td, existing_agents=False)
+        subprocess.run(
+            ["bash", str(repo / "install.sh"), "--zcode", "-y"],
+            check=True,
+            cwd=repo,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        agents_md = home / ".config" / "zed" / "AGENTS.md"
+        assert agents_md.exists()
+        content = agents_md.read_text(encoding="utf-8")
+        assert "kbs quick" in content
+        assert "kbs search" in content
 
 
 if __name__ == "__main__":

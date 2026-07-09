@@ -23,9 +23,34 @@ def strip_fenced(text):
     return pattern.sub("", text)
 
 
+KBS_MCP_HEADER = re.compile(
+    r'^\[mcp_servers\.(?P<q>["\']?)knowledge-based-search(?P=q)\]'
+)
+
+
+def _is_table_header(line):
+    return line.lstrip().startswith("[")
+
+
+def strip_stale_mcp_table(text):
+    # ponytail: safe while MCP args stay single-line. Use a tomllib round-trip if they span lines.
+    kept = []
+    skipping = False
+    for line in text.splitlines(keepends=True):
+        if KBS_MCP_HEADER.match(line):
+            skipping = True
+            continue
+        if skipping and _is_table_header(line):
+            skipping = False
+        if skipping:
+            continue
+        kept.append(line)
+    return "".join(kept)
+
+
 def merge(config_path, snippet_path, repo):
     current = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
-    current = strip_fenced(current).rstrip()
+    current = strip_stale_mcp_table(strip_fenced(current)).rstrip()
     snippet = render(snippet_path, repo)
     block = (
         f"{snippet}\n"

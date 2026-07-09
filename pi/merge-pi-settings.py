@@ -36,7 +36,11 @@ def merge(settings_path, extension_path):
         if item != extension and not is_knowledge_based_search_extension(item)
     ]
     data["extensions"].append(extension)
-    data.pop("mcpServers", None)
+    mcp_servers = data.get("mcpServers")
+    if isinstance(mcp_servers, dict):
+        mcp_servers.pop(SERVER_NAME, None)
+        if not mcp_servers:
+            data.pop("mcpServers", None)
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return data

@@ -11,6 +11,7 @@ WANT_CLAUDE=auto
 WANT_CODEX=auto
 WANT_PI=auto
 WANT_OPENCODE=auto
+WANT_ZED=auto
 ASSUME_YES=0
 EXPLICIT_TARGET=0
 
@@ -20,6 +21,7 @@ select_target() {
 		WANT_CODEX=0
 		WANT_PI=0
 		WANT_OPENCODE=0
+		WANT_ZED=0
 		EXPLICIT_TARGET=1
 	fi
 }
@@ -42,11 +44,15 @@ for arg in "$@"; do
 		select_target
 		WANT_OPENCODE=1
 		;;
+	--zed | --zcode)
+		select_target
+		WANT_ZED=1
+		;;
 	-y | --yes)
 		ASSUME_YES=1
 		;;
 	-h | --help)
-		printf '%s\n' "Usage: ./install.sh [--claude] [--codex] [--pi] [--opencode] [-y]"
+		printf '%s\n' "Usage: ./install.sh [--claude] [--codex] [--pi] [--opencode] [--zed] [-y]"
 		exit 0
 		;;
 	*)
@@ -191,12 +197,20 @@ install_kbs_bin() {
 }
 
 install_opencode() {
-	local cfg_dir="$HOME/.config/opencode"
-	local agents="$cfg_dir/AGENTS.md"
-	mkdir -p "$cfg_dir"
+	write_instructions_to "OpenCode" "$HOME/.config/opencode/AGENTS.md"
+}
+
+install_zed() {
+	write_instructions_to "Zed" "$HOME/.config/zed/AGENTS.md"
+}
+
+write_instructions_to() {
+	local label="$1"
+	local agents="$2"
+	mkdir -p "$(dirname "$agents")"
 	backup "$agents"
 	kbs_instructions >"$agents"
-	printf '%s\n' "OpenCode instructions written to $agents"
+	printf '%s\n' "$label instructions written to $agents"
 }
 
 verify_claude() {
@@ -241,8 +255,9 @@ CLAUDE="$(resolve "$WANT_CLAUDE" "$HOME/.claude")"
 CODEX="$(resolve "$WANT_CODEX" "$HOME/.codex")"
 PI="$(resolve "$WANT_PI" "$HOME/.pi")"
 OPENCODE="$(resolve "$WANT_OPENCODE" "$HOME/.config/opencode")"
+ZED="$(resolve "$WANT_ZED" "$HOME/.config/zed")"
 
-if [ "$CLAUDE" = 0 ] && [ "$CODEX" = 0 ] && [ "$PI" = 0 ] && [ "$OPENCODE" = 0 ]; then
+if [ "$CLAUDE" = 0 ] && [ "$CODEX" = 0 ] && [ "$PI" = 0 ] && [ "$OPENCODE" = 0 ] && [ "$ZED" = 0 ]; then
 	printf '%s\n' "nothing selected" >&2
 	exit 1
 fi
@@ -255,6 +270,7 @@ install_kbs_bin
 [ "$CODEX" = 1 ] && install_codex
 [ "$PI" = 1 ] && install_pi
 [ "$OPENCODE" = 1 ] && install_opencode
+[ "$ZED" = 1 ] && install_zed
 
 printf '%s\n' "--- kbs CLI instructions ---"
 kbs_instructions

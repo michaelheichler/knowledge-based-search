@@ -2,7 +2,7 @@
 
 Keyless web search for coding agents through one shell command: `kbs`.
 
-The package gives Claude Code, Codex, Pi, and OpenCode a shared search path without an MCP server. Agents call `kbs` through their normal shell tool, and the CLI returns compact, cited output.
+The package gives Claude Code, Codex, Pi, OpenCode, and Zed a shared search path without an MCP server. Agents call `kbs` through their normal shell tool, and the CLI returns compact, cited output.
 
 ## Commands
 
@@ -26,12 +26,12 @@ Use `--json` on any command for machine-readable output.
 - `server/rag.py` and `server/rag_host.py`: optional local ranking daemon with bm25 fallback.
 - `hooks/`: runtime reminders that nudge agents toward `kbs` when a prompt needs current sources.
 - `skills/knowledge-based-search/`: agent-facing method guide and reference notes.
-- `claude-code/`, `codex/`, `pi/`, `opencode/`: runtime wiring.
+- `claude-code/`, `codex/`, `pi/`, `opencode/`: runtime wiring. Zed reuses the shared instruction block written to `~/.config/zed/AGENTS.md`.
 
 ## Install
 
 ```sh
-./install.sh --claude --codex --pi --opencode -y
+./install.sh --claude --codex --pi --opencode --zed -y
 ```
 
 The installer:
