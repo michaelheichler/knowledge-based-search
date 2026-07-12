@@ -1,0 +1,100 @@
+claude-code/merge-claude-settings.py
+  s_c54fa64065bce4::t_69d2416eff70b6 91
+remove.sh
+  s_e64a47b0fea2ae::t_2114a2f13c1858 150-170,254
+  s_c54fa64065bce4::t_aec96f189d03d5 255
+  s_c54fa64065bce4::t_55372388e02147 252-253
+  s_e64a47b0fea2ae::t_e97b630da2dde8 1-149,171-251,256-267
+codex/merge-codex-config.py
+  s_c54fa64065bce4::t_e874ba0db3aa85 26-28,31,33-34,36-37,40-41,43
+  s_c54fa64065bce4::t_32a928951a2d72 29,46-47
+  s_c54fa64065bce4::t_579bc0859d7f9a 30,32,35,38-39,42,44-45
+  s_c54fa64065bce4::t_1e3ceb98c3ca6a 48-50
+  s_a9bea5d46dfd57::t_61695b483f9339 51,79-81
+server/tests/test_cli.py
+  s_e64a47b0fea2ae::t_d10f79665032e3 336-377
+tests/test_merge_installers.py
+  s_c54fa64065bce4::t_369d790e980cfc 177-178,180-186,188-189,191-207
+  s_c54fa64065bce4::t_93a7d2cdf71a9a 187,190
+  s_c54fa64065bce4::t_42e5a7f0e87cf6 414-418
+  s_c54fa64065bce4::t_bc7f4b6a2390e2 388-390
+  s_c54fa64065bce4::t_a20935dcf122b0 413
+  s_c54fa64065bce4::t_13e05dd3a83f8a 432-439
+  s_c54fa64065bce4::t_d970bf596ab765 383-387
+  s_c54fa64065bce4::t_121524c61339f3 174-176
+  s_c54fa64065bce4::t_bd59b425e476f2 179
+  s_c54fa64065bce4::t_fe8d8d07c19fbf 123,127-129,155,245,249-251,257,260-261,285-286
+server/method_index.py
+  s_e64a47b0fea2ae::t_d10f79665032e3 1-251
+hooks/skill_gate.py
+  s_c54fa64065bce4::t_4237e1290e15f5 11,17
+  s_c54fa64065bce4::t_a65f5788e29530 16
+  s_c54fa64065bce4::t_d033ac3d36fc24 40-43,45,52-57,59-60,82,98
+opencode/plugins/knowledge-based-search.ts
+  s_c54fa64065bce4::t_e602f715de7600 9-15,17-19,27-32,39-43
+  s_c54fa64065bce4::t_635ce1c374d6cf 3,7-8,16,20
+  s_c54fa64065bce4::t_ec884cd8f936b2 1-2,4-6,21-26,33-38
+skills/knowledge-based-search/SKILL.md
+  s_e64a47b0fea2ae::t_d10f79665032e3 13,41-43
+install.sh
+  s_c54fa64065bce4::t_f41133eac22d27 225-226,228,234-235,237
+  s_e64a47b0fea2ae::t_27a325d3b20956 149
+  s_c54fa64065bce4::t_d6580c5d9d7586 205-206
+  s_c54fa64065bce4::t_2d87af61c91dc6 201-204,207
+codex/codex-config.snippet.toml
+  s_c54fa64065bce4::t_ef14214989ac48 2-4,6
+tests/test_method_plan.py
+  s_c54fa64065bce4::t_f6af6bad7e09af 47-48
+  s_e64a47b0fea2ae::t_d10f79665032e3 2-3,6,11-46,49-52,54-109,111-113,118
+  s_e64a47b0fea2ae::t_a0e3b4cc7682b2 110
+server/cli.py
+  s_e64a47b0fea2ae::t_d10f79665032e3 11,66,125-126,130-131,133-138,169,244-248
+  s_e64a47b0fea2ae::t_c912e5705516a6 106-111
+  s_e64a47b0fea2ae::t_1d429e42830feb 132
+opencode/AGENTS.md
+  s_c54fa64065bce4::t_814ca3d39e1536 1
+tests/test_skill_gate.py
+  s_c54fa64065bce4::t_3f880cd4f6103b 15-21,63-68
+  s_c54fa64065bce4::t_6d66ba28cb2b24 69
+pi/extensions/knowledge-based-search/index.ts
+  s_c54fa64065bce4::t_e469d32883f3b1 20-26,28-29,32-37,40-43
+  s_c54fa64065bce4::t_b4b6b0a25a010c 1-4,6-8,10-14,16-18,38-39
+  s_c54fa64065bce4::t_112630c039c5cf 15
+  s_c54fa64065bce4::t_275cc1ca99843a 44-45
+claude-code/claude-settings.snippet.json
+  s_c54fa64065bce4::t_77cc74ce50e001 5
+README.md
+  s_c54fa64065bce4::t_dcde05726bc636 27,42-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "b79f0929dc09bb32f09eed965c97e2d713fcb575",
+  "prompts": {},
+  "sessions": {
+    "s_a9bea5d46dfd57": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e8bb7fe2-2809-42c9-a3fe-9bd227c20937",
+        "model": "unknown"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_c54fa64065bce4": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f5087-f2b6-7044-9f8f-5c2be6a98ee4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_e64a47b0fea2ae": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f4656-6133-7539-8277-45306d01d495",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
