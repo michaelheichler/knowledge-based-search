@@ -24,7 +24,7 @@ Use `--json` on any command for machine-readable output.
 - `server/search_core.py`: transport-free search, content fetch, deep research, and context search.
 - `server/state.py`: session-scoped context memory.
 - `server/rag.py` and `server/rag_host.py`: optional local ranking daemon with bm25 fallback.
-- `hooks/`: runtime reminders that nudge agents toward `kbs` when a prompt needs current sources.
+- `hooks/skill_gate.py`: invocation-bound KBS and native-web-search gate for Claude Code and Codex.
 - `skills/knowledge-based-search/`: agent-facing method guide and reference notes.
 - `claude-code/`, `codex/`, `pi/`, `opencode/`: runtime wiring. Zed reuses the shared instruction block written to `~/.config/zed/AGENTS.md`.
 
@@ -39,8 +39,8 @@ The installer:
 - writes `server/config.json` with the SearXNG URL,
 - links `bin/kbs` into `${KBS_BIN_DIR:-$HOME/.local/bin}`,
 - backs up existing runtime config before editing it,
-- installs the skill or instruction file for each selected runtime,
-- installs hooks where the runtime supports them,
+- installs the KBS skill and invocation gate for each selected runtime,
+- blocks built-in web-search tools while leaving KBS and configured Linkup tools available,
 - prints the exact agent instruction block.
 
 Make sure the bin directory is on `PATH`. For zsh on Linux, a common choice is:

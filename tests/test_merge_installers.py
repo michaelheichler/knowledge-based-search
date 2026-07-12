@@ -120,23 +120,13 @@ class MergeInstallerTests(unittest.TestCase):
             )
             self.assertEqual(
                 json.dumps(settings_data).count(
-                    "knowledge-based-search/hooks/session_start.py"
+                    "knowledge-based-search/hooks/skill_gate.py"
                 ),
                 1,
             )
-            self.assertEqual(
-                json.dumps(settings_data).count(
-                    "knowledge-based-search/hooks/prompt_inject.py"
-                ),
-                1,
-            )
-            self.assertEqual(
-                json.dumps(settings_data).count(
-                    "knowledge-based-search/hooks/method_inject.py"
-                ),
-                1,
-            )
-            self.assertEqual(json.dumps(settings_data).count('"matcher": "Bash"'), 2)
+            self.assertIn('"matcher": "Bash|WebSearch"', json.dumps(settings_data))
+            self.assertNotIn("prompt_inject.py", json.dumps(settings_data))
+            self.assertNotIn("method_inject.py", json.dumps(settings_data))
             self.assertEqual(
                 json.dumps(settings_data).count("/tmp/other/hooks/session_start.py"),
                 1,
@@ -162,7 +152,7 @@ class MergeInstallerTests(unittest.TestCase):
             self.assertNotIn("knowledge-based-search/hooks", json.dumps(data))
             self.assertEqual(
                 json.dumps(settings).count(
-                    "knowledge-based-search/hooks/session_start.py"
+                    "knowledge-based-search/hooks/skill_gate.py"
                 ),
                 1,
             )
@@ -181,10 +171,40 @@ class MergeInstallerTests(unittest.TestCase):
             run_script(*args)
             text = cfg.read_text(encoding="utf-8")
             self.assertNotIn("[mcp_servers.knowledge-based-search]", text)
-            self.assertEqual(text.count("[[hooks.SessionStart]]"), 1)
-            self.assertEqual(text.count("[[hooks.UserPromptSubmit]]"), 1)
-            self.assertEqual(text.count("session_start.py"), 1)
-            self.assertEqual(text.count("prompt_inject.py"), 1)
+            self.assertEqual(text.count("[[hooks.PreToolUse]]"), 1)
+            self.assertEqual(text.count("skill_gate.py"), 1)
+            self.assertIn('matcher = "Bash|WebSearch|web_search|websearch"', text)
+            self.assertNotIn("session_start.py", text)
+            self.assertNotIn("prompt_inject.py", text)
+
+    def test_codex_merge_removes_legacy_kbs_hooks(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as td:
+            cfg = Path(td) / "config.toml"
+            cfg.write_text(
+                "[[hooks.SessionStart]]\n"
+                'matcher = "startup"\n\n'
+                "[[hooks.SessionStart.hooks]]\n"
+                'command = "python3 /repo/knowledge-based-search/hooks/session_start.py"\n\n'
+                "[[hooks.UserPromptSubmit]]\n\n"
+                "[[hooks.UserPromptSubmit.hooks]]\n"
+                'command = "python3 /repo/knowledge-based-search/hooks/prompt_inject.py"\n\n'
+                "[[hooks.SessionStart]]\n"
+                'matcher = "startup"\n\n'
+                "[[hooks.SessionStart.hooks]]\n"
+                'command = "python3 /other/hooks/start.py"\n',
+                encoding="utf-8",
+            )
+            run_script(
+                ROOT / "codex" / "merge-codex-config.py",
+                cfg,
+                ROOT / "codex" / "codex-config.snippet.toml",
+                ROOT,
+            )
+            text = cfg.read_text(encoding="utf-8")
+            self.assertNotIn("session_start.py", text)
+            self.assertNotIn("prompt_inject.py", text)
+            self.assertIn("/other/hooks/start.py", text)
+            self.assertIn("skill_gate.py", text)
 
     def test_pi_merge_is_idempotent(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as td:
@@ -222,27 +242,23 @@ class MergeInstallerTests(unittest.TestCase):
             data = read_json(cfg)
             self.assertNotIn("mcpServers", data)
 
-    def test_pi_extension_uses_kbs_dir_override(self):
+    def test_pi_extension_gates_actual_tool_calls(self):
         ext = ROOT / "pi" / "extensions" / "knowledge-based-search" / "index.ts"
         text = ext.read_text(encoding="utf-8")
 
-        self.assertIn("process.env.KBS_DIR", text)
-
-    def test_pi_extension_guards_missing_startup_prompt(self):
-        ext = ROOT / "pi" / "extensions" / "knowledge-based-search" / "index.ts"
-        text = ext.read_text(encoding="utf-8")
-
-        self.assertIn('event?.systemPrompt ?? ""', text)
+        self.assertIn('pi.on("tool_call"', text)
+        self.assertIn("WEB_SEARCH_TOOLS", text)
+        self.assertIn("KBS_COMMAND", text)
 
     def test_codex_merge_strips_stale_unfenced_kbs_mcp_table(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as td:
             cfg = Path(td) / "config.toml"
             cfg.write_text(
-                '[mcp_servers.knowledge-based-search]\n'
+                "[mcp_servers.knowledge-based-search]\n"
                 'command = "python3"\n'
                 'args = ["/old/server/mcp_server.py"]\n'
-                '\n'
-                '[mcp_servers.other]\n'
+                "\n"
+                "[mcp_servers.other]\n"
                 'command = "x"\n',
                 encoding="utf-8",
             )
@@ -266,8 +282,8 @@ class MergeInstallerTests(unittest.TestCase):
                 '[mcp_servers."knowledge-based-search"]\n'
                 'command = "python3"\n'
                 'args = ["/old/server/mcp_server.py"]\n'
-                '\n'
-                '[mcp_servers.other]\n'
+                "\n"
+                "[mcp_servers.other]\n"
                 'command = "x"\n',
                 encoding="utf-8",
             )
@@ -364,6 +380,14 @@ def test_install_opencode_creates_instruction_file():
         (repo / "bin" / "kbs").write_text(
             "#!/usr/bin/env python3\nprint('stub')\n", encoding="utf-8"
         )
+        (repo / "skills" / "knowledge-based-search").mkdir(parents=True)
+        (repo / "opencode" / "plugins").mkdir(parents=True)
+        (repo / "opencode" / "plugins" / "knowledge-based-search.ts").write_text(
+            "export {};\n", encoding="utf-8"
+        )
+        (repo / "opencode" / "AGENTS.md").write_text(
+            "Built-in Web Search is blocked.\n", encoding="utf-8"
+        )
         (repo / "install.sh").write_text(
             (ROOT / "install.sh").read_text(encoding="utf-8"), encoding="utf-8"
         )
@@ -386,9 +410,12 @@ def test_install_opencode_creates_instruction_file():
         assert len(backups) == 1
         assert backups[0].read_text(encoding="utf-8") == "old instructions\n"
         content = agents_md.read_text(encoding="utf-8")
-        assert "kbs quick" in content
-        assert "kbs search" in content
-        assert "kbs doctor" in content
+        if "Web Search" not in content or "blocked" not in content:
+            raise AssertionError("OpenCode policy was not installed")
+        if not (agents_dir / "plugins" / "knowledge-based-search.ts").exists():
+            raise AssertionError("OpenCode KBS plugin was not installed")
+        if not (agents_dir / "skills" / "knowledge-based-search").is_symlink():
+            raise AssertionError("OpenCode KBS skill was not linked")
 
 
 def test_installer_stdout_includes_all_six_examples():
@@ -401,6 +428,14 @@ def test_installer_stdout_includes_all_six_examples():
         (repo / "bin").mkdir()
         (repo / "bin" / "kbs").write_text(
             "#!/usr/bin/env python3\nprint('stub')\n", encoding="utf-8"
+        )
+        (repo / "skills" / "knowledge-based-search").mkdir(parents=True)
+        (repo / "opencode" / "plugins").mkdir(parents=True)
+        (repo / "opencode" / "plugins" / "knowledge-based-search.ts").write_text(
+            "export {};\n", encoding="utf-8"
+        )
+        (repo / "opencode" / "AGENTS.md").write_text(
+            "Built-in Web Search is blocked.\n", encoding="utf-8"
         )
         (repo / "install.sh").write_text(
             (ROOT / "install.sh").read_text(encoding="utf-8"), encoding="utf-8"

@@ -10,7 +10,7 @@ description: >-
   tracing an identity, email, username, or domain). Trigger it on cues like
   "latest", "current", "look up", "research", "verify", "fact-check", "who is",
   "trace", a year, or a version number, even when the user does not say "search".
-  It drives the keyless `kbs` CLI (`kbs quick`, `kbs search`,
+  It drives the keyless `kbs` CLI (`kbs plan`, `kbs quick`, `kbs search`,
   `kbs deep`, `kbs context`, `kbs get <url>`) and routes to distilled
   OSINT and research tradecraft.
 ---
@@ -38,6 +38,9 @@ When this skill is invoked, run a search before answering any current or externa
 
 Five commands, a depth ladder from cheap to thorough:
 
+- `kbs plan <query>` - returns a method route, reference notes, and ready
+  `kbs search` commands. Run this first for OSINT, fact-checking, source
+  evaluation, and entity tracing, then search with the recipes it returns.
 - `kbs quick <query>` - fast lookup, ranked links and snippets. Use to confirm
   one current fact, a version, a date, or a name.
 - `kbs search <query>` - full pipeline (fetch, embed, rerank, summarize). Returns a

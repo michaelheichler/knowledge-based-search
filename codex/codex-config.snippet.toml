@@ -1,13 +1,7 @@
 # >>> knowledge-based-search >>>
-[[hooks.SessionStart]]
-matcher = "startup|resume|clear|compact"
-[[hooks.SessionStart.hooks]]
+[[hooks.PreToolUse]]
+matcher = "Bash|WebSearch|web_search|websearch"
+[[hooks.PreToolUse.hooks]]
 type = "command"
-command = "python3 __KBS_DIR__/hooks/session_start.py"
-statusMessage = "Loading knowledge based search"
-
-[[hooks.UserPromptSubmit]]
-[[hooks.UserPromptSubmit.hooks]]
-type = "command"
-command = "python3 __KBS_DIR__/hooks/prompt_inject.py"
+command = "python3 __KBS_DIR__/hooks/skill_gate.py"
 # <<< knowledge-based-search <<<

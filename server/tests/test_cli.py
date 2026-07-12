@@ -333,3 +333,45 @@ def test_cli_imports_no_subprocess():
 
     assert "subprocess" not in imports
     assert "subprocess" not in imported_from
+
+
+def test_plan_markdown_output():
+    code, stdout, stderr = run_cli(["plan", "verify", "a", "viral", "claim"])
+
+    assert code == cli.OK
+    assert stderr == ""
+    assert stdout == (
+        "Route: fact-checking\n"
+        "\n"
+        "References:\n"
+        "- references/exposingtheinvisible/fact-checking.md\n"
+        "- references/exposingtheinvisible/evaluate-evidence.md\n"
+        "\n"
+        "Commands:\n"
+        "kbs search 'verify a viral claim' fact check\n"
+        "kbs deep 'verify a viral claim'\n"
+    )
+
+
+def test_plan_json_output():
+    code, stdout, stderr = run_cli(["plan", "who owns example.com", "--json"])
+
+    assert code == cli.OK
+    assert stderr == ""
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise AssertionError("CLI emitted invalid JSON") from exc
+    assert data["route"] == "company-domain"
+    assert "exposingtheinvisible/companies.md" in data["references"]
+    assert any("site:" in c for c in data["commands"])
+    assert "company-domain" in data["matched_topics"]
+
+
+def test_plan_empty_query_bad_args():
+    code, stdout, stderr = run_cli(["plan"])
+
+    assert code == cli.BAD_ARGS
+    assert stdout == ""
+    assert "bad-args:" in stderr
+    assert "Traceback" not in stderr

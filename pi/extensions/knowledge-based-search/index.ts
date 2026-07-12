@@ -1,72 +1,46 @@
-import { execFile } from "node:child_process";
-import * as fs from "node:fs";
-import * as path from "node:path";
+type ToolCallEvent = {
+	toolName: string;
+	input: { command?: string };
+};
 
-function findRoot(): string {
-  if (process.env.KBS_DIR) return path.resolve(process.env.KBS_DIR);
-  let current = __dirname;
-  for (;;) {
-    if (fs.existsSync(path.join(current, "hooks", "session_start.py"))) return current;
-    const parent = path.dirname(current);
-    if (parent === current) throw new Error("Set KBS_DIR to the knowledge-based-search repo");
-    current = parent;
-  }
+type ExtensionContext = {
+	sessionManager: { getEntries(): unknown };
+};
+
+type ExtensionAPI = {
+	on(
+		event: "tool_call",
+		handler: (
+			event: ToolCallEvent,
+			ctx: ExtensionContext,
+		) => { block: true; reason: string } | undefined,
+	): void;
+};
+
+const KBS_COMMAND = /(^|[;&|]\s*)([A-Za-z_][A-Za-z0-9_]*=\S+\s+)*kbs(\s|$)/;
+const WEB_SEARCH_TOOLS = new Set(["WebSearch", "web_search", "websearch"]);
+const SKILL_PATH = "knowledge-based-search/SKILL.md";
+const SKILL_DENY_REASON =
+	"Load the knowledge-based-search skill first, then rerun the kbs command.";
+const WEB_SEARCH_DENY_REASON =
+	"Built-in web search is disabled. Use kbs through Bash or a configured Linkup tool instead.";
+
+function hasLoadedKbsSkill(entries: unknown): boolean {
+	return JSON.stringify(entries).includes(SKILL_PATH);
 }
 
-const ROOT = findRoot();
-const HOOKS = path.join(ROOT, "hooks");
-
-async function pythonHook(script: string, input: unknown): Promise<string | undefined> {
-  try {
-    const child = execFile("python3", [path.join(HOOKS, script)], {
-      cwd: HOOKS,
-      env: { ...process.env, PYTHONPATH: HOOKS },
-    });
-    child.stdin?.end(JSON.stringify(input ?? {}));
-    const stdout = await new Promise<string>((resolve, reject) => {
-      let out = "";
-      let err = "";
-      child.stdout?.on("data", chunk => {
-        out += chunk;
-      });
-      child.stderr?.on("data", chunk => {
-        err += chunk;
-      });
-      child.on("error", reject);
-      child.on("close", code => {
-        if (code === 0) resolve(out.trim());
-        else reject(new Error(err || `hook exited ${code}`));
-      });
-    });
-    return stdout || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function contextFromHook(stdout: string | undefined): string | undefined {
-  if (!stdout) return undefined;
-  try {
-    const data = JSON.parse(stdout);
-    return data?.hookSpecificOutput?.additionalContext;
-  } catch {
-    return undefined;
-  }
-}
-
-export default function (pi: any) {
-  pi.on("before_agent_start", async (event: any) => {
-    const stdout = await pythonHook("session_start.py", event ?? {});
-    const primer = contextFromHook(stdout);
-    if (!primer) return undefined;
-    return { systemPrompt: `${event?.systemPrompt ?? ""}\n\n${primer}` };
-  });
-
-  pi.on("prompt", async (event: any) => {
-    const prompt = event?.prompt ?? event?.message ?? event?.input ?? "";
-    const stdout = await pythonHook("prompt_inject.py", { prompt });
-    const nudge = contextFromHook(stdout);
-    if (!nudge) return undefined;
-    return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${nudge}` };
-  });
+export default function (pi: ExtensionAPI) {
+	pi.on("tool_call", (event, ctx) => {
+		if (WEB_SEARCH_TOOLS.has(event.toolName)) {
+			return { block: true, reason: WEB_SEARCH_DENY_REASON };
+		}
+		if (
+			event.toolName === "bash" &&
+			KBS_COMMAND.test(event.input.command ?? "") &&
+			!hasLoadedKbsSkill(ctx.sessionManager.getEntries())
+		) {
+			return { block: true, reason: SKILL_DENY_REASON };
+		}
+		return undefined;
+	});
 }

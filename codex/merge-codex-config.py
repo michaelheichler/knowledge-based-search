@@ -23,6 +23,32 @@ def strip_fenced(text):
     return pattern.sub("", text)
 
 
+_HOOK_GROUP = re.compile(r"^\[\[hooks\.[^.\]]+\]\]\s*$")
+
+
+def strip_legacy_kbs_hooks(text):
+    prefix = []
+    groups = []
+    group = None
+    for line in text.splitlines(keepends=True):
+        if _HOOK_GROUP.match(line):
+            if group is not None:
+                groups.append(group)
+            group = [line]
+        elif group is None:
+            prefix.append(line)
+        else:
+            group.append(line)
+    if group is not None:
+        groups.append(group)
+    kept = [
+        "".join(group)
+        for group in groups
+        if "knowledge-based-search" not in "".join(group)
+    ]
+    return "".join(prefix + kept)
+
+
 KBS_MCP_HEADER = re.compile(
     r'^\[mcp_servers\.(?P<q>["\']?)knowledge-based-search(?P=q)\]'
 )
@@ -50,7 +76,9 @@ def strip_stale_mcp_table(text):
 
 def merge(config_path, snippet_path, repo):
     current = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
-    current = strip_stale_mcp_table(strip_fenced(current)).rstrip()
+    current = strip_stale_mcp_table(
+        strip_legacy_kbs_hooks(strip_fenced(current))
+    ).rstrip()
     snippet = render(snippet_path, repo)
     block = (
         f"{snippet}\n"

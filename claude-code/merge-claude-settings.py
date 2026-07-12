@@ -88,6 +88,7 @@ def remove_kbs_server_config(data):
 
 
 def merge_hooks(settings, incoming_hooks):
+    remove_our_hooks(settings)
     hooks = settings.setdefault("hooks", {})
     for event, incoming_entries in incoming_hooks.items():
         current_entries = hooks.get(event, [])

@@ -8,6 +8,7 @@ import sys
 import time
 from pathlib import Path
 
+import method_index  # type: ignore[import-not-found]
 import rag  # type: ignore[import-not-found]
 import search_core  # type: ignore[import-not-found]
 import state as context_state  # type: ignore[import-not-found]
@@ -62,6 +63,7 @@ def _parser():
     sub = parser.add_subparsers(dest="command", required=True)
     _query_command(sub, "quick", "quick ranked search", default_limit=8)
     _query_command(sub, "search", "search with summary", default_limit=5)
+    _query_command(sub, "plan", "reference-backed search recipes", default_limit=None)
     get = sub.add_parser("get")
     get.add_argument("ref")
     get.add_argument("--json", action="store_true")
@@ -101,8 +103,12 @@ def _render(data):
     if "results" in data:
         lines = []
         for index, item in enumerate(data["results"], 1):
-            lines.append(f"{index}. {item.get('title', '')}")
-            lines.append(f"   {item.get('url', '')}")
+            lines.extend(
+                [
+                    f"{index}. {item.get('title', '')}",
+                    f"   {item.get('url', '')}",
+                ]
+            )
             snippet = item.get("snippet", "")
             if snippet:
                 lines.append(f"   {snippet}")
@@ -116,7 +122,18 @@ def _render(data):
         return "\n".join(part for part in parts if part.strip())
     if "page_content" in data:
         return f"Source: {data.get('source_url', '')}\n\n{data.get('page_content', '')}".strip()
+    if "matched_topics" in data:
+        return _render_plan(data)
     return _render_summary(data)
+
+
+def _render_plan(data):
+    lines = [f"Route: {data['route']}", "", "References:"]
+    lines.extend(f"- references/{ref}" for ref in data.get("references", []))
+    lines.append("")
+    lines.append("Commands:")
+    lines.extend(data.get("commands", []))
+    return "\n".join(lines)
 
 
 def _render_summary(data):
@@ -149,6 +166,7 @@ def _examples():
         "kbs get https://example.com",
         "kbs deep climate data",
         "kbs context climate --context research --session demo",
+        "kbs plan trace username alice",
         "kbs doctor",
     ]
 
@@ -223,6 +241,11 @@ def _dispatch(args, stdin):
             args.fetch_top_k,
             args.session,
         )
+    if args.command == "plan":
+        try:
+            return method_index.plan_search(_query(args.query, stdin))
+        except ValueError as exc:
+            raise BadArgsError(str(exc)) from exc
     if args.command == "doctor":
         return _doctor()
     return _daemon_status()

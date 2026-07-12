@@ -12,7 +12,13 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
 import skill_gate  # type: ignore[import-not-found]
-from skill_gate import SKILL_NAME, _line_loads_skill, should_block  # type: ignore[import-not-found]
+from skill_gate import (  # type: ignore[import-not-found]
+    SKILL_NAME,
+    WEB_SEARCH_DENY_REASON,
+    _line_loads_skill,
+    deny_reason,
+    should_block,
+)
 
 
 def _transcript(lines):
@@ -53,6 +59,13 @@ class SkillGateTests(unittest.TestCase):
                 }
             )
         )
+
+    def test_blocks_builtin_web_search(self):
+        for tool_name in ["WebSearch", "web_search", "websearch"]:
+            with self.subTest(tool_name=tool_name):
+                event = {"tool_name": tool_name}
+                self.assertTrue(should_block(event))
+                self.assertEqual(deny_reason(event), WEB_SEARCH_DENY_REASON)
 
     def test_allows_non_kbs_bash_without_skill(self):
         path = _transcript([])

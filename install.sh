@@ -146,6 +146,7 @@ kbs_instructions() {
 	cat <<'INSTRUCTIONS'
 Keyless web search via kbs CLI:
   kbs quick <query>      one fast fact, ranked links and snippets
+  kbs plan <query>       method plan with reference notes before OSINT/fact checks
   kbs search <query>     full pipeline, cited summary
   kbs get <url>          open one source in full
   kbs deep <query>       bounded multi-round cited report
@@ -197,7 +198,13 @@ install_kbs_bin() {
 }
 
 install_opencode() {
-	write_instructions_to "OpenCode" "$HOME/.config/opencode/AGENTS.md"
+	local config_dir="$HOME/.config/opencode"
+	mkdir -p "$config_dir/plugins" "$config_dir/skills"
+	ln -snf "$REPO/skills/knowledge-based-search" "$config_dir/skills/knowledge-based-search"
+	cp "$REPO/opencode/plugins/knowledge-based-search.ts" "$config_dir/plugins/knowledge-based-search.ts"
+	backup "$config_dir/AGENTS.md"
+	cp "$REPO/opencode/AGENTS.md" "$config_dir/AGENTS.md"
+	printf '%s\n' "OpenCode KBS gate installed"
 }
 
 install_zed() {
@@ -215,19 +222,19 @@ write_instructions_to() {
 
 verify_claude() {
 	local settings="$HOME/.claude/settings.json"
-	if [ -f "$settings" ] && grep -q "$SERVER_NAME/hooks/session_start.py" "$settings"; then
-		printf '%s\n' "Claude kbs hooks installed"
+	if [ -f "$settings" ] && grep -q "$SERVER_NAME/hooks/skill_gate.py" "$settings"; then
+		printf '%s\n' "Claude KBS gate installed"
 	else
-		printf '%s\n' "Claude kbs hooks not found"
+		printf '%s\n' "Claude KBS gate not found"
 	fi
 }
 
 verify_codex() {
 	local cfg="$HOME/.codex/config.toml"
-	if [ -f "$cfg" ] && grep -q "$SERVER_NAME/hooks/session_start.py" "$cfg"; then
-		printf '%s\n' "Codex kbs hooks installed"
+	if [ -f "$cfg" ] && grep -q "$SERVER_NAME/hooks/skill_gate.py" "$cfg"; then
+		printf '%s\n' "Codex KBS gate installed"
 	else
-		printf '%s\n' "Codex kbs hooks not found"
+		printf '%s\n' "Codex KBS gate not found"
 	fi
 }
 
