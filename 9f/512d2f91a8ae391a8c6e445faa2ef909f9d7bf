@@ -1,0 +1,21 @@
+tests/test_merge_installers.py
+  s_ef227f29261427::t_b63b26317d9048 466-471
+install.sh
+  s_ef227f29261427::t_674c0b8fe08457 161-163,171-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "9f512d2f91a8ae391a8c6e445faa2ef909f9d7bf",
+  "prompts": {},
+  "sessions": {
+    "s_ef227f29261427": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5177-b841-77f3-aaf7-8fd5cd6e51cb",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
