@@ -463,6 +463,12 @@ def test_installer_stdout_includes_all_six_examples():
             assert cmd in result.stdout, f"missing '{cmd}' in installer output"
 
 
+def test_installer_binds_wrapper_to_kbs_virtual_environment():
+    text = (ROOT / "install.sh").read_text(encoding="utf-8")
+    assert "python_has_requirements" not in text
+    assert 'printf \'%s\\n\' "$VENV_DIR/bin/python"' in text
+
+
 def _setup_zed_install(td, existing_agents=True):
     home = Path(td) / "home"
     repo = Path(td) / "repo"

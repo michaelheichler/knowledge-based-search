@@ -158,8 +158,9 @@ Verify any fact that can change since training before stating it.
 INSTRUCTIONS
 }
 
-python_has_requirements() {
-	python3 - <<'PY' >/dev/null 2>&1
+kbs_venv_is_ready() {
+	[ -x "$VENV_DIR/bin/python" ] || return 1
+	"$VENV_DIR/bin/python" - <<'PY' >/dev/null 2>&1
 import bm25s
 import numpy
 import pypdf
@@ -167,12 +168,10 @@ PY
 }
 
 ensure_kbs_python() {
-	if python_has_requirements; then
-		printf '%s\n' "python3"
-		return 0
+	if ! kbs_venv_is_ready; then
+		python3 -m venv "$VENV_DIR"
+		"$VENV_DIR/bin/python" -m pip install -r "$REPO/requirements.txt" >&2
 	fi
-	python3 -m venv "$VENV_DIR"
-	"$VENV_DIR/bin/python" -m pip install -r "$REPO/requirements.txt" >&2
 	printf '%s\n' "$VENV_DIR/bin/python"
 }
 
