@@ -1,6 +1,6 @@
 {
   "name": "knowledge-based-search",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Keyless dual-engine web search CLI for coding agents. Uses a CLI, not MCP.",
   "author": {
     "name": "Michael Heichler"

@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import threading
+import time
 import urllib.parse
 import urllib.request
 
@@ -574,13 +575,50 @@ _DIRECT_DEFAULTS = {
 }
 
 
+_MIN_INTERVAL = 2.0
+_CACHE_TTL = 600.0
+_CACHE_CAP = 128
+_pace_lock = threading.Lock()
+_last_slot: dict = {}
+_query_cache: dict = {}
+
+
+def _reserve_slot(name) -> float:
+    """Slots are reserved under the lock because parallel rounds would otherwise share one."""
+    with _pace_lock:
+        now = time.monotonic()
+        start = max(now, _last_slot.get(name, 0.0) + _MIN_INTERVAL)
+        _last_slot[name] = start
+        return start - now
+
+
+def _cached_call(name, query, k, thunk) -> list:
+    """Repeat queries are served from cache because burst traffic gets providers banned."""
+    key = (name, query, k)
+    with _pace_lock:
+        entry = _query_cache.get(key)
+        if entry and time.monotonic() - entry[0] < _CACHE_TTL:
+            return [dict(hit) for hit in entry[1]]
+    time.sleep(_reserve_slot(name))
+    hits = thunk()
+    with _pace_lock:
+        _query_cache[key] = (time.monotonic(), [dict(hit) for hit in hits])
+        while len(_query_cache) > _CACHE_CAP:
+            _query_cache.pop(next(iter(_query_cache)))
+    return hits
+
+
 def _build_tasks(query, config, k) -> dict:
     tasks = {}
     if config.get("searxng_url"):
-        tasks["searxng"] = lambda: searxng(query, config["searxng_url"], k)
+        tasks["searxng"] = lambda: _cached_call(
+            "searxng", query, k, lambda: searxng(query, config["searxng_url"], k)
+        )
     for name, thunk in _direct_callables(query, config, k).items():
         if config.get(name, _DIRECT_DEFAULTS[name]):
-            tasks[name] = thunk
+            tasks[name] = lambda name=name, thunk=thunk: _cached_call(
+                name, query, k, thunk
+            )
     return tasks
 
 
