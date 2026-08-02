@@ -1,0 +1,57 @@
+server/engine_state.py
+  s_23b53406b49f1d::t_e4631e8a2e4efd 1-61,66-77,82-91,94-97
+  s_23b53406b49f1d::t_e9423c3c10b6fc 92-93
+  s_23b53406b49f1d::t_a32b44db6a8400 62-65
+  s_23b53406b49f1d::t_623b1baee02f15 78-81
+server/tests/test_cli.py
+  s_23b53406b49f1d::t_37763a2b551380 361-365,377-381
+server/tests/conftest.py
+  s_23b53406b49f1d::t_58509c507e6d0d 6-7
+  s_23b53406b49f1d::t_80cae855f9a714 11-16
+README.md
+  s_23b53406b49f1d::t_1766bff71de850 7
+  s_23b53406b49f1d::t_4e3c624e8934fb 59,63-65,69,73-74,78-90
+server/tests/test_engine_pacing.py
+  s_23b53406b49f1d::t_256109692ac146 76-77
+  s_23b53406b49f1d::t_457702a1b0cd31 16-17
+  s_23b53406b49f1d::t_bd75af045903ae 7
+  s_23b53406b49f1d::t_307638c46957e0 3-5
+  s_23b53406b49f1d::t_73070c68ce40fc 62-75,78-82,102-123
+  s_23b53406b49f1d::t_ce903d39862d33 83-101
+server/tests/test_engine_adapters.py
+  s_23b53406b49f1d::t_62b62a806b0ed0 1-56,68-73,76-97
+  s_23b53406b49f1d::t_775c8ec4013284 57-67,74-75
+server/engines.py
+  s_23b53406b49f1d::t_9c493b160ce549 692-694,696,699-707
+  s_23b53406b49f1d::t_76701394f17a50 741,745-747
+  s_23b53406b49f1d::t_6da51d08ad64a6 770-771,775-777
+  s_23b53406b49f1d::t_880fbe26f0858a 8
+  s_23b53406b49f1d::t_66bc273bf3023c 15-16
+  s_23b53406b49f1d::t_6b291963be0aff 632,638-639,641-643,652-654
+  s_23b53406b49f1d::t_79030adebf1e84 231-257,268,272-276,278-286,298-299
+  s_23b53406b49f1d::t_989da81f41b377 759
+  s_23b53406b49f1d::t_f521ec9657316a 670-673
+  s_23b53406b49f1d::t_2092477ed45e9e 773-774,778
+  s_23b53406b49f1d::t_a6c4652163b498 659-660
+  s_23b53406b49f1d::t_e553d18d485171 258-267,269-271,277,287-297
+.claude-plugin/marketplace.json
+  s_23b53406b49f1d::t_5748a03cb48d8e 12
+.claude-plugin/plugin.json
+  s_23b53406b49f1d::t_333e06ea1c9ea5 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "78c07c4395035e36a7485cec08560c7e7ad74408",
+  "prompts": {},
+  "sessions": {
+    "s_23b53406b49f1d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f3505206-ed24-454b-b57f-68467d7bba60",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
