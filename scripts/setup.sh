@@ -76,7 +76,13 @@ write_wrapper() {
 	rm -f "$target"
 	{
 		printf '%s\n' '#!/usr/bin/env bash'
-		printf 'exec %q %q "$@"\n' "$VENV_DIR/bin/python" "$ROOT/bin/kbs"
+		if [[ "$ROOT" == */plugins/cache/* ]]; then
+			# Pinning $ROOT here goes stale because plugin updates install into a new version dir.
+			printf 'root="$(ls -d %q/*/ | sort -V | tail -n 1)"\n' "$(dirname "$ROOT")"
+			printf 'exec %q "${root}bin/kbs" "$@"\n' "$VENV_DIR/bin/python"
+		else
+			printf 'exec %q %q "$@"\n' "$VENV_DIR/bin/python" "$ROOT/bin/kbs"
+		fi
 	} >"$target"
 	chmod +x "$target"
 }
