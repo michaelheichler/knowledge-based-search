@@ -137,6 +137,18 @@ def test_quick_markdown_output(monkeypatch) -> None:
     assert stdout == ("1. Quick alpha beta\n   https://example.com/quick\n   limit 2\n")
 
 
+def test_rendered_confidence_includes_numeric_trust() -> None:
+    item = {
+        "title": "Trusted source",
+        "url": "https://example.com",
+        "confidence": "primary",
+        "trust": 95,
+    }
+
+    assert "confidence: primary (trust 95)" in cli._render_results([item])
+    assert "[confidence: primary (trust 95)]" in cli._source_line(1, item)
+
+
 def test_search_json_output_and_stdin(monkeypatch) -> None:
     install_core_stubs(monkeypatch)
 

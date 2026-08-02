@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from collections import Counter
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from urllib.parse import urlsplit
 
 Correction = dict[str, str]
@@ -188,6 +190,50 @@ _QUALITY_DOWNWEIGHT = re.compile(
     r"\b(?:press release|sponsored|self-published|pre-?print|working paper)\b",
     re.IGNORECASE,
 )
+_TRUST_PATH = Path(__file__).with_name("data") / "trust.json"
+_TRUST_CACHE: tuple[int, dict] | None = None
+_CATEGORY_KEYWORDS = {
+    "science": {
+        "study",
+        "paper",
+        "research",
+        "arxiv",
+        "quantum",
+        "physics",
+        "biology",
+        "chemistry",
+    },
+    "tech": {
+        "ram",
+        "gpu",
+        "cpu",
+        "chip",
+        "dram",
+        "ssd",
+        "semiconductor",
+        "nvidia",
+        "amd",
+        "intel",
+        "linux",
+        "kernel",
+        "software",
+        "hardware",
+        "api",
+    },
+    "health": {"vaccine", "drug", "disease", "clinical", "therapy", "symptom"},
+    "finance": {"stock", "inflation", "earnings", "interest rate", "etf", "bond"},
+    "reference": {
+        "documentation",
+        "docs",
+        "rfc",
+        "spec",
+        "standard",
+        "syntax",
+        "w3c",
+        "html",
+        "css",
+    },
+}
 
 
 def enforcement_disabled(raw: bool = False) -> bool:
@@ -294,7 +340,9 @@ def quality_gate(results, top_n=5) -> tuple:
 
 def _tag_source(item: Mapping[str, object]) -> dict:
     tagged = dict(item)
-    tagged["confidence"] = source_tier(str(tagged.get("url", "")), tagged)
+    url = str(tagged.get("url", ""))
+    tagged["trust"] = trust_score(url)
+    tagged["confidence"] = source_tier(url, tagged)
     return tagged
 
 
@@ -335,8 +383,66 @@ def _hostname(url: str) -> str:
         return ""
 
 
+def _trust_data() -> dict:
+    global _TRUST_CACHE
+    mtime = _TRUST_PATH.stat().st_mtime_ns
+    if _TRUST_CACHE is None or _TRUST_CACHE[0] != mtime:
+        _TRUST_CACHE = (
+            mtime,
+            json.loads(_TRUST_PATH.read_text(encoding="utf-8")),
+        )
+    return _TRUST_CACHE[1]
+
+
+def query_category(query: str) -> str | None:
+    """Infer a coarse topic from exact query keywords."""
+    lowered = query.lower()
+    tokens = set(re.findall(r"[a-z0-9]+", lowered))
+    for category, keywords in _CATEGORY_KEYWORDS.items():
+        if any(
+            keyword in lowered if " " in keyword else keyword in tokens
+            for keyword in keywords
+        ):
+            return category
+    return None
+
+
+def trust_score(url: str, category: str | None = None) -> int | None:
+    """Return a maintained source score with an optional topic bonus."""
+    data = _trust_data()
+    domains = {_hostname(url).removeprefix("www."), root_domain(url)} - {""}
+    categories = data["categories"]
+    if category in categories:
+        category_scores = [
+            categories[category][domain]
+            for domain in domains
+            if domain in categories[category]
+        ]
+        if category_scores:
+            return min(100, max(category_scores) + 10)
+    scores = [
+        scores[domain]
+        for scores in [*categories.values(), data["news"]]
+        for domain in domains
+        if domain in scores
+    ]
+    return max(scores, default=None)
+
+
+def trust_order(query: str, ranked: list) -> list:
+    """Apply a bounded trust adjustment without replacing relevance ranking."""
+    category = query_category(query)
+
+    def adjusted_relevance(hit: Mapping[str, object]) -> float:
+        score = trust_score(str(hit.get("url", "")), category)
+        bonus = 0 if score is None else (score - 50) / 500
+        return float(hit.get("relevance", 0) or 0) + bonus
+
+    return sorted(ranked, key=adjusted_relevance, reverse=True)
+
+
 def source_tier(url: str, item: Mapping[str, object] | None = None) -> str:
-    """Classify a source with a small, inspectable static rule set."""
+    """Classify a source with maintained scores and explicit overrides."""
     host = _hostname(url).removeprefix("www.")
     domain = root_domain(url)
     text = "" if item is None else f"{item.get('title', '')} {item.get('snippet', '')}"
@@ -344,6 +450,13 @@ def source_tier(url: str, item: Mapping[str, object] | None = None) -> str:
         return "weak"
     if domain in _PRIMARY_DOMAINS or host.endswith(_PRIMARY_SUFFIXES):
         return "primary"
+    score = trust_score(url)
+    if score is not None:
+        if score >= 80:
+            return "primary"
+        if score >= 55:
+            return "standard"
+        return "weak"
     if host in _STANDARD_DOMAINS or domain in _STANDARD_DOMAINS:
         return "standard"
     if domain in _WEAK_DOMAINS or any(

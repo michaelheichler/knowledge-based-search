@@ -130,12 +130,21 @@ def _query(parts, stdin, raw=False):
     return value if raw else value.strip()
 
 
+def _confidence_label(item):
+    confidence = item.get("confidence")
+    if not confidence:
+        return ""
+    trust = item.get("trust")
+    return f"{confidence} (trust {trust})" if trust is not None else confidence
+
+
 def _render_results(results):
     lines = []
     for index, item in enumerate(results, 1):
         lines.extend([f"{index}. {item.get('title', '')}", f"   {item.get('url', '')}"])
-        if item.get("confidence"):
-            lines.append(f"   confidence: {item['confidence']}")
+        confidence = _confidence_label(item)
+        if confidence:
+            lines.append(f"   confidence: {confidence}")
         snippet = item.get("snippet", "")
         if snippet:
             lines.append(f"   {snippet}")
@@ -214,7 +223,7 @@ def _render_plan(data):
 
 def _source_line(index, item):
     """Confidence stays beside each citation because separated labels obscure attribution."""
-    confidence = item.get("confidence")
+    confidence = _confidence_label(item)
     label = f" [confidence: {confidence}]" if confidence else ""
     return f"{index}. {item.get('title', '')}{label} {item.get('url', '')}".rstrip()
 
