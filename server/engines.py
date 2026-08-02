@@ -5,11 +5,14 @@ import datetime
 import html
 import json
 import logging
+import random
 import re
 import threading
 import time
 import urllib.parse
 import urllib.request
+
+import engine_state
 
 BROWSER_UA = (
     "Mozilla/5.0 (X11 Linux x86_64) "
@@ -223,6 +226,75 @@ def searxng(query, base, k=10, timeout=_TIMEOUT) -> list:
                 )
             )
     return hits
+
+
+def mwmbl(query, k=10, timeout=_TIMEOUT) -> list:
+    """Query the keyless Mwmbl search API."""
+    params = urllib.parse.urlencode({"s": query})
+    payload = json.loads(_get(f"https://mwmbl.org/api/v1/search/?{params}", timeout))
+    hits = []
+    for rank, row in enumerate(payload[:k], 1):
+        if not row.get("url"):
+            continue
+        title = "".join(segment.get("value", "") for segment in row.get("title", []))
+        snippet = "".join(
+            segment.get("value", "") for segment in row.get("extract", [])
+        )
+        hits.append(result(title, row["url"], snippet, "mwmbl", rank))
+    return hits
+
+
+def wikipedia(query, k=10, timeout=_TIMEOUT) -> list:
+    """Query the keyless English Wikipedia search API."""
+    params = urllib.parse.urlencode(
+        {
+            "action": "query",
+            "list": "search",
+            "format": "json",
+            "srlimit": k,
+            "srsearch": query,
+        }
+    )
+    payload = json.loads(_get(f"https://en.wikipedia.org/w/api.php?{params}", timeout))
+    rows = payload.get("query", {}).get("search", [])[:k]
+    return [
+        result(
+            row["title"],
+            "https://en.wikipedia.org/wiki/"
+            + urllib.parse.quote(row["title"].replace(" ", "_"), safe=""),
+            row.get("snippet", ""),
+            "wikipedia",
+            rank,
+        )
+        for rank, row in enumerate(rows, 1)
+        if row.get("title")
+    ]
+
+
+def tavily(query, k=10, timeout=_TIMEOUT, config=None) -> list:
+    """Query Tavily with the configured free API key."""
+    request_body = json.dumps(
+        {"api_key": config["tavily_api_key"], "query": query, "max_results": k}
+    ).encode("utf-8")
+    payload = json.loads(
+        _get(
+            "https://api.tavily.com/search",
+            timeout,
+            data=request_body,
+            headers={"Content-Type": "application/json"},
+        )
+    )
+    return [
+        result(
+            row.get("title", ""),
+            row["url"],
+            row.get("content", ""),
+            "tavily",
+            rank,
+        )
+        for rank, row in enumerate(payload.get("results", [])[:k], 1)
+        if row.get("url")
+    ]
 
 
 def _ddg_target(href) -> str:
@@ -557,13 +629,18 @@ def merge(result_lists, cap=20) -> list:
 
 
 def _direct_callables(query, config, k) -> dict:
-    return {
+    callables = {
         "duckduckgo": lambda: duckduckgo(query, k),
         "google": lambda: google(query, k, config=config),
         "bing": lambda: bing(query, k),
         "startpage": lambda: startpage(query, k=k),
         "mojeek": lambda: mojeek(query, k=k),
+        "mwmbl": lambda: mwmbl(query, k=k),
+        "wikipedia": lambda: wikipedia(query, k=k),
     }
+    if config.get("tavily_api_key"):
+        callables["tavily"] = lambda: tavily(query, k=k, config=config)
+    return callables
 
 
 _DIRECT_DEFAULTS = {
@@ -572,24 +649,28 @@ _DIRECT_DEFAULTS = {
     "bing": False,
     "startpage": False,
     "mojeek": False,
+    "mwmbl": True,
+    "wikipedia": True,
+    "tavily": True,
 }
 
 
 _MIN_INTERVAL = 2.0
+_MAX_JITTER = 2.0
+_COOLDOWN_SECONDS = 1800.0
 _CACHE_TTL = 600.0
 _CACHE_CAP = 128
 _pace_lock = threading.Lock()
-_last_slot: dict = {}
 _query_cache: dict = {}
 
 
 def _reserve_slot(name) -> float:
     """Slots are reserved under the lock because parallel rounds would otherwise share one."""
     with _pace_lock:
-        now = time.monotonic()
-        start = max(now, _last_slot.get(name, 0.0) + _MIN_INTERVAL)
-        _last_slot[name] = start
-        return start - now
+        now = time.time()
+        interval = _MIN_INTERVAL + random.uniform(0.0, _MAX_JITTER)
+        start = engine_state.reserve_slot(name, now, interval)
+        return max(0.0, start - now)
 
 
 def _cached_call(name, query, k, thunk) -> list:
@@ -608,18 +689,22 @@ def _cached_call(name, query, k, thunk) -> list:
     return hits
 
 
-def _build_tasks(query, config, k) -> dict:
-    tasks = {}
+def _build_tasks(query, config, k, outcomes=None) -> dict:
+    """Cooldown outcomes stay visible because skipped providers never create futures."""
+    enabled = {}
     if config.get("searxng_url"):
-        tasks["searxng"] = lambda: _cached_call(
-            "searxng", query, k, lambda: searxng(query, config["searxng_url"], k)
-        )
+        enabled["searxng"] = lambda: searxng(query, config["searxng_url"], k)
     for name, thunk in _direct_callables(query, config, k).items():
         if config.get(name, _DIRECT_DEFAULTS[name]):
-            tasks[name] = lambda name=name, thunk=thunk: _cached_call(
-                name, query, k, thunk
-            )
-    return tasks
+            enabled[name] = thunk
+    cooling = engine_state.cooling_down(enabled, time.time())
+    if outcomes is not None:
+        outcomes.update({name: {"status": "cooldown"} for name in cooling})
+    return {
+        name: lambda name=name, thunk=thunk: _cached_call(name, query, k, thunk)
+        for name, thunk in enabled.items()
+        if name not in cooling
+    }
 
 
 class SearchResults(list):
@@ -653,10 +738,13 @@ def _daemon_future(fn):
     return future
 
 
-def _task_outcome(future) -> tuple[list, dict]:
+def _task_outcome(name, future) -> tuple[list, dict]:
     try:
         hits = future.result()
         return hits, {"status": "ok", "count": len(hits)}
+    except ProviderBlocked as exc:
+        engine_state.block_provider(name, time.time() + _COOLDOWN_SECONDS)
+        return [], {"status": "error", "error": type(exc).__name__}
     except _PROVIDER_FAILURES as exc:
         return [], {"status": "error", "error": type(exc).__name__}
 
@@ -668,7 +756,7 @@ def _run_tasks(tasks) -> tuple[list, dict]:
     outcomes = {}
     for future in done:
         name = futures[future]
-        results[name], outcomes[name] = _task_outcome(future)
+        results[name], outcomes[name] = _task_outcome(name, future)
     for future in pending:
         name = futures[future]
         future.cancel()
@@ -679,11 +767,15 @@ def _run_tasks(tasks) -> tuple[list, dict]:
 
 def search(query, config, k=10, cap=20) -> list:
     """Query only enabled providers and merge their results."""
-    tasks = _build_tasks(query, config, k)
+    outcomes = {}
+    tasks = _build_tasks(query, config, k, outcomes)
     if not tasks:
-        return SearchResults([], {})
-    lists, outcomes = _run_tasks(tasks)
-    if all(item["status"] == "error" for item in outcomes.values()):
+        if outcomes:
+            raise AllProvidersFailed(outcomes)
+        return SearchResults([], outcomes)
+    lists, task_outcomes = _run_tasks(tasks)
+    outcomes.update(task_outcomes)
+    if not any(item["status"] == "ok" for item in outcomes.values()):
         raise AllProvidersFailed(outcomes)
     return SearchResults(merge(lists, cap), outcomes)
 

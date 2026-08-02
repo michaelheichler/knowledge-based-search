@@ -4,7 +4,7 @@
 
 ## Search model
 
-DuckDuckGo and SearXNG are co-equal primary engines. When both are available, `kbs` queries them in parallel, merges duplicate results, and records provider provenance. DuckDuckGo works without a key or configuration. SearXNG is optional and has no built-in URL.
+DuckDuckGo, Mwmbl, and Wikipedia are enabled keyless engines. When multiple engines are available, `kbs` queries them in parallel, merges duplicate results, and records provider provenance. SearXNG and Tavily are optional.
 
 The agent contract comes from the books in `skills/knowledge-based-search/references/`:
 
@@ -56,24 +56,38 @@ The installer detects existing runtimes. Pass `--codex`, `--pi`, `--opencode`, o
 
 ## Configuration
 
-User configuration lives at `~/.config/kbs/config.json`. A DuckDuckGo-only configuration is:
-
-```json
-{
-  "duckduckgo": true
-}
-```
-
-Add a SearXNG instance when available:
+User configuration lives at `~/.config/kbs/config.json`. The default keyless engines are:
 
 ```json
 {
   "duckduckgo": true,
-  "searxng_url": "https://searxng.example.org"
+  "mwmbl": true,
+  "wikipedia": true
 }
 ```
 
-There is no default SearXNG URL. `KBS_CONFIG` can contain inline JSON or a path to another JSON file. `KBS_STATE_FILE` overrides the state file used for session context and result references.
+Add optional SearXNG and Tavily access when available:
+
+```json
+{
+  "searxng_url": "https://searxng.example.org",
+  "tavily_api_key": "tvly-..."
+}
+```
+
+| Config key | Default | Engine |
+|---|---|---|
+| `duckduckgo` | `true` | DuckDuckGo direct search |
+| `mwmbl` | `true` | Mwmbl keyless JSON API |
+| `wikipedia` | `true` | English Wikipedia search API |
+| `google` | `false` | Google direct search or configured API |
+| `bing` | `false` | Bing direct search |
+| `startpage` | `false` | Startpage direct search |
+| `mojeek` | `false` | Mojeek direct search |
+| `searxng_url` | unset | SearXNG instance URL |
+| `tavily_api_key` | unset | Tavily API, enabled when a key is present |
+
+There is no default SearXNG URL. `KBS_CONFIG` can contain inline JSON or a path to another JSON file. `KBS_STATE_FILE` overrides the state file used for session context and result references. `KBS_ENGINE_STATE` overrides the provider pacing and cooldown state file.
 
 ## Optional dense ranking
 

@@ -358,7 +358,11 @@ def test_all_provider_failure_maps_to_network_exit(monkeypatch) -> None:
     def fail(query, k=10, timeout=12) -> None:
         raise OSError("provider offline")
 
-    monkeypatch.setattr(cli, "load_config", lambda: {"duckduckgo": True})
+    monkeypatch.setattr(
+        cli,
+        "load_config",
+        lambda: {"duckduckgo": True, "mwmbl": False, "wikipedia": False},
+    )
     monkeypatch.setattr(search_core.engines, "duckduckgo", fail)
     code, stdout, stderr = run_cli(["quick", "query", "--raw"])
 
@@ -370,7 +374,11 @@ def test_all_provider_failure_maps_to_network_exit(monkeypatch) -> None:
 def test_blocked_duckduckgo_maps_to_network_exit(monkeypatch) -> None:
     """A captcha is provider failure, not an honest empty result set."""
     blocked = "<html>captcha unusual traffic</html>"
-    monkeypatch.setattr(cli, "load_config", lambda: {"duckduckgo": True})
+    monkeypatch.setattr(
+        cli,
+        "load_config",
+        lambda: {"duckduckgo": True, "mwmbl": False, "wikipedia": False},
+    )
     monkeypatch.setattr(search_core.engines, "_get", lambda *args, **kwargs: blocked)
 
     code, stdout, stderr = run_cli(["quick", "query", "--raw"])
