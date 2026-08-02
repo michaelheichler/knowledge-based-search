@@ -1,72 +1,96 @@
-# knowledge-based-search
+# kbs
 
-Keyless web search for coding agents through one shell command: `kbs`.
+`kbs` is a keyless web search CLI for coding agents. Agents call it through their normal shell tool, not through an MCP server. This follows the approach in Mario Zechner's [What if you don't need MCP at all?](https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/).
 
-The package gives Claude Code, Codex, Pi, OpenCode, and Zed a shared search path without an MCP server. Agents call `kbs` through their normal shell tool, and the CLI returns compact, cited output.
+## Search model
+
+DuckDuckGo and SearXNG are co-equal primary engines. When both are available, `kbs` queries them in parallel, merges duplicate results, and records provider provenance. DuckDuckGo works without a key or configuration. SearXNG is optional and has no built-in URL.
+
+The agent contract comes from the books in `skills/knowledge-based-search/references/`:
+
+- Query rewriting and bounded corrective rounds run before a weak result is returned.
+- Human and JSON output include the correction trail.
+- Search rounds, fetch counts, and output sizes have hard budgets.
+- Results include source quality and confidence labels. Confirmation requires corroboration across distinct domains.
+- `--raw` disables query rewriting and automatic recovery for commands that accept it.
 
 ## Commands
 
 ```sh
-kbs quick <query>      # one fast fact, ranked links and snippets
-kbs search <query>     # full search pipeline, cited summary
-kbs get <url>          # open one source in full
-kbs deep <query>       # bounded multi-round cited report
-kbs context <query>    # context-aware search with session memory
-kbs doctor             # check config, daemon, PATH, and examples
+kbs quick <query>      # ranked links and snippets
+kbs plan <query>       # book-backed research method plan
+kbs search <query>     # search with a cited summary
+kbs get <r1-or-url>    # fetch one result or URL
+kbs deep <query>       # bounded multi-round report
+kbs context <query>    # search with session memory
+kbs doctor             # explain config, ranking, daemon, and PATH status
 ```
 
-Use `--json` on any command for machine-readable output.
+Add `--json` for machine-readable output.
 
-## Components
+## Requirements
 
-- `bin/kbs`: executable entry point.
-- `server/cli.py`: argument parsing, rendering, exit codes, and doctor output.
-- `server/search_core.py`: transport-free search, content fetch, deep research, and context search.
-- `server/state.py`: session-scoped context memory.
-- `server/rag.py` and `server/rag_host.py`: optional local ranking daemon with bm25 fallback.
-- `hooks/skill_gate.py`: invocation-bound KBS and native-web-search gate for Claude Code and Codex.
-- `skills/knowledge-based-search/`: agent-facing method guide and reference notes.
-- `claude-code/`, `codex/`, `pi/`, `opencode/`: runtime wiring. Zed reuses the shared instruction block written to `~/.config/zed/AGENTS.md`.
+Python 3.11 or newer is required.
 
-## Install
+## Claude Code install
+
+Add this repository as a plugin marketplace, install the plugin, then run its setup command:
+
+```text
+/plugin marketplace add michaelheichler/knowledge-based-search
+/plugin install knowledge-based-search@knowledge-based-search
+/kbs-setup
+```
+
+`/kbs-setup` creates the runtime environment, writes the `kbs` wrapper, and prompts for an optional SearXNG URL.
+
+## Other runtime install
+
+Codex, Pi, OpenCode, and Zed use the root installer:
 
 ```sh
-./install.sh --claude --codex --pi --opencode --zed -y
+./install.sh
 ```
 
-The installer:
-
-- writes `server/config.json` with the SearXNG URL,
-- links `bin/kbs` into `${KBS_BIN_DIR:-$HOME/.local/bin}`,
-- backs up existing runtime config before editing it,
-- installs the KBS skill and invocation gate for each selected runtime,
-- blocks built-in web-search tools while leaving KBS and configured Linkup tools available,
-- prints the exact agent instruction block.
-
-Make sure the bin directory is on `PATH`. For zsh on Linux, a common choice is:
-
-```sh
-printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> ~/.zshenv
-```
+The installer detects existing runtimes. Pass `--codex`, `--pi`, `--opencode`, or `--zed` to select one explicitly. The wrapper is installed in `${KBS_BIN_DIR:-$HOME/.local/bin}`. Put that directory on `PATH`.
 
 ## Configuration
 
-Default config lives in `server/config.json`:
+User configuration lives at `~/.config/kbs/config.json`. A DuckDuckGo-only configuration is:
 
 ```json
-{"searxng_url": "https://endianness.de", "duckduckgo": true}
+{
+  "duckduckgo": true
+}
 ```
 
-Override at runtime with `KBS_CONFIG`, either as JSON or as a path to a JSON file.
+Add a SearXNG instance when available:
 
-Context memory defaults to `~/.cache/knowledge-based-search/state.json`. Override with `KBS_STATE_FILE`.
+```json
+{
+  "duckduckgo": true,
+  "searxng_url": "https://searxng.example.org"
+}
+```
+
+There is no default SearXNG URL. `KBS_CONFIG` can contain inline JSON or a path to another JSON file. `KBS_STATE_FILE` overrides the state file used for session context and result references.
+
+## Optional dense ranking
+
+Dense ranking requires the separate `skill-model-loader` project and compatible local models. Without them, search degrades to BM25 ranking. `kbs doctor` reports whether dense ranking is available and explains missing requirements.
+
+## Uninstall
+
+```sh
+./remove.sh
+```
+
+The uninstaller removes owned runtime files and leaves `~/.config/kbs/config.json` in place.
 
 ## Development
 
 ```sh
-uv run --with pytest --with bm25s --with numpy --with pypdf pytest tests/ server/tests/ -q
-bash -n install.sh
+python3 -m pytest tests/ server/tests/ -q
+bash -n install.sh remove.sh scripts/setup.sh scripts/lib.sh
 ./bin/kbs doctor --json
 ```
-
-No MCP server remains in the runtime path. The old adapter was removed after the CLI path was proven for all supported runtimes.

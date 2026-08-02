@@ -1,10 +1,21 @@
+"""Fetch and extract public web pages with SSRF protection."""
+
 import codecs
+import ipaddress
+import os
 import re
+import socket
 import urllib.parse
 import urllib.request
 from html.parser import HTMLParser
 
 _UA = "Mozilla/5.0 (compatible knowledge-based-search/0.1)"
+
+
+class BlockedFetchError(ValueError):
+    """Signal that URL policy blocked a fetch before connection."""
+
+
 _BLOCK_TAGS = {"div", "main", "article", "section"}
 _BREAK_TAGS = {"br", "p", "li", "h1", "h2", "h3", "h4", "h5", "h6"}
 _SKIP_TAGS = {
@@ -38,7 +49,7 @@ class _TextParser(HTMLParser):
             "useful_chars": 0,
         }
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag, attrs) -> None:
         tag = tag.lower()
         if self.skip:
             if tag in _SKIP_TAGS:
@@ -64,7 +75,7 @@ class _TextParser(HTMLParser):
         if tag in _BREAK_TAGS:
             self._append("\n\n")
 
-    def handle_endtag(self, tag):
+    def handle_endtag(self, tag) -> None:
         tag = tag.lower()
         if self.skip:
             if self.skip[-1] == tag:
@@ -77,19 +88,23 @@ class _TextParser(HTMLParser):
         if tag == "a" and self.link_depth:
             self.link_depth -= 1
         if tag in _BLOCK_TAGS:
-            for index in range(len(self.current) - 1, -1, -1):
-                if self.current[index]["tag"] == tag:
-                    self.blocks.append(self.current.pop(index))
-                    break
+            self._close_block(tag)
 
-    def handle_data(self, data):
+    def _close_block(self, tag) -> None:
+        for index in range(len(self.current) - 1, -1, -1):
+            if self.current[index]["tag"] != tag:
+                continue
+            self.blocks.append(self.current.pop(index))
+            return
+
+    def handle_data(self, data) -> None:
         if self.skip:
             return
         text = data.strip()
         if text:
             self._append(text)
 
-    def best_text(self):
+    def best_text(self) -> str:
         viable_blocks = [
             block for block in self.blocks + self.current if _score(block) >= 0
         ]
@@ -98,16 +113,21 @@ class _TextParser(HTMLParser):
             return ""
         return _clean_text(" ".join(best["parts"]))
 
-    def _append(self, text):
+    def _append(self, text) -> None:
         for block in self.current + [self.whole_page]:
-            block["parts"].append(text)
-            if text.strip():
-                size = len(text)
-                block["chars"] += size
-                if self.link_depth:
-                    block["link_chars"] += size
-                if self.useful_depth:
-                    block["useful_chars"] += size
+            self._append_to_block(block, text)
+
+    def _append_to_block(self, block, text) -> None:
+        """Counters share one text span because mixed spans would corrupt density scoring."""
+        block["parts"].append(text)
+        if not text.strip():
+            return
+        size = len(text)
+        block["chars"] += size
+        if self.link_depth:
+            block["link_chars"] += size
+        if self.useful_depth:
+            block["useful_chars"] += size
 
 
 def _score(block):
@@ -125,7 +145,7 @@ def _clean_text(text):
 
 
 def _charset(content_type):
-    match = re.search(r"charset\s*=\s*['\"]?([^;'\"\s]+)", content_type or "", re.I)
+    match = re.search(r"charset\s*=\s*['\"]?([^;'\"\s]+)", content_type or "", re.IGNORECASE)
     if not match:
         return "utf-8"
     charset = match.group(1)
@@ -136,11 +156,67 @@ def _charset(content_type):
     return charset
 
 
-def fetch_clean(url, max_chars):
+def _allow_private() -> bool:
+    """The bypass requires explicit opt in because fetched URLs may come from untrusted pages."""
+    return os.environ.get("KBS_ALLOW_PRIVATE") == "1"
+
+
+def _forbidden_address(value: str) -> bool:
+    """These ranges stay blocked because public fetches must never reach local networks."""
+    address = ipaddress.ip_address(value)
+    return any(
+        (
+            address.is_loopback,
+            address.is_link_local,
+            address.is_private,
+            address.is_multicast,
+            address.is_reserved,
+            address.is_unspecified,
+        )
+    )
+
+
+def _validate_url(url: str) -> None:
+    """Resolution precedes connection because request forgery must be stopped before network I/O."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme.lower() not in {"http", "https"}:
+        raise BlockedFetchError("only http and https URLs are allowed")
+    if not parts.hostname:
+        raise BlockedFetchError("URL must include a host")
+    if _allow_private():
+        return
+    port = parts.port or (443 if parts.scheme.lower() == "https" else 80)
+    addresses = socket.getaddrinfo(parts.hostname, port, type=socket.SOCK_STREAM)
+    if not addresses:
+        raise OSError(f"host did not resolve: {parts.hostname}")
+    if any(_forbidden_address(item[4][0]) for item in addresses):
+        raise BlockedFetchError("private or special-use network addresses are not allowed")
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """A custom handler is required because urllib follows location headers automatically."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl) -> object:
+        _validate_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _open(request, timeout):
+    """A dedicated opener is required because global urllib behavior would bypass this policy."""
+    return urllib.request.build_opener(_SafeRedirectHandler()).open(
+        request, timeout=timeout
+    )
+
+
+def fetch_clean(url, max_chars) -> str:
+    """Fetch one public HTML page and return its useful text."""
+    _validate_url(url)
     if urllib.parse.urlsplit(url).path.lower().endswith(".pdf"):
         return ""
     request = urllib.request.Request(url, headers={"User-Agent": _UA})
-    with urllib.request.urlopen(request, timeout=10) as response:
+    with _open(request, timeout=10) as response:
+        final_url = getattr(response, "geturl", lambda: url)()
+        _validate_url(final_url)
         header_reader = getattr(
             response, "getheader", lambda name, default=None: default
         )

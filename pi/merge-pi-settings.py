@@ -1,30 +1,52 @@
 #!/usr/bin/env python3
+"""Merge the KBS extension into Pi settings without losing user data."""
+
 # ruff: noqa
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 
 SERVER_NAME = "knowledge-based-search"
 
 
-def is_knowledge_based_search_extension(item):
+def is_knowledge_based_search_extension(item: object) -> bool:
+    """Return whether an extension path points to the KBS extension."""
     path = Path(str(item))
     return path.name == "index.ts" and path.parent.name == SERVER_NAME
 
 
-def read_json(path):
+def read_json(path: Path) -> dict[str, object]:
+    """Read a JSON object, refusing malformed files and non-object roots."""
     if not path.exists():
         return {}
-    with path.open(encoding="utf-8") as handle:
-        try:
-            data = json.load(handle)
-        except ValueError:
-            data = {}
-    return data if isinstance(data, dict) else {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        raise SystemExit(f"refusing to overwrite malformed JSON in {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise SystemExit(f"refusing to overwrite {path}: JSON root must be an object")
+    return data
 
 
-def merge(settings_path, extension_path):
+def write_atomic(path: Path, text: str) -> None:
+    """Write text through a same-directory temporary file and rename."""
+    fd, temporary_path = tempfile.mkstemp(
+        dir=str(path.parent), prefix=path.name + "."
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(temporary_path, path)
+    except BaseException:
+        os.unlink(temporary_path)
+        raise
+
+
+def merge(settings_path: Path, extension_path: Path) -> dict[str, object]:
+    """Replace stale KBS entries while preserving unrelated Pi settings."""
     data = read_json(settings_path)
     extensions = data.get("extensions", [])
     if not isinstance(extensions, list):
@@ -42,11 +64,12 @@ def merge(settings_path, extension_path):
         if not mcp_servers:
             data.pop("mcpServers", None)
     settings_path.parent.mkdir(parents=True, exist_ok=True)
-    settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    write_atomic(settings_path, json.dumps(data, indent=2) + "\n")
     return data
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
+    """Merge settings from command-line paths or their default locations."""
     settings_path = (
         Path(argv[1]).expanduser()
         if len(argv) > 1

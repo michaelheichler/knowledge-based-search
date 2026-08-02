@@ -2,24 +2,13 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVER_NAME="knowledge-based-search"
+source "$REPO/scripts/lib.sh"
 BIN_DIR="${KBS_BIN_DIR:-$HOME/.local/bin}"
-VENV_DIR="${KBS_VENV_DIR:-$REPO/.venv}"
-
-backup() {
-	local path="$1"
-	[ -f "$path" ] || return 0
-	local stamp target n
-	stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-	target="$path.kbs-remove.$stamp.bak"
-	n=1
-	while [ -e "$target" ]; do
-		n=$((n + 1))
-		target="$path.kbs-remove.$stamp.$n.bak"
-	done
-	cp "$path" "$target"
-	printf '%s\n' "backed up $path to $target"
-}
+VENV_DIR="${KBS_VENV_DIR:-$HOME/.local/share/kbs/venv}"
+VENV_MARKER=".kbs-owned-venv"
+FENCE_START="<!-- kbs:start -->"
+FENCE_END="<!-- kbs:end -->"
+printf -v KBS_BIN_NEEDLE '%q' "$REPO/bin/kbs"
 
 remove_if_owned_file() {
 	local path="$1"
@@ -33,12 +22,31 @@ remove_if_owned_file() {
 	fi
 }
 
+remove_if_same_file() {
+	local path="$1"
+	local source="$2"
+	[ -f "$path" ] || return 0
+	if cmp -s "$path" "$source"; then
+		rm -f "$path"
+		printf '%s\n' "removed $path"
+	else
+		printf '%s\n' "kept $path, not owned by this install"
+	fi
+}
+
 remove_link_or_owned_dir() {
 	local path="$1"
 	[ -e "$path" ] || [ -L "$path" ] || return 0
 	if [ -L "$path" ]; then
-		rm -f "$path"
-		printf '%s\n' "removed $path"
+		case "$(readlink "$path")" in
+		"$REPO"/*)
+			rm -f "$path"
+			printf '%s\n' "removed $path"
+			;;
+		*)
+			printf '%s\n' "kept $path, symlink does not point into this install"
+			;;
+		esac
 	elif [ -d "$path" ] && [ "$(cd "$path" && pwd)" = "$REPO/skills/knowledge-based-search" ]; then
 		rm -rf "$path"
 		printf '%s\n' "removed $path"
@@ -47,163 +55,32 @@ remove_link_or_owned_dir() {
 	fi
 }
 
-remove_claude_settings() {
-	local settings="$HOME/.claude/settings.json"
-	local cfg="$HOME/.claude.json"
-	python3 - "$settings" "$cfg" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-server_name = "knowledge-based-search"
-settings_path = Path(sys.argv[1]).expanduser()
-config_path = Path(sys.argv[2]).expanduser()
-
-
-def read_json(path):
-    if not path.exists():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except ValueError:
-        return None
-    return data if isinstance(data, dict) else None
-
-
-def write_json(path, data):
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-
-
-def hook_is_ours(entry):
-    return "knowledge-based-search/hooks" in json.dumps(entry)
-
-changed = False
-settings = read_json(settings_path)
-if settings is not None:
-    hooks = settings.get("hooks")
-    if isinstance(hooks, dict):
-        for event, entries in list(hooks.items()):
-            if isinstance(entries, list):
-                kept = [entry for entry in entries if not hook_is_ours(entry)]
-                if kept != entries:
-                    hooks[event] = kept
-                    changed = True
-        for event in list(hooks):
-            if hooks[event] == []:
-                del hooks[event]
-                changed = True
-        if hooks == {}:
-            settings.pop("hooks", None)
-            changed = True
-    if changed:
-        write_json(settings_path, settings)
-        print(f"removed Claude hooks from {settings_path}")
-
-changed = False
-config = read_json(config_path)
-if config is not None:
-    servers = config.get("mcpServers")
-    if isinstance(servers, dict) and server_name in servers:
-        del servers[server_name]
-        changed = True
-        if not servers:
-            config.pop("mcpServers", None)
-    if changed:
-        write_json(config_path, config)
-        print(f"removed Claude MCP server from {config_path}")
-PY
+fence_pair_is_sane() {
+	awk -v start="$FENCE_START" -v end="$FENCE_END" '
+		$0==start {if (seen_start || seen_end) invalid=1; seen_start=1}
+		$0==end {if (!seen_start || seen_end) invalid=1; seen_end=1}
+		END {exit !(seen_start && seen_end && !invalid)}
+	' "$1"
 }
 
-remove_codex_config() {
-	local cfg="$HOME/.codex/config.toml"
-	[ -f "$cfg" ] || return 0
-	python3 - "$cfg" <<'PY'
-import re
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1]).expanduser()
-text = path.read_text(encoding="utf-8")
-original = text
-text = re.sub(
-    r"(?ms)^# >>> knowledge-based-search >>>.*?^# <<< knowledge-based-search <<<\n*",
-    "",
-    text,
-)
-lines = []
-skipping = False
-for line in text.splitlines(keepends=True):
-    if re.match(r"^\[mcp_servers\.(['\"]?)knowledge-based-search\1\]", line):
-        skipping = True
-        continue
-    if skipping and line.lstrip().startswith("["):
-        skipping = False
-    if not skipping:
-        lines.append(line)
-text = "".join(lines)
-if text != original:
-    path.write_text(text.rstrip() + "\n", encoding="utf-8")
-    print(f"removed Codex kbs block from {path}")
-PY
-}
-
-remove_agents_duplicate_skill() {
-	local path="$HOME/.agents/skills/knowledge-based-search"
-	[ -e "$path" ] || [ -L "$path" ] || return 0
-	if [ -L "$path" ]; then
-		rm -f "$path"
-		printf '%s\n' "removed $path"
+remove_fenced_block() {
+	local path="$1"
+	[ -f "$path" ] || return 0
+	grep -qF "$FENCE_START" "$path" || grep -qF "$FENCE_END" "$path" || return 0
+	if ! grep -qF "$FENCE_START" "$path" || ! grep -qF "$FENCE_END" "$path" || ! fence_pair_is_sane "$path"; then
+		printf '%s\n' "kept $path, malformed kbs fence markers"
 		return 0
 	fi
-	if [ -f "$path/SKILL.md" ] && grep -q '^name: knowledge-based-search$' "$path/SKILL.md"; then
-		local disabled stamp target
-		disabled="$HOME/.agents/skills/.disabled-conflicts"
-		stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-		target="$disabled/knowledge-based-search.$stamp"
-		mkdir -p "$disabled"
-		mv "$path" "$target"
-		printf '%s\n' "moved duplicate skill to $target"
+	local tmp
+	tmp="$(mktemp)"
+	awk -v start="$FENCE_START" -v end="$FENCE_END" '$0==start{skip=1;next} $0==end{skip=0;next} !skip' "$path" >"$tmp"
+	if grep -q '[^[:space:]]' "$tmp"; then
+		mv "$tmp" "$path"
+		printf '%s\n' "removed kbs block from $path"
 	else
-		printf '%s\n' "kept $path, not recognized as knowledge-based-search"
+		rm -f "$path" "$tmp"
+		printf '%s\n' "removed $path"
 	fi
-}
-
-remove_pi_settings() {
-	local cfg="$HOME/.pi/agent/settings.json"
-	[ -f "$cfg" ] || return 0
-	python3 - "$cfg" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1]).expanduser()
-try:
-    data = json.loads(path.read_text(encoding="utf-8"))
-except ValueError:
-    raise SystemExit(0)
-if not isinstance(data, dict):
-    raise SystemExit(0)
-changed = False
-extensions = data.get("extensions")
-if isinstance(extensions, list):
-    kept = []
-    for item in extensions:
-        text = str(item)
-        if "knowledge-based-search" in text and text.endswith("index.ts"):
-            changed = True
-            continue
-        kept.append(item)
-    data["extensions"] = kept
-servers = data.get("mcpServers")
-if isinstance(servers, dict) and "knowledge-based-search" in servers:
-    del servers["knowledge-based-search"]
-    changed = True
-    if not servers:
-        data.pop("mcpServers", None)
-if changed:
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    print(f"removed Pi kbs extension from {path}")
-PY
 }
 
 kbs_instructions() {
@@ -222,46 +99,52 @@ Verify any fact that can change since training before stating it.
 INSTRUCTIONS
 }
 
-remove_instructions_file() {
-	local path="$1"
+remove_legacy_zed_instructions() {
+	local path="$HOME/.config/zed/AGENTS.md"
 	[ -f "$path" ] || return 0
 	local expected
 	expected="$(mktemp)"
 	kbs_instructions >"$expected"
-	if cmp -s "$path" "$expected"; then
-		rm -f "$path"
-		printf '%s\n' "removed $path"
-	else
-		printf '%s\n' "kept $path, not owned by this install"
-	fi
+	remove_if_same_file "$path" "$expected"
 	rm -f "$expected"
 }
 
-backup "$HOME/.claude/settings.json"
-backup "$HOME/.claude.json"
-backup "$HOME/.codex/config.toml"
-backup "$HOME/.pi/agent/settings.json"
-backup "$HOME/.config/opencode/AGENTS.md"
-backup "$HOME/.config/zed/AGENTS.md"
+remove_venv() {
+	[ -d "$VENV_DIR" ] || return 0
+	local resolved
+	resolved="$(cd "$VENV_DIR" && pwd)"
+	if [ "$resolved" = "/" ] || [ "$resolved" = "$HOME" ] || [ ! -f "$resolved/$VENV_MARKER" ]; then
+		printf '%s\n' "kept $resolved, missing $VENV_MARKER marker" >&2
+		return 0
+	fi
+	rm -rf "$resolved"
+	printf '%s\n' "removed $resolved"
+}
 
-remove_if_owned_file "$BIN_DIR/kbs" "$REPO/bin/kbs"
+backup_file "$HOME/.claude/settings.json" kbs-remove
+backup_file "$HOME/.claude.json" kbs-remove
+backup_file "$HOME/.codex/config.toml" kbs-remove
+backup_file "$HOME/.pi/agent/settings.json" kbs-remove
+backup_file "$HOME/.config/opencode/AGENTS.md" kbs-remove
+backup_file "$HOME/.config/zed/AGENTS.md" kbs-remove
+
+remove_if_owned_file "$BIN_DIR/kbs" "$KBS_BIN_NEEDLE"
 remove_link_or_owned_dir "$HOME/.claude/skills/knowledge-based-search"
 remove_link_or_owned_dir "$HOME/.codex/skills/knowledge-based-search"
 remove_link_or_owned_dir "$HOME/.pi/agent/skills/knowledge-based-search"
 remove_if_owned_file "$HOME/.pi/agent/prompts/search.md" "knowledge-based-search"
 remove_link_or_owned_dir "$HOME/.config/opencode/skills/knowledge-based-search"
-remove_if_owned_file "$HOME/.config/opencode/plugins/knowledge-based-search.ts" "$REPO/opencode/plugins/knowledge-based-search.ts"
-remove_agents_duplicate_skill
-remove_if_owned_file "$HOME/.config/opencode/AGENTS.md" "$REPO/opencode/AGENTS.md"
-remove_instructions_file "$HOME/.config/zed/AGENTS.md"
+remove_if_same_file "$HOME/.config/opencode/plugins/knowledge-based-search.ts" "$REPO/opencode/plugins/knowledge-based-search.ts"
+remove_fenced_block "$HOME/.config/opencode/AGENTS.md"
+remove_if_same_file "$HOME/.config/opencode/AGENTS.md" "$REPO/opencode/AGENTS.md"
+remove_fenced_block "$HOME/.config/zed/AGENTS.md"
+remove_legacy_zed_instructions
 
-remove_claude_settings
-remove_codex_config
-remove_pi_settings
+python3 "$REPO/scripts/uninstall_configs.py" claude
+python3 "$REPO/scripts/uninstall_configs.py" codex
+python3 "$REPO/scripts/uninstall_configs.py" pi
 
-if [ -d "$VENV_DIR" ]; then
-	rm -rf "$VENV_DIR"
-	printf '%s\n' "removed $VENV_DIR"
-fi
+remove_venv
 
+printf '%s\n' "user config remains at $HOME/.config/kbs/config.json when present"
 printf '%s\n' "removed knowledge-based-search install artifacts"

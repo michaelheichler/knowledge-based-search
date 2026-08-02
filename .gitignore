@@ -18,6 +18,8 @@ context-snapshot.json
 .pi/
 outputs/
 planning/
+tasks/
+.add-new-resource/
 python-critic-verdict.md
 benchmark/quality/cache/
 benchmark/quality/runs/

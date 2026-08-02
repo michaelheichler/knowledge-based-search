@@ -1,12 +1,14 @@
-#!/usr/bin/env python3
+"""Provider isolation keeps blocked and failed engines visible to callers."""
+
+import concurrent.futures
 import datetime
 import html
 import json
 import logging
 import re
+import threading
 import urllib.parse
 import urllib.request
-import concurrent.futures
 
 BROWSER_UA = (
     "Mozilla/5.0 (X11 Linux x86_64) "
@@ -14,6 +16,7 @@ BROWSER_UA = (
     "Chrome/126.0.0.0 Safari/537.36"
 )
 _TIMEOUT = 12.0
+_PROVIDER_FAILURES = (Exception,)
 _DDG_RESULT = re.compile(
     r'result__a"[^>]*href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>.*?'
     r'result__snippet"[^>]*>(?P<snippet>.*?)</a>',
@@ -64,9 +67,21 @@ _MOJEEK_SNIPPET = re.compile(
 )
 _BLOCKED = re.compile(
     r"captcha|unusual traffic|verify you are human|automated queries|our systems have detected",
-    re.I,
+    re.IGNORECASE,
 )
 _LOG = logging.getLogger(__name__)
+
+
+class ProviderBlocked(RuntimeError):
+    """Signal that a provider returned an anti-automation page."""
+
+
+def _raise_if_blocked(body, provider, hits) -> None:
+    if not hits and _BLOCKED.search(body):
+        _LOG.warning("%s direct scraper blocked", provider)
+        raise ProviderBlocked(provider)
+
+
 _MONTHS = {
     "jan": 1,
     "january": 1,
@@ -110,7 +125,6 @@ _URL_DATE_PATTERNS = (
 )
 
 
-# craftsman-ignore: PY001 a search hit carries all five fields
 def result(title, url, snippet, engine, rank) -> dict:
     cleaned_snippet = _clean(snippet)
     return {
@@ -192,11 +206,9 @@ def _get(url, timeout=_TIMEOUT, data=None, headers=None) -> str:
 
 
 def searxng(query, base, k=10, timeout=_TIMEOUT) -> list:
+    """Query one SearXNG provider."""
     params = urllib.parse.urlencode({"q": query, "format": "json"})
-    try:
-        payload = json.loads(_get(f"{base.rstrip('/')}/search?{params}", timeout))
-    except (OSError, ValueError):
-        return []
+    payload = json.loads(_get(f"{base.rstrip('/')}/search?{params}", timeout))
     hits = []
     for rank, row in enumerate(payload.get("results", [])[:k], 1):
         if row.get("url"):
@@ -266,25 +278,29 @@ def _parse_duckduckgo_lite(body, k=10) -> list:
 
 
 def duckduckgo(query, k=10, timeout=_TIMEOUT) -> list:
+    """Query both DuckDuckGo HTML endpoints before returning no matches."""
     params = urllib.parse.urlencode({"q": query})
     form = params.encode("utf-8")
+    lite_blocked = False
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
     try:
         body = _get(
-            "https://lite.duckduckgo.com/lite/",
-            timeout,
-            data=form,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            "https://lite.duckduckgo.com/lite/", timeout, data=form, headers=headers
         )
+        hits = _parse_duckduckgo_lite(body, k)
+        if hits:
+            return hits
+        _raise_if_blocked(body, "duckduckgo", hits)
+    except ProviderBlocked:
+        lite_blocked = True
     except OSError:
-        body = ""
-    hits = _parse_duckduckgo_lite(body, k)
-    if hits:
-        return hits
-    try:
-        body = _get(f"https://html.duckduckgo.com/html/?{params}", timeout)
-    except OSError:
-        return []
-    return _parse_duckduckgo_html(body, k)
+        pass
+    body = _get(f"https://html.duckduckgo.com/html/?{params}", timeout)
+    hits = _parse_duckduckgo_html(body, k)
+    _raise_if_blocked(body, "duckduckgo", hits)
+    if lite_blocked and not hits:
+        raise ProviderBlocked("duckduckgo")
+    return hits
 
 
 def _google_target(href) -> str:
@@ -333,39 +349,40 @@ def _parse_google_json(payload, k=10) -> list:
     return hits
 
 
+def _google_api(query, k, timeout, config):
+    if not config or not config.get("google_api_key") or not config.get("google_cx"):
+        return None
+    params = urllib.parse.urlencode(
+        {
+            "key": config["google_api_key"],
+            "cx": config["google_cx"],
+            "q": query,
+            "num": min(k, 10),
+        }
+    )
+    payload = _get(
+        f"https://customsearch.googleapis.com/customsearch/v1?{params}", timeout
+    )
+    return _parse_google_json(json.loads(payload), k)
+
+
 def google(query, k=10, timeout=_TIMEOUT, config=None) -> list:
-    if config and config.get("google_api_key") and config.get("google_cx"):
-        params = urllib.parse.urlencode(
-            {
-                "key": config["google_api_key"],
-                "cx": config["google_cx"],
-                "q": query,
-                "num": min(k, 10),
-            }
-        )
-        try:
-            payload = json.loads(
-                _get(
-                    f"https://customsearch.googleapis.com/customsearch/v1?{params}",
-                    timeout,
-                )
-            )
-            return _parse_google_json(payload, k)
-        except (OSError, ValueError, TypeError):
-            pass
-    params = urllib.parse.urlencode({"q": query, "num": k})
+    """Query configured Google API access or the direct HTML endpoint."""
     try:
-        body = _get(
-            f"https://www.google.com/search?{params}",
-            timeout,
-            headers={"Cookie": "CONSENT=YES+"},
-        )
-    except OSError:
-        return []
-    if _BLOCKED.search(body):
-        _LOG.warning("google direct scraper blocked")
-        return []
-    return _parse_google_html(body, k)
+        api_hits = _google_api(query, k, timeout, config)
+        if api_hits is not None:
+            return api_hits
+    except (OSError, ValueError, TypeError):
+        pass
+    params = urllib.parse.urlencode({"q": query, "num": k})
+    body = _get(
+        f"https://www.google.com/search?{params}",
+        timeout,
+        headers={"Cookie": "CONSENT=YES+"},
+    )
+    hits = _parse_google_html(body, k)
+    _raise_if_blocked(body, "google", hits)
+    return hits
 
 
 def _parse_bing_html(body, k=10) -> list:
@@ -389,8 +406,11 @@ def _parse_bing_html(body, k=10) -> list:
             )
         if len(hits) >= k:
             break
-    if hits:
-        return hits
+    return hits or _parse_bing_legacy(body, k)
+
+
+def _parse_bing_legacy(body, k):
+    hits = []
     for rank, match in enumerate(_BING_LEGACY_RESULT.finditer(body), 1):
         if rank > k:
             break
@@ -407,15 +427,12 @@ def _parse_bing_html(body, k=10) -> list:
 
 
 def bing(query, k=10, timeout=_TIMEOUT) -> list:
+    """Query the Bing HTML endpoint."""
     params = urllib.parse.urlencode({"q": query})
-    try:
-        body = _get(f"https://www.bing.com/search?{params}", timeout)
-    except OSError:
-        return []
-    if _BLOCKED.search(body):
-        _LOG.warning("bing direct scraper blocked")
-        return []
-    return _parse_bing_html(body, k)
+    body = _get(f"https://www.bing.com/search?{params}", timeout)
+    hits = _parse_bing_html(body, k)
+    _raise_if_blocked(body, "bing", hits)
+    return hits
 
 
 def _clean_startpage_title(title) -> str:
@@ -429,7 +446,7 @@ def _parse_startpage_html(body, limit=10) -> list:
         r"<(?:style|script)\b[^>]*>.*?</(?:style|script)>",
         "",
         body,
-        flags=re.DOTALL | re.I,
+        flags=re.DOTALL | re.IGNORECASE,
     )
     for match in _STARTPAGE_LINK.finditer(scrubbed_body):
         attrs = match["attrs"]
@@ -457,16 +474,12 @@ def startpage(query, timeout=_TIMEOUT, **options) -> list:
         "Accept": "text/html,application/xhtml+xml,application/xml,*/*",
         "Accept-Language": "en-US,en",
     }
-    try:
-        body = _get(
-            f"https://www.startpage.com/sp/search?{params}", timeout, headers=headers
-        )
-    except OSError:
-        return []
-    if _BLOCKED.search(body):
-        _LOG.warning("startpage direct scraper blocked")
-        return []
-    return _parse_startpage_html(body, limit)
+    body = _get(
+        f"https://www.startpage.com/sp/search?{params}", timeout, headers=headers
+    )
+    hits = _parse_startpage_html(body, limit)
+    _raise_if_blocked(body, "startpage", hits)
+    return hits
 
 
 def _parse_mojeek_html(body, limit=10) -> list:
@@ -489,42 +502,53 @@ def _parse_mojeek_html(body, limit=10) -> list:
 def mojeek(query, timeout=_TIMEOUT, **options) -> list:
     limit = options.get("k", 10)
     params = urllib.parse.urlencode({"q": query})
+    body = _get(f"https://www.mojeek.com/search?{params}", timeout)
+    hits = _parse_mojeek_html(body, limit)
+    _raise_if_blocked(body, "mojeek", hits)
+    return hits
+
+
+def _normalized_netloc(parts) -> str:
+    user_info = parts.netloc.rsplit("@", 1)[0] + "@" if "@" in parts.netloc else ""
+    hostname = (parts.hostname or "").lower()
+    host = f"[{hostname}]" if ":" in hostname else hostname
     try:
-        body = _get(f"https://www.mojeek.com/search?{params}", timeout)
-    except OSError:
-        return []
-    if _BLOCKED.search(body):
-        _LOG.warning("mojeek direct scraper blocked")
-        return []
-    return _parse_mojeek_html(body, limit)
+        port_number = parts.port
+    except ValueError:
+        return parts.netloc
+    port = f":{port_number}" if port_number is not None else ""
+    return f"{user_info}{host}{port}"
 
 
 def norm_url(url) -> str:
-    parts = urllib.parse.urlsplit(url.lower())
+    """Normalize URL identity without changing path or query case."""
+    parts = urllib.parse.urlsplit(url)
     path = parts.path.rstrip("/")
     query = urllib.parse.urlencode(
         sorted(urllib.parse.parse_qsl(parts.query, keep_blank_values=True))
     )
-    return f"{parts.netloc}{path}?{query}" if query else f"{parts.netloc}{path}"
+    identity = f"{_normalized_netloc(parts)}{path}"
+    return f"{identity}?{query}" if query else identity
 
 
-_norm_url = norm_url
+def _merge_hit(by_url, hit) -> None:
+    key = norm_url(hit["url"])
+    existing = by_url.get(key)
+    if existing is None:
+        by_url[key] = {**hit, "engines": [hit["engine"]]}
+        return
+    existing["rank"] = min(existing["rank"], hit["rank"])
+    if not existing.get("date") and hit.get("date"):
+        existing["date"] = hit["date"]
+    if hit["engine"] not in existing["engines"]:
+        existing["engines"].append(hit["engine"])
 
 
 def merge(result_lists, cap=20) -> list:
     by_url = {}
     for hits in result_lists:
         for hit in hits:
-            key = norm_url(hit["url"])
-            existing = by_url.get(key)
-            if existing is None:
-                by_url[key] = {**hit, "engines": [hit["engine"]]}
-            else:
-                existing["rank"] = min(existing["rank"], hit["rank"])
-                if not existing.get("date") and hit.get("date"):
-                    existing["date"] = hit["date"]
-                if hit["engine"] not in existing["engines"]:
-                    existing["engines"].append(hit["engine"])
+            _merge_hit(by_url, hit)
     ordered = sorted(
         by_url.values(), key=lambda hit: (hit["rank"], -len(hit["engines"]))
     )
@@ -560,48 +584,70 @@ def _build_tasks(query, config, k) -> dict:
     return tasks
 
 
-def _ready_results(futures) -> list:
-    return [
-        future.result()
-        for future in futures
-        if future.done() and not future.exception()
-    ]
+class SearchResults(list):
+    """Merged hits with structured outcomes for every attempted provider."""
+
+    def __init__(self, hits, outcomes):
+        super().__init__(hits)
+        self.outcomes = outcomes
 
 
-def _run_tasks(tasks) -> list:
-    lists = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(tasks))) as pool:
-        futures = {pool.submit(fn): name for name, fn in tasks.items()}
+class AllProvidersFailed(OSError):
+    """Signal that every configured provider ended in an error."""
+
+    def __init__(self, outcomes):
+        super().__init__("all configured search providers failed")
+        self.outcomes = outcomes
+
+
+def _daemon_future(fn):
+    future = concurrent.futures.Future()
+
+    def run() -> None:
+        if not future.set_running_or_notify_cancel():
+            return
         try:
-            for future in concurrent.futures.as_completed(
-                futures, timeout=_TIMEOUT + 2
-            ):
-                try:
-                    lists.append(future.result())
-                except Exception:
-                    lists.append([])
-        except concurrent.futures.TimeoutError:
-            lists.extend(_ready_results(futures))
-    return lists
+            future.set_result(fn())
+        except _PROVIDER_FAILURES as exc:
+            future.set_exception(exc)
+
+    threading.Thread(target=run, daemon=True).start()
+    return future
+
+
+def _task_outcome(future) -> tuple[list, dict]:
+    try:
+        hits = future.result()
+        return hits, {"status": "ok", "count": len(hits)}
+    except _PROVIDER_FAILURES as exc:
+        return [], {"status": "error", "error": type(exc).__name__}
+
+
+def _run_tasks(tasks) -> tuple[list, dict]:
+    futures = {_daemon_future(fn): name for name, fn in tasks.items()}
+    done, pending = concurrent.futures.wait(futures, timeout=_TIMEOUT + 2)
+    results = {}
+    outcomes = {}
+    for future in done:
+        name = futures[future]
+        results[name], outcomes[name] = _task_outcome(future)
+    for future in pending:
+        name = futures[future]
+        future.cancel()
+        outcomes[name] = {"status": "error", "error": "aggregate timeout"}
+    lists = [results.get(name, []) for name in tasks]
+    return lists, outcomes
 
 
 def search(query, config, k=10, cap=20) -> list:
+    """Query only enabled providers and merge their results."""
     tasks = _build_tasks(query, config, k)
     if not tasks:
-        return []
-    lists = _run_tasks(tasks)
-    hits = merge(lists, cap)
-    if hits:
-        return hits
-    # Fall back to non-enabled direct engines when the enabled set returns nothing.
-    fallback = {
-        name: thunk
-        for name, thunk in _direct_callables(query, config, k).items()
-        if name not in tasks
-    }
-    if not fallback:
-        return hits
-    return merge(lists + _run_tasks(fallback), cap)
+        return SearchResults([], {})
+    lists, outcomes = _run_tasks(tasks)
+    if all(item["status"] == "error" for item in outcomes.values()):
+        raise AllProvidersFailed(outcomes)
+    return SearchResults(merge(lists, cap), outcomes)
 
 
 def _demo_merge_and_dates() -> None:
@@ -622,7 +668,7 @@ def _demo_merge_and_dates() -> None:
     assert _parse_date("no date here") == ""
 
 
-def _demo_parsers() -> None:
+def _demo_duckduckgo_parsers() -> None:
     sample = '<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fok.com">Hit</a><a class="result__snippet" href="#">snip</a>'
     assert _parse_duckduckgo_html(sample)[0]["url"] == "https://ok.com", (
         "ddg html decode failed"
@@ -632,6 +678,10 @@ def _demo_parsers() -> None:
     assert len(lite_hits) == 1 and lite_hits[0]["snippet"] == "lite snip", (
         "ddg lite parse failed"
     )
+
+
+def _demo_parsers() -> None:
+    _demo_duckduckgo_parsers()
     google_html = '<a href="/url?q=https%3A%2F%2Fg.com&sa=U"><h3>G</h3></a><div class="VwiC3b">gs</div>'
     assert _parse_google_html(google_html)[0]["url"] == "https://g.com", (
         "google html parse failed"

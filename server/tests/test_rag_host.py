@@ -3,13 +3,11 @@ import contextlib
 import importlib
 import os
 import socket
-import sys
 import tempfile
 import threading
 import time
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import rag
 
 _HOST = os.path.join(os.path.dirname(os.path.dirname(__file__)), "rag_host.py")
@@ -28,7 +26,6 @@ def _env():
 
 def _fake_host():
     os.environ["KBS_FAKE_MODEL"] = "1"
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
     import rag_host
 
     return importlib.reload(rag_host)
@@ -84,29 +81,22 @@ def test_spawn_once_reuses_warm_process(monkeypatch):
     sock_path, ref_dir = _paths()
     spawned = []
     state = {"live": False}
+    connection = object()
 
-    conn = object()
+    def popen(argv, **kwargs):
+        spawned.append(argv)
+        state["live"] = True
 
-    class Popen:
-        def __init__(self, argv, **kwargs):
-            spawned.append(argv)
-            state["live"] = True
-
-    monkeypatch.setattr(rag, "_connect", lambda path: conn if state["live"] else None)
+    monkeypatch.setattr(rag, "_connect", lambda path: connection if state["live"] else None)
     monkeypatch.setattr(
         rag,
         "_poll_for_host",
-        lambda path, stop_if_absent: conn if state["live"] else None,
+        lambda path, stop_if_absent: connection if state["live"] else None,
     )
-    monkeypatch.setattr(rag.subprocess, "Popen", Popen)
-
-    first = rag._connect_or_spawn(
-        sock_path, ref_dir, ["python", "server/rag_host.py"], _env()
-    )
-    second = rag._connect_or_spawn(
-        sock_path, ref_dir, ["python", "server/rag_host.py"], _env()
-    )
-
+    monkeypatch.setattr(rag.subprocess, "Popen", popen)
+    command = ["python", "server/rag_host.py"]
+    first = rag._connect_or_spawn(sock_path, ref_dir, command, _env())
+    second = rag._connect_or_spawn(sock_path, ref_dir, command, _env())
     assert first is not None
     assert second is not None
     assert len(spawned) == 1
@@ -274,14 +264,11 @@ def test_idle_watchdog_does_not_shutdown_during_active_request(monkeypatch):
             calls.append("shutdown")
 
     server = Server()
-    thread = threading.Thread(
-        target=host._idle_watchdog, args=(server, ref_dir), daemon=True
-    )
+    thread = threading.Thread(target=host._idle_watchdog, args=(server, ref_dir), daemon=True)
     thread.start()
     time.sleep(0.05)
     server._shutting_down = True
     thread.join(timeout=1)
-
     assert calls == []
 
 

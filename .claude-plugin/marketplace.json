@@ -1,0 +1,19 @@
+{
+  "name": "knowledge-based-search",
+  "description": "Marketplace for the knowledge-based-search plugin",
+  "owner": {
+    "name": "Michael Heichler",
+    "email": "ki@afitec-consulting.de"
+  },
+  "plugins": [
+    {
+      "name": "knowledge-based-search",
+      "description": "Keyless dual-engine web search CLI for coding agents. Uses a CLI, not MCP.",
+      "version": "0.1.0",
+      "source": "./",
+      "author": {
+        "name": "Michael Heichler"
+      }
+    }
+  ]
+}

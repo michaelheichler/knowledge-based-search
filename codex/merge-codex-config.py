@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
+"""Merge the KBS hook into Codex configuration without losing user data."""
+
 # ruff: noqa
+import os
 import re
+import shlex
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -10,13 +15,16 @@ START = "# >>> knowledge-based-search >>>"
 END = "# <<< knowledge-based-search <<<"
 
 
-def render(path, repo):
+def render(path: Path, repo: Path) -> str:
+    """Shell quoting is required because hook paths may contain spaces or metacharacters."""
     text = path.read_text(encoding="utf-8")
-    text = text.replace("__KBS_DIR__", str(repo))
+    hook_path = shlex.quote(str(repo / "hooks" / "skill_gate.py"))
+    text = text.replace("__KBS_HOOK__", hook_path)
     return text.strip()
 
 
-def strip_fenced(text):
+def strip_fenced(text: str) -> str:
+    """Remove existing fenced KBS configuration blocks."""
     pattern = re.compile(
         r"(?ms)^" + re.escape(START) + r".*?^" + re.escape(END) + r"\n*"
     )
@@ -26,19 +34,18 @@ def strip_fenced(text):
 _HOOK_GROUP = re.compile(r"^\[\[hooks\.[^.\]]+\]\]\s*$")
 
 
-def strip_legacy_kbs_hooks(text):
+def strip_legacy_kbs_hooks(text: str) -> str:
+    """Legacy groups must go because fenced ownership cannot coexist with unfenced hooks."""
     prefix = []
     groups = []
     group = None
     for line in text.splitlines(keepends=True):
-        if _HOOK_GROUP.match(line):
-            if group is not None:
-                groups.append(group)
-            group = [line]
-        elif group is None:
-            prefix.append(line)
-        else:
-            group.append(line)
+        if not _HOOK_GROUP.match(line):
+            (prefix if group is None else group).append(line)
+            continue
+        if group is not None:
+            groups.append(group)
+        group = [line]
     if group is not None:
         groups.append(group)
     kept = [
@@ -54,11 +61,12 @@ KBS_MCP_HEADER = re.compile(
 )
 
 
-def _is_table_header(line):
+def _is_table_header(line: str) -> bool:
     return line.lstrip().startswith("[")
 
 
-def strip_stale_mcp_table(text):
+def strip_stale_mcp_table(text: str) -> str:
+    """Remove the obsolete KBS MCP table while preserving later tables."""
     # ponytail: safe while MCP args stay single-line. Use a tomllib round-trip if they span lines.
     kept = []
     skipping = False
@@ -74,7 +82,22 @@ def strip_stale_mcp_table(text):
     return "".join(kept)
 
 
-def merge(config_path, snippet_path, repo):
+def write_atomic(path: Path, text: str) -> None:
+    """Replacement stays atomic because interruption must not truncate user configuration."""
+    fd, temporary_path = tempfile.mkstemp(
+        dir=str(path.parent), prefix=path.name + "."
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(temporary_path, path)
+    except BaseException:
+        os.unlink(temporary_path)
+        raise
+
+
+def merge(config_path: Path, snippet_path: Path, repo: Path) -> str:
+    """Only one owned block may survive because repeated installs must stay idempotent."""
     current = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
     current = strip_stale_mcp_table(
         strip_legacy_kbs_hooks(strip_fenced(current))
@@ -88,11 +111,12 @@ def merge(config_path, snippet_path, repo):
     merged = f"{current}\n\n{block}" if current else block
     tomllib.loads(merged)
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(merged, encoding="utf-8")
+    write_atomic(config_path, merged)
     return merged
 
 
-def main(argv):
+def main(argv: list[str]) -> int:
+    """Default paths remain because installers depend on noninteractive invocation."""
     config_path = (
         Path(argv[1]).expanduser()
         if len(argv) > 1

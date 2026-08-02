@@ -63,14 +63,15 @@ def test_pool_from_cache_subsets_and_merges():
 def test_has_hits_distinguishes_empty_from_populated():
     import json
     import tempfile
+
     import run_variants
 
-    empty = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
-    json.dump({"searxng": [], "mojeek": []}, empty)
-    empty.close()
-    populated = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
-    json.dump({"searxng": [{"url": "https://a.com"}]}, populated)
-    populated.close()
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+        json.dump({"searxng": [], "mojeek": []}, handle)
+        empty = handle
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+        json.dump({"searxng": [{"url": "https://a.com"}]}, handle)
+        populated = handle
 
     assert run_variants._has_hits(empty.name) is False
     assert run_variants._has_hits(populated.name) is True

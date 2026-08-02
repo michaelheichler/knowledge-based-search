@@ -2,13 +2,10 @@
 # ruff: noqa
 """Standalone checks for the kbs plan method index."""
 
-import os
 import shlex
-import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "server"))
 import method_index  # type: ignore[import-not-found]
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -109,7 +106,7 @@ class MethodPlanTests(unittest.TestCase):
             self.assertEqual(parts[0], "kbs")
             self.assertIn('foo" && rm -rf /', parts)
             self.assertFalse(
-                any(p in dangerous for p in parts),
+                any(part in dangerous for part in parts),
                 f"Shell operator leaked in command: {cmd}",
             )
 

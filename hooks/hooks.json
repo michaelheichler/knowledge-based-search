@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 __KBS_DIR__/hooks/skill_gate.py"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_gate.py\""
           }
         ]
       }

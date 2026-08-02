@@ -1,18 +1,6 @@
 ---
 name: knowledge-based-search
-description: >-
-  Search the web well and verify what you find. Use this whenever a task needs
-  information from outside your training data: current or changeable facts
-  (library and framework versions, APIs, prices, releases, events, people,
-  company or domain details), research and comparison ("research X", "find
-  sources on", "what is the current state of"), fact-checking and claim
-  verification, or investigation and OSINT (who runs a site, who owns a company,
-  tracing an identity, email, username, or domain). Trigger it on cues like
-  "latest", "current", "look up", "research", "verify", "fact-check", "who is",
-  "trace", a year, or a version number, even when the user does not say "search".
-  It drives the keyless `kbs` CLI (`kbs plan`, `kbs quick`, `kbs search`,
-  `kbs deep`, `kbs context`, `kbs get <url>`) and routes to distilled
-  OSINT and research tradecraft.
+description: Search the web and verify current facts, research questions, claims, people, companies, domains, identities, emails, and usernames. Use for requests such as latest, current, look up, research, verify, fact-check, who is, trace, version, or year-specific questions, even when the user does not say search. Drives the keyless kbs CLI and routes to distilled OSINT and research tradecraft.
 ---
 
 # Knowledge-Based Search
@@ -52,9 +40,8 @@ Five commands, a depth ladder from cheap to thorough:
 - `kbs context <query> --context <text> --session <id>` - context-aware multi-round
   search with session memory. Use when you need broad recall across engines and
   want already-seen URLs suppressed in later calls.
-- `kbs get <url-or-ref>` - open one source in full, condensed against your
-  query. Use to read one result from a prior search without running a whole
-  `kbs deep`.
+- `kbs get <url-or-ref>` - open one source in full. Use to read one result
+  from a prior search without running a whole `kbs deep`.
 
 Start cheap. Escalate only when the cheaper command leaves the question open.
 
@@ -66,6 +53,29 @@ Start cheap. Escalate only when the cheaper command leaves the question open.
   the source shape (`site:`, `filetype:`).
 - For dorking and advanced operators, read
   `references/exposingtheinvisible/google-dorking.md`.
+
+## Enforced search contract
+
+`kbs quick`, `search`, `deep`, and `context` enforce the same book-backed query
+rules before dispatch. KBS quotes exact identifiers and multi-word names, expands
+`filetype:` into sibling formats, preserves advanced operators, and compresses
+agent question framing to keywords. The `corrections` trail records every
+attempt in human and JSON output, including attempts whose results were discarded.
+
+When results are empty or noisy, KBS may issue at most two corrective retries.
+It can relax quotes, reorder operators, add a phrase wildcard after zero or
+one hit, or exclude a frequent irrelevant snippet term. This budget is separate
+from the documented `deep` and `context` research rounds. Use `--raw` or set
+`KBS_NO_ENFORCE=1` when the exact literal query matters. Deep and context still
+generate their bounded subqueries in raw mode, but each generated query is sent
+verbatim without enforcement.
+
+Results and citations always expose provider provenance in an `engines` list,
+even when one provider supplied the item. Citations include a transparent
+source-tier `confidence` label. The quality block reports an approximate distinct root-domain count and labels the answer
+`corroborated` only when overlapping evidence appears on at least two root
+domains. Otherwise it is `single-source`. Low diversity means the top results collapse to one or two
+root domains and needs further verification.
 
 ## Verify before you trust
 

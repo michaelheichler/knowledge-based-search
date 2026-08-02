@@ -8,13 +8,14 @@ import stat
 import subprocess
 import threading
 import time
+from pathlib import Path
 
 import bm25s
 import numpy as np
 
 _CONNECT_TIMEOUT = 10.0
 _REQUEST_TIMEOUT = 120.0
-_DEFAULT_SOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "kbs-rag.sock")
+_RUNTIME_SUBDIR = "kbs"
 _HOST = os.path.join(os.path.dirname(__file__), "rag_host.py")
 _spawn_lock = threading.Lock()
 _RRF_K = 60
@@ -38,8 +39,48 @@ def _loader_python():
     )
 
 
+def dense_ranking_status():
+    """Report whether the external dense model host can be started."""
+    loader = Path(_loader_dir())
+    checks = [
+        ("model loader", loader / "refcount.py"),
+        ("model loader Python", Path(_loader_python())),
+    ]
+    if os.environ.get("KBS_FAKE_MODEL") != "1":
+        models = Path.home() / ".english-for-agents" / "models"
+        embed = Path(
+            os.environ.get(
+                "KBS_EMBED_MLX_MODEL_DIR", models / "jina-embeddings-v5-text-nano-mlx"
+            )
+        )
+        rerank = Path(
+            os.environ.get("KBS_JINA_MLX_DIR", models / "jina-reranker-v3-mlx")
+        )
+        checks.extend((("embedding model", embed), ("reranking model", rerank)))
+    for label, path in checks:
+        if not path.exists():
+            return {"available": False, "reason": f"{label} missing at {path}"}
+    python_path = Path(_loader_python())
+    if not python_path.is_file() or not os.access(python_path, os.X_OK):
+        reason = f"model loader Python is not executable at {python_path}"
+        return {"available": False, "reason": reason}
+    return {"available": True, "reason": "model loader and model paths are present"}
+
+
+def _runtime_dir():
+    """Isolation is required because shared socket paths allow cross user interference."""
+    xdg = os.environ.get("XDG_RUNTIME_DIR")
+    base = Path(xdg).expanduser() if xdg else Path.home() / ".cache"
+    directory = base / _RUNTIME_SUBDIR
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    directory.chmod(0o700)
+    return directory
+
+
 def default_sock_path():
-    return os.environ.get("KBS_RAG_SOCK_PATH", _DEFAULT_SOCK)
+    """Return the configured or private default daemon socket path."""
+    override = os.environ.get("KBS_RAG_SOCK_PATH")
+    return override or str(_runtime_dir() / "rag.sock")
 
 
 def default_ref_dir():
@@ -104,40 +145,65 @@ def _request_host(msg, sock_path, ref_dir, host_argv, env):
 
 
 def _connect_or_spawn(sock_path, ref_dir, host_argv, env):
+    """This decision is serialized because clients must not spawn duplicate model hosts."""
     conn = _connect(sock_path)
     if conn is not None:
         return conn
-    lock_path = sock_path + ".spawnlock"
     with _spawn_lock:
         try:
-            os.makedirs(os.path.dirname(sock_path), exist_ok=True)
+            os.makedirs(os.path.dirname(sock_path), mode=0o700, exist_ok=True)
         except OSError:
             return None
-        lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
-        try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX)
-            conn = _connect(sock_path)
-            if conn is not None:
-                return conn
-            if os.path.exists(sock_path):
-                with contextlib.suppress(OSError):
-                    os.remove(sock_path)
-            else:
-                conn = _poll_for_host(sock_path, stop_if_absent=True)
-                if conn is not None:
-                    return conn
-            argv = list(host_argv) if host_argv else [_loader_python(), _HOST]
-            subprocess.Popen(
-                argv + [sock_path, ref_dir],
-                start_new_session=True,
-                env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            return _poll_for_host(sock_path, stop_if_absent=False)
-        finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            os.close(lock_fd)
+        return _connect_under_spawn_lock(sock_path, ref_dir, host_argv, env)
+
+
+def _connect_under_spawn_lock(sock_path, ref_dir, host_argv, env):
+    """The lock covers stale checks and creation because separating them leaves a spawn race."""
+    lock_fd = os.open(sock_path + ".spawnlock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        return _recover_or_spawn(sock_path, ref_dir, host_argv, env)
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+
+def _host_lock_held(sock_path):
+    """The lifetime lock is authoritative because one failed connection does not prove death."""
+    lock_fd = os.open(sock_path + ".hostlock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(lock_fd)
+        return True
+    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+    os.close(lock_fd)
+    return False
+
+
+def _recover_or_spawn(sock_path, ref_dir, host_argv, env):
+    """Removal waits for lock proof because a live host may briefly reject connections."""
+    conn = _connect(sock_path)
+    if conn is not None:
+        return conn
+    if not os.path.exists(sock_path):
+        conn = _poll_for_host(sock_path, stop_if_absent=True)
+        if conn is not None:
+            return conn
+    if _host_lock_held(sock_path):
+        return _poll_for_host(sock_path, stop_if_absent=False)
+    if os.path.exists(sock_path):
+        with contextlib.suppress(OSError):
+            os.remove(sock_path)
+    argv = list(host_argv) if host_argv else [_loader_python(), _HOST]
+    subprocess.Popen(
+        argv + [sock_path, ref_dir],
+        start_new_session=True,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return _poll_for_host(sock_path, stop_if_absent=False)
 
 
 def _poll_for_host(sock_path, stop_if_absent):
@@ -175,20 +241,25 @@ def _request(sock_path, msg, timeout=_REQUEST_TIMEOUT):
     return _request_on(conn, msg, timeout)
 
 
-def daemon_status(sock_path=None):
-    socket_path = sock_path or default_sock_path()
-    socket_exists = os.path.exists(socket_path)
-    status = {
+def _base_daemon_status(socket_path):
+    """Stable keys are required because CLI consumers compare daemon states structurally."""
+    return {
         "status": "down",
         "persistent_process": "rag_host",
         "socket_path": socket_path,
-        "socket_exists": socket_exists,
+        "socket_exists": os.path.exists(socket_path),
         "socket_stale": False,
         "model_warm": None,
         "last_request_at": None,
         "idle_seconds": None,
     }
-    if not socket_exists:
+
+
+def daemon_status(sock_path=None):
+    """Report daemon reachability and model warmth."""
+    socket_path = sock_path or default_sock_path()
+    status = _base_daemon_status(socket_path)
+    if not status["socket_exists"]:
         return status
     if _stale_path(socket_path):
         status["status"] = "stale"

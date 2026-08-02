@@ -15,7 +15,7 @@ from typing import Any, cast
 import time
 
 _ENGLISH_MODELS = os.path.expanduser("~/.english-for-agents/models")
-_DEFAULT_SOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "kbs-rag.sock")
+_RUNTIME_SUBDIR = "kbs"
 _EMBED_DIR = os.environ.get(
     "KBS_EMBED_MLX_MODEL_DIR",
     os.path.join(_ENGLISH_MODELS, "jina-embeddings-v5-text-nano-mlx"),
@@ -116,32 +116,54 @@ class _Server(socketserver.ThreadingUnixStreamServer):
         super().__init__(sock_path, _Handler)
 
 
+def _runtime_dir():
+    """Isolation is required because shared socket paths allow cross user interference."""
+    xdg = os.environ.get("XDG_RUNTIME_DIR")
+    base = Path(xdg).expanduser() if xdg else Path.home() / ".cache"
+    directory = base / _RUNTIME_SUBDIR
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    directory.chmod(0o700)
+    return directory
+
+
 def default_sock_path():
-    return os.environ.get("KBS_RAG_SOCK_PATH", _DEFAULT_SOCK)
+    """Return the configured or private default daemon socket path."""
+    override = os.environ.get("KBS_RAG_SOCK_PATH")
+    return override or str(_runtime_dir() / "rag.sock")
 
 
 def default_ref_dir():
     return os.environ.get("KBS_RAG_REF_DIR", default_sock_path() + ".refs")
 
 
-def _dispatch(message, ref_dir, server):
-    operation = message.get("op")
-    if operation == "status":
-        last_request_at, active_requests = _request_snapshot(server)
-        return {
-            "status": "alive",
-            "model_warm": _model_warm(),
-            "last_request_at": last_request_at,
-            "idle_seconds": max(0.0, time.monotonic() - last_request_at),
-            "active_requests": active_requests,
-            "shutting_down": getattr(server, "_shutting_down", False),
-        }
-    if getattr(server, "_shutting_down", False) and operation in (
+def _status_response(server):
+    """Monotonic time is required because wall clock changes must not distort idle age."""
+    last_request_at, active_requests = _request_snapshot(server)
+    return {
+        "status": "alive",
+        "model_warm": _model_warm(),
+        "last_request_at": last_request_at,
+        "idle_seconds": max(0.0, time.monotonic() - last_request_at),
+        "active_requests": active_requests,
+        "shutting_down": getattr(server, "_shutting_down", False),
+    }
+
+
+def _blocked_by_shutdown(operation, server):
+    """New work stops because accepting it would race server closure."""
+    return getattr(server, "_shutting_down", False) and operation in {
         "attach",
         "attach_turn",
         "embed",
         "rerank",
-    ):
+    }
+
+
+def _dispatch(message, ref_dir, server):
+    operation = message.get("op")
+    if operation == "status":
+        return _status_response(server)
+    if _blocked_by_shutdown(operation, server):
         return {"error": "host is shutting down"}
     if operation == "embed":
         return {"vectors": _embed(message.get("texts", []))}
@@ -254,18 +276,17 @@ def _fake_rerank(query, docs):
     return rows
 
 
-def _load_embedder():  # craftsman-ignore: PY002
-    global _embedder
-    if _embedder is not None:
-        return _embedder
-    import mlx.core as mx  # type: ignore[import-not-found]
-    from tokenizers import Tokenizer  # type: ignore[import-not-found]
-
+def _embedding_config():
+    """Metadata is checked first because invalid settings must fail before weight allocation."""
     try:
         with open(os.path.join(_EMBED_DIR, "config.json"), encoding="utf-8") as handle:
-            config = json.load(handle)
+            return json.load(handle)
     except (OSError, ValueError) as exc:
         raise RuntimeError("embedding config not readable") from exc
+
+
+def _embedding_module():
+    """Path loading is required because the model implementation is not an installed package."""
     spec = importlib.util.spec_from_file_location(
         "kbs_jina_embed", os.path.join(_EMBED_DIR, "model.py")
     )
@@ -273,18 +294,35 @@ def _load_embedder():  # craftsman-ignore: PY002
         raise RuntimeError("embedding model module not found")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
+
+
+def _initialize_embedder(mx, tokenizer_class):
+    """Assets share one directory because mismatched weights and tokens produce invalid vectors."""
+    module = _embedding_module()
     model_class = next(
         getattr(module, name)
         for name in dir(module)
         if name.endswith("EmbeddingModel") and isinstance(getattr(module, name), type)
     )
-    model = _build_embed_model(module, model_class, config)
+    model = _build_embed_model(module, model_class, _embedding_config())
     weights = mx.load(os.path.join(_EMBED_DIR, "model.safetensors"))
     if hasattr(model, "sanitize"):
         weights = model.sanitize(weights)
     model.load_weights(list(weights.items()))
     mx.eval(model.parameters())
-    tokenizer = Tokenizer.from_file(os.path.join(_EMBED_DIR, "tokenizer.json"))
+    tokenizer = tokenizer_class.from_file(os.path.join(_EMBED_DIR, "tokenizer.json"))
+    return model, tokenizer
+
+
+def _load_embedder():
+    global _embedder
+    if _embedder is not None:
+        return _embedder
+    import mlx.core as mx  # type: ignore[import-not-found]
+    from tokenizers import Tokenizer  # type: ignore[import-not-found]
+
+    model, tokenizer = _initialize_embedder(mx, Tokenizer)
 
     def encode(texts):
         output = model.encode(texts, tokenizer, task_type=_EMBED_TASK)
@@ -337,7 +375,7 @@ def _load_reranker():
 
 
 def _idle_watchdog(server, ref_dir):
-    """After _IDLE_SECS with no completed request and no request in flight, clear the cache and shut down."""
+    """Idle shutdown is required because warm models must release memory after demand stops."""
     while not getattr(server, "_shutting_down", False):
         time.sleep(_IDLE_POLL_SECS)
         if getattr(server, "_shutting_down", False):
@@ -356,18 +394,17 @@ def _idle_watchdog(server, ref_dir):
 
 
 def _run(sock_path, ref_dir):
-    # Held for the process lifetime so a second host can never bind over a live one and double-load the models.
+    try:
+        os.makedirs(os.path.dirname(sock_path), mode=0o700, exist_ok=True)
+    except OSError:
+        return
     host_lock_fd = os.open(sock_path + ".hostlock", os.O_CREAT | os.O_RDWR, 0o600)
     try:
         fcntl.flock(host_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
-        sys.exit(0)
-    Path(sock_path).unlink(missing_ok=True)
-    try:
-        os.makedirs(os.path.dirname(sock_path), exist_ok=True)
-    except OSError:
         os.close(host_lock_fd)
         return
+    Path(sock_path).unlink(missing_ok=True)
     _set_cache_limit()
     server = _Server(sock_path, ref_dir)
 
@@ -379,7 +416,6 @@ def _run(sock_path, ref_dir):
     threading.Thread(target=_idle_watchdog, args=(server, ref_dir), daemon=True).start()
     server.serve_forever(poll_interval=0.2)
     server.server_close()
-    # AF_UNIX close() does not remove the bound path, so unlink it ourselves.
     Path(sock_path).unlink(missing_ok=True)
 
 

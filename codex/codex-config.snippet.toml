@@ -3,5 +3,5 @@
 matcher = "Bash|WebSearch|web_search|websearch"
 [[hooks.PreToolUse.hooks]]
 type = "command"
-command = "python3 __KBS_DIR__/hooks/skill_gate.py"
+command = "python3 __KBS_HOOK__"
 # <<< knowledge-based-search <<<
