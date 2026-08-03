@@ -45,6 +45,8 @@ class _SearchRequest:
     k: int
     cap: int
     refine: bool = True
+    providers: frozenset | None = None
+    include_library: bool = False
 
 
 @dataclass
@@ -63,6 +65,8 @@ class _PoolOptions:
     per_engine: int
     max_rounds: int
     raw: bool
+    scientific: bool = False
+    platform: list | None = None
 
 
 @dataclass(frozen=True)
@@ -75,6 +79,8 @@ class _ContextOptions:
     fetch_top_k: int = 5
     session: str | None = None
     raw: bool = False
+    scientific: bool = False
+    platform: list | None = None
 
 
 @dataclass(frozen=True)
@@ -94,6 +100,24 @@ class _DetailRequest:
     rank_query: str
     fetch_top_k: int
     session: str | None
+
+
+def _resolve_sources(config, options) -> tuple[frozenset | None, bool]:
+    """Library rides beside the providers set because it never enters the paced fan-out."""
+    if not options.get("scientific"):
+        return None, False
+    library_configured = bool(
+        config.get("library_mcp_url") and config.get("library_mcp_token")
+    )
+    platforms = options.get("platform")
+    if platforms is None:
+        providers = (
+            frozenset(engines._DIRECT_DEFAULTS)
+            | {"searxng"}
+            | engines.SCIENTIFIC_PLATFORMS
+        )
+        return providers, library_configured
+    return frozenset(platforms) - {"library"}, "library" in platforms and library_configured
 
 
 def _required_int(value):
@@ -116,12 +140,37 @@ def _prepare_query(query: str, raw: bool, context=None):
 
 
 def _run_engine_search(request: _SearchRequest, corrections):
-    hits = engines.search(request.query, request.config, k=request.k, cap=request.cap)
+    search_options = (
+        {"providers": request.providers} if request.providers is not None else {}
+    )
+    hits = engines.search(
+        request.query, request.config, k=request.k, cap=request.cap, **search_options
+    )
     state = _RefinementState(request.query, request.query, hits, set(), corrections)
-    if request.refine:
+    if request.refine and request.providers != frozenset():
         _spend_refinement_budget(state, request)
-    _assert_dual_primary(state.hits, request.config)
+    if request.providers is None:
+        _assert_dual_primary(state.hits, request.config)
+    if request.include_library:
+        _append_library_hits(state, request)
     return state.current, state.hits
+
+
+def _append_library_hits(state: _RefinementState, request: _SearchRequest) -> None:
+    """Library failures remain visible while trusted passages join successful web hits."""
+    try:
+        hits = engines.library(request.query, k=request.k, config=request.config)
+    except engines._PROVIDER_FAILURES as exc:
+        outcomes = getattr(state.hits, "outcomes", None)
+        if outcomes is not None:
+            outcomes["library"] = {"status": "error", "error": type(exc).__name__}
+        return
+    for hit in hits:
+        hit["engines"] = ["library"]
+    state.hits.extend(hits)
+    outcomes = getattr(state.hits, "outcomes", None)
+    if outcomes is not None:
+        outcomes["library"] = {"status": "ok", "count": len(hits)}
 
 
 def _spend_refinement_budget(state: _RefinementState, request: _SearchRequest):
@@ -137,9 +186,12 @@ def _spend_refinement_budget(state: _RefinementState, request: _SearchRequest):
 def _apply_refinement(state: _RefinementState, request: _SearchRequest, attempt):
     candidate, item = attempt
     state.corrections.append(item)
+    search_options = (
+        {"providers": request.providers} if request.providers is not None else {}
+    )
     try:
         retried = engines.search(
-            candidate, request.config, k=request.k, cap=request.cap
+            candidate, request.config, k=request.k, cap=request.cap, **search_options
         )
     except engines.AllProvidersFailed as exc:
         outcomes = getattr(state.hits, "outcomes", None)
@@ -221,7 +273,16 @@ def quick_web_search(query, config, num_results=8, **options) -> dict:
     num_results = _bounded_int(num_results, 1, 20)
     searched, corrections = _prepare_query(query, raw, options.get("context"))
     refine = not enforce.enforcement_disabled(raw)
-    request = _SearchRequest(searched, config, num_results, num_results, refine)
+    providers, include_library = _resolve_sources(config, options)
+    request = _SearchRequest(
+        searched,
+        config,
+        num_results,
+        num_results,
+        refine,
+        providers,
+        include_library,
+    )
     searched, hits = _run_engine_search(request, corrections)
     ranked = enforce.trust_order(searched, rag.rank(searched, hits))
     results, quality = enforce.quality_gate(
@@ -242,7 +303,16 @@ def web_search(query, config, num_results=5, **options) -> dict:
     num_results = _bounded_int(num_results, 1, 10)
     searched, corrections = _prepare_query(query, raw, options.get("context"))
     refine = not enforce.enforcement_disabled(raw)
-    request = _SearchRequest(searched, config, num_results, num_results, refine)
+    providers, include_library = _resolve_sources(config, options)
+    request = _SearchRequest(
+        searched,
+        config,
+        num_results,
+        num_results,
+        refine,
+        providers,
+        include_library,
+    )
     searched, hits = _run_engine_search(request, corrections)
     ranked_hits = enforce.trust_order(searched, rag.rank(searched, hits))[:num_results]
     chunks, citations, result_ids = _search_details(ranked_hits)
@@ -324,9 +394,15 @@ def get_content(ref: str, session: str | None = None) -> dict:
 def deep_research(query, config, max_rounds=3, **options) -> dict:
     """Run bounded multi-query research with enforcement on each dispatch."""
     raw = bool(options.get("raw", False))
-    return _deep_research(
-        query, max_rounds, lambda sub_query: _deep_search(sub_query, config, raw)
-    )
+    scientific = bool(options.get("scientific", False))
+    platform = options.get("platform")
+    if scientific or platform is not None:
+        search = lambda sub_query: _deep_search(
+            sub_query, config, raw, scientific=True, platform=platform
+        )
+    else:
+        search = lambda sub_query: _deep_search(sub_query, config, raw)
+    return _deep_research(query, max_rounds, search)
 
 
 def _failed_deep_response(query, failure, response=None):
@@ -348,22 +424,36 @@ def _failed_deep_response(query, failure, response=None):
     return failed
 
 
-def _deep_search(sub_query, config, raw=False):
+def _deep_search(sub_query, config, raw=False, scientific=False, platform=None):
     try:
-        response = _call_web_search(sub_query, config, raw)
+        if scientific or platform is not None:
+            response = _call_web_search(
+                sub_query, config, raw, scientific=True, platform=platform
+            )
+        else:
+            response = _call_web_search(sub_query, config, raw)
     except engines.AllProvidersFailed as exc:
         return _failed_deep_response(sub_query, exc)
     if response.get("citations") or (response.get("summary") or "").strip():
         return response
     if enforce.enforcement_disabled(raw) or _corrective_rounds(response) >= 2:
         return response
+    if scientific or platform is not None:
+        return _deep_fallback(
+            sub_query, config, response, scientific=True, platform=platform
+        )
     return _deep_fallback(sub_query, config, response)
 
 
-def _deep_fallback(sub_query, config, response):
+def _deep_fallback(sub_query, config, response, scientific=False, platform=None):
     fallback_query = response.get("query", sub_query)
     try:
-        quick = _call_literal_quick(fallback_query, config)
+        if scientific or platform is not None:
+            quick = _call_literal_quick(
+                fallback_query, config, scientific=True, platform=platform
+            )
+        else:
+            quick = _call_literal_quick(fallback_query, config)
     except engines.AllProvidersFailed as exc:
         return _failed_deep_response(fallback_query, exc, response)
     results = quick.get("results", [])
@@ -384,14 +474,24 @@ def _deep_fallback(sub_query, config, response):
     return data
 
 
-def _call_web_search(query, config, raw):
+def _call_web_search(query, config, raw, scientific=False, platform=None):
+    options = (
+        {"scientific": True, "platform": platform}
+        if scientific or platform is not None
+        else {}
+    )
     if raw:
-        return web_search(query, config, raw=True)
-    return web_search(query, config)
+        return web_search(query, config, raw=True, **options)
+    return web_search(query, config, **options)
 
 
-def _call_literal_quick(query, config):
-    return quick_web_search(query, config, num_results=5, raw=True)
+def _call_literal_quick(query, config, scientific=False, platform=None):
+    options = (
+        {"scientific": True, "platform": platform}
+        if scientific or platform is not None
+        else {}
+    )
+    return quick_web_search(query, config, num_results=5, raw=True, **options)
 
 
 def _corrective_rounds(response) -> int:
@@ -495,6 +595,8 @@ def _pool_options(options: _ContextOptions) -> _PoolOptions:
         options.per_engine,
         options.max_rounds,
         options.raw,
+        options.scientific,
+        options.platform,
     )
 
 
@@ -579,13 +681,15 @@ def _initial_context_pool(request, corrections):
         return request.query, pool, exc, False
 
 
-def _append_context_round(pool, query, options):
+def _append_context_round(pool, query, options, providers=None):
+    search_options = {"providers": providers} if providers is not None else {}
     try:
         hits = engines.search(
             query,
             options.config,
             k=options.per_engine,
             cap=options.per_engine * 6,
+            **search_options,
         )
     except engines.AllProvidersFailed as exc:
         outcomes = getattr(pool, "outcomes", None)
@@ -598,12 +702,18 @@ def _append_context_round(pool, query, options):
 
 def _gather_pool(options: _PoolOptions, memory):
     searched, corrections = _prepare_query(options.query, options.raw)
+    providers, include_library = _resolve_sources(
+        options.config,
+        {"scientific": options.scientific, "platform": options.platform},
+    )
     request = _SearchRequest(
         searched,
         options.config,
         options.per_engine,
         options.per_engine * 6,
         not enforce.enforcement_disabled(options.raw),
+        providers,
+        include_library,
     )
     searched, pool, failure, succeeded = _initial_context_pool(request, corrections)
     if searched not in memory["issued_queries"]:
@@ -612,7 +722,9 @@ def _gather_pool(options: _PoolOptions, memory):
         if sub_query in memory["issued_queries"]:
             continue
         memory["issued_queries"].append(sub_query)
-        round_failure, round_succeeded = _append_context_round(pool, sub_query, options)
+        round_failure, round_succeeded = _append_context_round(
+            pool, sub_query, options, providers
+        )
         failure = round_failure or failure
         succeeded = succeeded or round_succeeded
     if not succeeded and failure is not None:
