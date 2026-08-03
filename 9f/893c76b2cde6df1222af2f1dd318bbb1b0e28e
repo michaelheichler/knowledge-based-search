@@ -1,0 +1,35 @@
+.vbw-planning/phases/01-scientific-source-integration/01-01-PLAN.md
+  s_3f7ee6883d5ba5::t_3ac8b0b4721bc4 123-125
+.vbw-planning/phases/01-scientific-source-integration/remediation/qa/round-01/R01-PLAN.md
+  s_3f7ee6883d5ba5::t_0b27242220ccc9 19
+  s_3f7ee6883d5ba5::t_1f7c4905d97e10 193-200
+  s_3f7ee6883d5ba5::t_a22d22e61c4363 190,216
+  s_3f7ee6883d5ba5::t_f2c76cd8303614 225
+  s_3f7ee6883d5ba5::t_5262668bc5f532 223-224
+  s_3f7ee6883d5ba5::t_309876579a5e06 201-203
+  s_3454c4dcbd4d65::t_783374428cfffa 1-18,20-189,191-192,204-215,217-222,226-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "9f893c76b2cde6df1222af2f1dd318bbb1b0e28e",
+  "prompts": {},
+  "sessions": {
+    "s_3454c4dcbd4d65": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aabca06d-e034-4020-8cf2-e22b26391f23",
+        "model": "terra"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_3f7ee6883d5ba5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d76ff2a-6200-4e08-9e11-ddc72aadca6a",
+        "model": "terra"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
