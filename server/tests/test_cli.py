@@ -172,6 +172,64 @@ def test_query_after_double_dash(monkeypatch) -> None:
     assert "Quick --literal" in stdout
 
 
+def test_platform_requires_scientific() -> None:
+    code, stdout, stderr = run_cli(["quick", "query", "--platform", "arxiv"])
+
+    assert code == cli.BAD_ARGS
+    assert stdout == ""
+    assert "--platform requires --scientific" in stderr
+
+
+def test_unknown_platform_rejected() -> None:
+    code, stdout, stderr = run_cli(
+        ["quick", "query", "--scientific", "--platform", "openalex"]
+    )
+
+    assert code == cli.BAD_ARGS
+    assert stdout == ""
+    assert "openalex" in stderr
+    assert "arxiv" in stderr
+    assert "library" in stderr
+
+
+def test_plan_rejects_scientific_flag() -> None:
+    code, stdout, stderr = run_cli(["plan", "query", "--scientific"])
+
+    assert code == cli.BAD_ARGS
+    assert stdout == ""
+    assert "unrecognized arguments" in stderr
+
+
+def test_scientific_flag_threads_to_search_core(monkeypatch) -> None:
+    captured = {}
+
+    def fake_quick(query, config, num_results=8, **options) -> dict:
+        captured.update(query=query, config=config, num_results=num_results, options=options)
+        return {"results": []}
+
+    monkeypatch.setattr(search_core, "quick_web_search", fake_quick)
+
+    code, stdout, stderr = run_cli(
+        [
+            "quick",
+            "query",
+            "--scientific",
+            "--platform",
+            "arxiv",
+            "--platform",
+            "library",
+        ]
+    )
+
+    assert code == cli.SUCCESS
+    assert stdout == ""
+    assert stderr == ""
+    assert captured["options"] == {
+        "scientific": True,
+        "platform": ["arxiv", "library"],
+    }
+
+
 def test_injection_shaped_tokens_are_plain_query(monkeypatch) -> None:
     captured = []
 

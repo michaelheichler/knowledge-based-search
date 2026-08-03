@@ -45,6 +45,8 @@ Five commands, a depth ladder from cheap to thorough:
 
 Start cheap. Escalate only when the cheaper command leaves the question open.
 
+Scientific searches accept `--scientific` and optional repeated `--platform` values: `arxiv`, `pubmed`, `semanticscholar`, `crossref`, or `library`.
+
 ## Query craft
 
 - Search the terms an expert source would use, not the user's casual phrasing.
