@@ -232,3 +232,122 @@ def test_providers_filter_selects_scientific_only() -> None:
     )
     assert "bing" not in tasks
     assert "arxiv" in tasks
+
+
+def test_library_handshake_sequence_and_auth(monkeypatch) -> None:
+    """MCP requires initialization and the returned session on later messages."""
+    calls = []
+    responses = [
+        (json.dumps({"jsonrpc": "2.0", "id": 1}), {"mcp-session-id": "abc"}),
+        ("", {}),
+        (
+            "data: " + json.dumps(
+                {"jsonrpc": "2.0", "result": {"content": [{"text": json.dumps({"passages": []})}]}},
+            ),
+            {},
+        ),
+    ]
+
+    def fake_post(url, token, payload, session_id=None, timeout=engines._TIMEOUT):
+        calls.append((url, token, payload, session_id, timeout))
+        return responses.pop(0)
+
+    monkeypatch.setattr(engines, "_mcp_post", fake_post)
+    engines.library(
+        "defensive design",
+        k=3,
+        timeout=4,
+        config={"library_mcp_url": "http://library/mcp", "library_mcp_token": "secret"},
+    )
+
+    assert [call[2]["method"] for call in calls] == [
+        "initialize",
+        "notifications/initialized",
+        "tools/call",
+    ]
+    assert all(call[1] == "secret" for call in calls)
+    assert [call[3] for call in calls] == [None, "abc", "abc"]
+    assert calls[0][2]["params"]["protocolVersion"] == "2025-03-26"
+    assert calls[2][2]["params"] == {
+        "name": "search_library",
+        "arguments": {"query": "defensive design", "k": 3},
+    }
+
+
+def test_library_parses_sse_passages(monkeypatch) -> None:
+    """SSE passages become capped, confidence-free library hits."""
+    long_text = "x" * 301
+    payload = {
+        "passages": [
+            {
+                "chunk_id": "sentient-design-1",
+                "book_id": "sentient-design",
+                "book_title": "The Sentient Design",
+                "chapter_title": "Defensive Design",
+                "text": long_text,
+                "confidence": "high",
+            },
+            {
+                "chunk_id": "sentient-design-2",
+                "book_id": "sentient-design",
+                "book_title": "The Sentient Design",
+                "chapter_title": "Design Rules",
+                "text": "A shorter passage.",
+            },
+        ]
+    }
+    body = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "result": {"content": [{"text": json.dumps(payload)}]},
+        }
+    )
+    responses = [
+        ("{}", {"MCP-SESSION-ID": "abc"}),
+        ("", {}),
+        ("event: message\n" + f"data: {body}\n", {}),
+    ]
+
+    def fake_post(*_args, **_kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr(engines, "_mcp_post", fake_post)
+    hits = engines.library(
+        "design",
+        k=2,
+        config={"library_mcp_url": "http://library/mcp", "library_mcp_token": "secret"},
+    )
+
+    assert len(hits) == 2
+    assert [hit["url"] for hit in hits] == [
+        "library://sentient-design?chunk=sentient-design-1",
+        "library://sentient-design?chunk=sentient-design-2",
+    ]
+    assert all(hit["engine"] == "library" for hit in hits)
+    assert len(hits[0]["snippet"]) == 300
+    assert "confidence" not in hits[0]
+
+
+def test_library_urls_survive_merge_dedup() -> None:
+    """Distinct library chunks must remain distinct after URL normalization."""
+    hits = [
+        engines.result("One", "library://book?chunk=one", "first", "library", 1),
+        engines.result("Two", "library://book?chunk=two", "second", "library", 2),
+    ]
+
+    merged = engines.merge([hits])
+
+    assert len(merged) == 2
+    assert engines.norm_url(hits[0]["url"]) != engines.norm_url(hits[1]["url"])
+
+
+def test_library_never_in_task_fanout() -> None:
+    """The private library call must not enter paced provider task fan-out."""
+    tasks = engines._build_tasks(
+        "q",
+        {"library_mcp_url": "http://x", "library_mcp_token": "t"},
+        5,
+        providers=frozenset({"library"}),
+    )
+
+    assert "library" not in tasks
