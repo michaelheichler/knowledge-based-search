@@ -155,6 +155,14 @@ def _render_results(results):
     return "\n".join(lines)
 
 
+def _render_buckets(buckets):
+    parts = []
+    for bucket in buckets:
+        content = _render_results(bucket.get("results", []))
+        parts.append(f"## {bucket.get('name', '')}\n{content}".rstrip())
+    return "\n\n".join(parts)
+
+
 def _render_context(data):
     """Fetched evidence stays visible because context work must not disappear from human output."""
     parts = [_render_results(data.get("results", []))]
@@ -185,6 +193,8 @@ def _render(data):
 
 def _render_body(data):
     """Layouts stay separate because shared metadata must be appended exactly once."""
+    if "buckets" in data:
+        return _render_buckets(data["buckets"])
     if "results" in data:
         if "already_seen_suppressed" in data:
             return _render_context(data)
