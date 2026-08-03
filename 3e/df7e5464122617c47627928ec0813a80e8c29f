@@ -1,0 +1,31 @@
+skills/knowledge-based-search/SKILL.md
+  s_148ae53cf16113::t_015fd67b3295e1 48-49
+server/tests/test_cli.py
+  s_c3bf2730aba262::t_b7aa3b477b1ded 175-232
+tests/test_search_core.py
+  s_c3bf2730aba262::t_02f255b20a1ba6 107-259
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "3edf7e5464122617c47627928ec0813a80e8c29f",
+  "prompts": {},
+  "sessions": {
+    "s_148ae53cf16113": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82bc467d-d72d-428e-97b7-1f3f33916f5e",
+        "model": "terra"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_c3bf2730aba262": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a082c2cd0e7413966",
+        "model": "unknown"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
