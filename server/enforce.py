@@ -324,9 +324,10 @@ def results_are_noisy(query: str, hits: list[Mapping[str, object]]) -> bool:
     return relevant * 2 < len(hits)
 
 
-def quality_gate(results, top_n=5) -> tuple:
+def quality_gate(results, top_n=5, query: str = "") -> tuple:
     """Tag source tiers and summarize distinct-root-domain corroboration."""
-    tagged = [_tag_source(item) for item in results]
+    category = query_category(query) if query else None
+    tagged = [_tag_source(item, category) for item in results]
     sample = tagged[: max(1, top_n)]
     domains = _result_domains(sample)
     supporting = _supporting_domains(sample)
@@ -401,10 +402,12 @@ def rrf_rank(query: str, hits: list) -> list:
     return [hits[index] for index in sorted(indices, key=lambda index: -scores[index])]
 
 
-def _tag_source(item: Mapping[str, object]) -> dict[str, object]:
+def _tag_source(
+    item: Mapping[str, object], category: str | None = None
+) -> dict[str, object]:
     tagged = dict(item)
     url = str(tagged.get("url", ""))
-    tagged["trust"] = _trust_with_penalties(tagged)
+    tagged["trust"] = _trust_with_penalties(tagged, category)
     tagged["confidence"] = source_tier(url, tagged)
     return tagged
 
