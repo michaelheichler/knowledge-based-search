@@ -1,0 +1,25 @@
+.vbw-planning/phases/01-scientific-source-integration/01-01-PLAN.md
+  s_3f7ee6883d5ba5::t_22b5ec1a9aa0c0 1-123
+.vbw-planning/phases/01-scientific-source-integration/01-04-PLAN.md
+  s_3f7ee6883d5ba5::t_220735a42d57e7 1-114
+tests/conftest.py
+  s_3f7ee6883d5ba5::t_8e4f63c9e8a090 1,6-7,13-25
+tests/test_engines.py
+  s_3f7ee6883d5ba5::t_4a3db90279d51d 62-71,263-266,282,284,292-297,302,316-321,332-337,354-357,360-365,380-383
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "6c373ec5807e2c254c7996cf6f49594fc02f27c5",
+  "prompts": {},
+  "sessions": {
+    "s_3f7ee6883d5ba5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d76ff2a-6200-4e08-9e11-ddc72aadca6a",
+        "model": "sol"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
