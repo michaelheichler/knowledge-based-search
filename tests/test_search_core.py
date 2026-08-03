@@ -1,5 +1,6 @@
 import importlib
 import tempfile
+import unittest
 from pathlib import Path
 
 import pytest
@@ -59,6 +60,182 @@ def _assert_provenance(items) -> None:
     assert all("engine" not in item and "source" not in item for item in items)
 
 
+class ScientificSearchTests(unittest.TestCase):
+    def test_scientific_resolves_providers(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            calls = []
+            library_calls = []
+
+            def fake_search(query, config, **options) -> object:
+                calls.append(options.get("providers"))
+                return engines.SearchResults([], {"arxiv": {"status": "ok", "count": 0}})
+
+            monkeypatch.setattr(engines, "search", fake_search)
+
+            def fake_library(*args, **kwargs):
+                library_calls.append(args)
+                return []
+
+            monkeypatch.setattr(engines, "library", fake_library)
+
+            config = {"library_mcp_url": "http://library", "library_mcp_token": "token"}
+            search_core.quick_web_search("q", config, raw=True, scientific=True)
+            search_core.quick_web_search(
+                "q", config, raw=True, scientific=True, platform=["arxiv"]
+            )
+
+            expected = set(engines._DIRECT_DEFAULTS) | {"searxng"} | set(
+                engines.SCIENTIFIC_PLATFORMS
+            )
+            assert calls[0] == frozenset(expected)
+            assert calls[1] == frozenset({"arxiv"})
+            assert len(library_calls) == 1
+
+    def test_library_hits_merge_and_outcomes(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            web_hit = {
+                **HITS[0],
+                "url": "https://arxiv.org/abs/1234",
+                "engine": "arxiv",
+                "engines": ["arxiv"],
+            }
+            library_hits = [
+                {
+                    "title": "Library passage one",
+                    "url": "library://book?chunk=one",
+                    "snippet": "Library evidence one",
+                    "engine": "library",
+                    "rank": 1,
+                    "date": "",
+                },
+                {
+                    "title": "Library passage two",
+                    "url": "library://book?chunk=two",
+                    "snippet": "Library evidence two",
+                    "engine": "library",
+                    "rank": 2,
+                    "date": "",
+                },
+            ]
+            monkeypatch.setattr(
+                engines,
+                "search",
+                lambda *args, **kwargs: engines.SearchResults(
+                    [web_hit], {"arxiv": {"status": "ok", "count": 1}}
+                ),
+            )
+            monkeypatch.setattr(engines, "library", lambda *args, **kwargs: library_hits)
+            monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
+
+            response = search_core.quick_web_search(
+                "research",
+                {
+                    "library_mcp_url": "http://library",
+                    "library_mcp_token": "token",
+                },
+                raw=True,
+                scientific=True,
+            )
+
+            urls = {item["url"] for item in response["results"]}
+            assert urls == {
+                "https://arxiv.org/abs/1234",
+                "library://book?chunk=one",
+                "library://book?chunk=two",
+            }
+            assert response["providers"]["library"] == {"status": "ok", "count": 2}
+            assert all(
+                item["confidence"] == "primary"
+                for item in response["results"]
+                if item["url"].startswith("library://")
+            )
+
+    def test_library_error_is_structured_outcome(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            web_hit = engines.SearchResults(
+                [dict(HITS[0])], {"duckduckgo": {"status": "ok", "count": 1}}
+            )
+            monkeypatch.setattr(engines, "search", lambda *args, **kwargs: web_hit)
+
+            def fail_library(*args, **kwargs):
+                raise OSError("library offline")
+
+            monkeypatch.setattr(engines, "library", fail_library)
+
+            response = search_core.quick_web_search(
+                "research",
+                {
+                    "library_mcp_url": "http://library",
+                    "library_mcp_token": "token",
+                },
+                raw=True,
+                scientific=True,
+            )
+
+            assert response["results"]
+            assert response["providers"]["library"] == {
+                "status": "error",
+                "error": "OSError",
+            }
+
+    def test_platform_library_only(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            calls = []
+            library_hit = {
+                "title": "Library passage",
+                "url": "library://book?chunk=only",
+                "snippet": "Evidence",
+                "engine": "library",
+                "rank": 1,
+                "date": "",
+            }
+
+            def fake_search(query, config, **options) -> object:
+                calls.append(options["providers"])
+                return engines.SearchResults([], {})
+
+            monkeypatch.setattr(engines, "search", fake_search)
+            monkeypatch.setattr(engines, "library", lambda *args, **kwargs: [library_hit])
+            monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
+
+            response = search_core.quick_web_search(
+                "research",
+                {
+                    "library_mcp_url": "http://library",
+                    "library_mcp_token": "token",
+                },
+                raw=True,
+                scientific=True,
+                platform=["library"],
+            )
+
+            assert calls == [frozenset()]
+            assert [item["url"] for item in response["results"]] == [
+                "library://book?chunk=only"
+            ]
+            assert response["providers"]["library"] == {"status": "ok", "count": 1}
+
+    def test_result_helpers_preserve_optional_citation_count(self) -> None:
+        hit = {
+            "title": "Paper",
+            "url": "https://arxiv.org/abs/1",
+            "snippet": "Abstract",
+            "engine": "arxiv",
+            "date": "2026-01-02",
+            "relevance": 0.8,
+            "citation_count": 42,
+        }
+        without_count = {key: value for key, value in hit.items() if key != "citation_count"}
+
+        for helper in (
+            search_core._brief_result,
+            search_core._citation,
+            search_core._label,
+        ):
+            assert helper(hit)["citation_count"] == 42
+            assert "citation_count" not in helper(without_count)
+
+
 def test_quick_web_search_pins_current_shape(monkeypatch) -> object:
     install_stubs(monkeypatch)
 
@@ -103,158 +280,6 @@ def test_get_content_accepts_raw_url(monkeypatch) -> object:
         "page_content": "Raw URL page content.",
     }
 
-
-def test_scientific_resolves_providers(monkeypatch) -> None:
-    calls = []
-    library_calls = []
-
-    def fake_search(query, config, **options) -> object:
-        calls.append(options.get("providers"))
-        return engines.SearchResults([], {"arxiv": {"status": "ok", "count": 0}})
-
-    monkeypatch.setattr(engines, "search", fake_search)
-    def fake_library(*args, **kwargs):
-        library_calls.append(args)
-        return []
-
-    monkeypatch.setattr(engines, "library", fake_library)
-
-    config = {"library_mcp_url": "http://library", "library_mcp_token": "token"}
-    search_core.quick_web_search("q", config, raw=True, scientific=True)
-    search_core.quick_web_search(
-        "q", config, raw=True, scientific=True, platform=["arxiv"]
-    )
-
-    expected = set(engines._DIRECT_DEFAULTS) | {"searxng"} | set(
-        engines.SCIENTIFIC_PLATFORMS
-    )
-    assert calls[0] == frozenset(expected)
-    assert calls[1] == frozenset({"arxiv"})
-    assert len(library_calls) == 1
-
-
-def test_library_hits_merge_and_outcomes(monkeypatch) -> None:
-    web_hit = {
-        **HITS[0],
-        "url": "https://arxiv.org/abs/1234",
-        "engine": "arxiv",
-        "engines": ["arxiv"],
-    }
-    library_hits = [
-        {
-            "title": "Library passage one",
-            "url": "library://book?chunk=one",
-            "snippet": "Library evidence one",
-            "engine": "library",
-            "rank": 1,
-            "date": "",
-        },
-        {
-            "title": "Library passage two",
-            "url": "library://book?chunk=two",
-            "snippet": "Library evidence two",
-            "engine": "library",
-            "rank": 2,
-            "date": "",
-        },
-    ]
-    monkeypatch.setattr(
-        engines,
-        "search",
-        lambda *args, **kwargs: engines.SearchResults(
-            [web_hit], {"arxiv": {"status": "ok", "count": 1}}
-        ),
-    )
-    monkeypatch.setattr(engines, "library", lambda *args, **kwargs: library_hits)
-    monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
-
-    response = search_core.quick_web_search(
-        "research",
-        {
-            "library_mcp_url": "http://library",
-            "library_mcp_token": "token",
-        },
-        raw=True,
-        scientific=True,
-    )
-
-    urls = {item["url"] for item in response["results"]}
-    assert urls == {
-        "https://arxiv.org/abs/1234",
-        "library://book?chunk=one",
-        "library://book?chunk=two",
-    }
-    assert response["providers"]["library"] == {"status": "ok", "count": 2}
-    assert all(
-        item["confidence"] == "primary"
-        for item in response["results"]
-        if item["url"].startswith("library://")
-    )
-
-
-def test_library_error_is_structured_outcome(monkeypatch) -> None:
-    web_hit = engines.SearchResults(
-        [dict(HITS[0])], {"duckduckgo": {"status": "ok", "count": 1}}
-    )
-    monkeypatch.setattr(engines, "search", lambda *args, **kwargs: web_hit)
-
-    def fail_library(*args, **kwargs):
-        raise OSError("library offline")
-
-    monkeypatch.setattr(engines, "library", fail_library)
-
-    response = search_core.quick_web_search(
-        "research",
-        {
-            "library_mcp_url": "http://library",
-            "library_mcp_token": "token",
-        },
-        raw=True,
-        scientific=True,
-    )
-
-    assert response["results"]
-    assert response["providers"]["library"] == {
-        "status": "error",
-        "error": "OSError",
-    }
-
-
-def test_platform_library_only(monkeypatch) -> None:
-    calls = []
-    library_hit = {
-        "title": "Library passage",
-        "url": "library://book?chunk=only",
-        "snippet": "Evidence",
-        "engine": "library",
-        "rank": 1,
-        "date": "",
-    }
-
-    def fake_search(query, config, **options) -> object:
-        calls.append(options["providers"])
-        return engines.SearchResults([], {})
-
-    monkeypatch.setattr(engines, "search", fake_search)
-    monkeypatch.setattr(engines, "library", lambda *args, **kwargs: [library_hit])
-    monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
-
-    response = search_core.quick_web_search(
-        "research",
-        {
-            "library_mcp_url": "http://library",
-            "library_mcp_token": "token",
-        },
-        raw=True,
-        scientific=True,
-        platform=["library"],
-    )
-
-    assert calls == [frozenset()]
-    assert [item["url"] for item in response["results"]] == [
-        "library://book?chunk=only"
-    ]
-    assert response["providers"]["library"] == {"status": "ok", "count": 1}
 
 
 @pytest.mark.parametrize(
@@ -589,23 +614,3 @@ def test_context_raises_when_every_provider_round_fails(monkeypatch, tmp_path) -
         search_core.deep_context_aware_search(
             "alpha", {}, max_rounds=1, fetch_top_k=0, raw=True
         )
-
-def test_result_helpers_preserve_optional_citation_count() -> None:
-    hit = {
-        "title": "Paper",
-        "url": "https://arxiv.org/abs/1",
-        "snippet": "Abstract",
-        "engine": "arxiv",
-        "date": "2026-01-02",
-        "relevance": 0.8,
-        "citation_count": 42,
-    }
-    without_count = {key: value for key, value in hit.items() if key != "citation_count"}
-
-    for helper in (
-        search_core._brief_result,
-        search_core._citation,
-        search_core._label,
-    ):
-        assert helper(hit)["citation_count"] == 42
-        assert "citation_count" not in helper(without_count)
