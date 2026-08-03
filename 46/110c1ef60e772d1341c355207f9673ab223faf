@@ -1,0 +1,20 @@
+server/engines.py
+  s_3f7ee6883d5ba5::t_f8577894e81ddc 219-299
+  s_3f7ee6883d5ba5::t_efd4fff35120d9 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "46110c1ef60e772d1341c355207f9673ab223faf",
+  "prompts": {},
+  "sessions": {
+    "s_3f7ee6883d5ba5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d76ff2a-6200-4e08-9e11-ddc72aadca6a",
+        "model": "sol"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
