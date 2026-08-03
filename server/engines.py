@@ -3,18 +3,20 @@
 import concurrent.futures
 import datetime
 import html
-import json
 import logging
 import random
-import urllib.error
 import re
 import threading
 import time
-from typing import cast
+import urllib.error
 import urllib.parse
 import urllib.request
+from typing import Any
 
+import engine_pacing as _pacing
 import engine_state
+from library_engine import _mcp_json, _mcp_post
+from library_engine import library as _library
 
 BROWSER_UA = (
     "Mozilla/5.0 (X11 Linux x86_64) "
@@ -22,7 +24,16 @@ BROWSER_UA = (
     "Chrome/126.0.0.0 Safari/537.36"
 )
 _TIMEOUT = 12.0
-_PROVIDER_FAILURES = (Exception,)
+_PROVIDER_FAILURES = _pacing._PROVIDER_FAILURES
+ProviderBlocked = _pacing.ProviderBlocked
+_MIN_INTERVAL = _pacing._MIN_INTERVAL
+_MAX_JITTER = _pacing._MAX_JITTER
+_COOLDOWN_SECONDS = _pacing._COOLDOWN_SECONDS
+_CACHE_TTL = _pacing._CACHE_TTL
+_CACHE_CAP = _pacing._CACHE_CAP
+_pace_lock = _pacing._pace_lock
+_query_cache = _pacing._query_cache
+_pacing.random = random
 _DDG_RESULT = re.compile(
     r'result__a"[^>]*href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>.*?'
     r'result__snippet"[^>]*>(?P<snippet>.*?)</a>',
@@ -76,15 +87,6 @@ _BLOCKED = re.compile(
     re.IGNORECASE,
 )
 _LOG = logging.getLogger(__name__)
-
-
-class ProviderBlocked(RuntimeError):
-    """Signal that a provider returned an anti-automation page or rate-limit response."""
-
-    def __init__(self, provider, cooldown=None):
-        """Store an optional cooldown that overrides the scraper-block default."""
-        super().__init__(provider)
-        self.cooldown = cooldown
 
 
 def _raise_if_blocked(body, provider, hits) -> None:
@@ -216,85 +218,82 @@ def _get(url, timeout=_TIMEOUT, data=None, headers=None) -> str:
         return response.read().decode("utf-8", "replace")
 
 
-def _mcp_post(url, token, payload, session_id=None, timeout=_TIMEOUT) -> tuple[str, dict]:
-    """Retain MCP response headers because initialize returns the session there."""
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
-        "Authorization": f"Bearer {token}",
+_DIRECT_NAMES = frozenset(
+    {
+        "searxng",
+        "mwmbl",
+        "wikipedia",
+        "tavily",
+        "duckduckgo",
+        "google",
+        "bing",
+        "startpage",
+        "mojeek",
+        "_ddg_target",
+        "_parse_duckduckgo_html",
+        "_parse_duckduckgo_lite",
+        "_google_target",
+        "_parse_google_html",
+        "_parse_google_json",
+        "_google_api",
+        "_parse_bing_html",
+        "_parse_bing_legacy",
+        "_clean_startpage_title",
+        "_parse_startpage_html",
+        "_parse_mojeek_html",
     }
-    if session_id:
-        headers["Mcp-Session-Id"] = session_id
-    request = urllib.request.Request(
-        url, data=json.dumps(payload).encode("utf-8"), headers=headers
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.read().decode("utf-8", "replace"), dict(response.headers)
+)
 
 
-def _mcp_json(body) -> dict:
-    """Accept plain JSON because some streamable-HTTP servers skip SSE."""
-    body = body.lstrip()
-    if body.startswith("{"):
-        return json.loads(body)
-    for line in body.splitlines():
-        if line.startswith("data: "):
-            return json.loads(line[6:])
-    raise ValueError("MCP response did not contain a JSON data event")
+def _direct(name: str) -> Any:
+    """Load direct adapters only when a caller selects one."""
+    import direct_engines
+
+    return getattr(direct_engines, name)
+
+
+def _provider(name: str) -> Any:
+    """Prefer patched compatibility attributes before loading direct adapters."""
+    return globals().get(name) or _direct(name)
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DIRECT_NAMES:
+        return _direct(name)
+    raise AttributeError(name)
+
+
+def _reserve_slot(name) -> float:
+    """Keep pacing constants patchable through the legacy engines module."""
+    _pacing._MIN_INTERVAL = _MIN_INTERVAL
+    _pacing._MAX_JITTER = _MAX_JITTER
+    return _pacing._reserve_slot(name)
+
+
+def _cached_call(name, query, k, thunk) -> list:
+    """Keep cache limits patchable through the legacy engines module."""
+    _pacing._CACHE_TTL = _CACHE_TTL
+    _pacing._CACHE_CAP = _CACHE_CAP
+    return _pacing._cached_call(name, query, k, thunk)
+
+
+def _task_outcome(name, future) -> tuple[list, dict]:
+    """Keep cooldown limits patchable through the legacy engines module."""
+    _pacing._COOLDOWN_SECONDS = _COOLDOWN_SECONDS
+    return _pacing._task_outcome(name, future)
 
 
 def library(query, k=10, timeout=_TIMEOUT, config=None) -> list:
     """Keep trusted library passages outside the paced network fan-out."""
-    config = cast(dict[str, str], config)
-    url = config["library_mcp_url"]
-    token = config["library_mcp_token"]
-    initialize = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "protocolVersion": "2025-03-26",
-            "capabilities": {},
-            "clientInfo": {"name": "kbs", "version": "0.2"},
-        },
-    }
-    body, response_headers = _mcp_post(url, token, initialize, timeout=timeout)
-    headers = {key.lower(): value for key, value in response_headers.items()}
-    session_id = headers.get("mcp-session-id")
-    _mcp_post(
-        url,
-        token,
-        {"jsonrpc": "2.0", "method": "notifications/initialized"},
-        session_id=session_id,
+    return _library(
+        query,
+        k=k,
         timeout=timeout,
+        config=config,
+        post=_mcp_post,
+        parser=_mcp_json,
+        result_fn=result,
     )
-    body, _ = _mcp_post(
-        url,
-        token,
-        {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": "search_library",
-                "arguments": {"query": query, "k": k},
-            },
-        },
-        session_id=session_id,
-        timeout=timeout,
-    )
-    data = _mcp_json(body)
-    payload = json.loads(data["result"]["content"][0]["text"])
-    return [
-        result(
-            f"{passage['book_title']}: {passage['chapter_title']}",
-            f"library://{passage['book_id']}?chunk={passage['chunk_id']}",
-            passage["text"][:300],
-            "library",
-            rank,
-        )
-        for rank, passage in enumerate(payload.get("passages", [])[:k], 1)
-    ]
 
 
 _SCIENCE_UA = "kbs/0.2 (keyless research CLI)"
@@ -352,377 +351,6 @@ def _scientific_callables(query, config, k) -> dict:
     }
 
 
-def searxng(query, base, k=10, timeout=_TIMEOUT) -> list:
-    """Query one SearXNG provider."""
-    params = urllib.parse.urlencode({"q": query, "format": "json"})
-    payload = json.loads(_get(f"{base.rstrip('/')}/search?{params}", timeout))
-    hits = []
-    for rank, row in enumerate(payload.get("results", [])[:k], 1):
-        if row.get("url"):
-            hits.append(
-                result(
-                    row.get("title", ""),
-                    row["url"],
-                    row.get("content", ""),
-                    "searxng",
-                    rank,
-                )
-            )
-    return hits
-
-
-def mwmbl(query, k=10, timeout=_TIMEOUT) -> list:
-    """Query the keyless Mwmbl search API."""
-    params = urllib.parse.urlencode({"s": query})
-    payload = json.loads(_get(f"https://mwmbl.org/api/v1/search/?{params}", timeout))
-    hits = []
-    for rank, row in enumerate(payload[:k], 1):
-        if not row.get("url"):
-            continue
-        title = "".join(segment.get("value", "") for segment in row.get("title", []))
-        snippet = "".join(
-            segment.get("value", "") for segment in row.get("extract", [])
-        )
-        hits.append(result(title, row["url"], snippet, "mwmbl", rank))
-    return hits
-
-
-def wikipedia(query, k=10, timeout=_TIMEOUT) -> list:
-    """Query the keyless English Wikipedia search API."""
-    params = urllib.parse.urlencode(
-        {
-            "action": "query",
-            "list": "search",
-            "format": "json",
-            "srlimit": k,
-            "srsearch": query,
-        }
-    )
-    payload = json.loads(_get(f"https://en.wikipedia.org/w/api.php?{params}", timeout))
-    rows = payload.get("query", {}).get("search", [])[:k]
-    return [
-        result(
-            row["title"],
-            "https://en.wikipedia.org/wiki/"
-            + urllib.parse.quote(row["title"].replace(" ", "_"), safe=""),
-            row.get("snippet", ""),
-            "wikipedia",
-            rank,
-        )
-        for rank, row in enumerate(rows, 1)
-        if row.get("title")
-    ]
-
-
-def tavily(query, k=10, timeout=_TIMEOUT, config=None) -> list:
-    """Query Tavily with the configured free API key."""
-    request_body = json.dumps(
-        {"api_key": config["tavily_api_key"], "query": query, "max_results": k}
-    ).encode("utf-8")
-    payload = json.loads(
-        _get(
-            "https://api.tavily.com/search",
-            timeout,
-            data=request_body,
-            headers={"Content-Type": "application/json"},
-        )
-    )
-    return [
-        result(
-            row.get("title", ""),
-            row["url"],
-            row.get("content", ""),
-            "tavily",
-            rank,
-        )
-        for rank, row in enumerate(payload.get("results", [])[:k], 1)
-        if row.get("url")
-    ]
-
-
-def _ddg_target(href) -> str:
-    href = html.unescape(href)
-    if "uddg=" in href:
-        query = urllib.parse.urlparse(href).query
-        target = urllib.parse.parse_qs(query).get("uddg", [None])[0]
-        if target:
-            return target
-    return urllib.parse.urljoin("https://duckduckgo.com", href)
-
-
-def _parse_duckduckgo_html(body, k=10) -> list:
-    hits = []
-    for rank, match in enumerate(_DDG_RESULT.finditer(body), 1):
-        if rank > k:
-            break
-        hits.append(
-            result(
-                match["title"],
-                _ddg_target(match["href"]),
-                match["snippet"],
-                "duckduckgo",
-                rank,
-            )
-        )
-    return hits
-
-
-def _parse_duckduckgo_lite(body, k=10) -> list:
-    hits = []
-    matches = list(_DDG_LITE_LINK.finditer(body))
-    for match in matches:
-        href = html.unescape(match["href"])
-        title = _clean(match["title"])
-        target = _ddg_target(href)
-        resolved_host = urllib.parse.urlparse(target).hostname or ""
-        if not title or title.lower() == "duckduckgo":
-            continue
-        if resolved_host.lower() in {"duckduckgo.com", "lite.duckduckgo.com"}:
-            continue
-        if title.lower() in {"next page", "previous page"}:
-            continue
-        next_start = next(
-            (other.start() for other in matches if other.start() > match.start()),
-            len(body),
-        )
-        snippet_match = _DDG_LITE_SNIPPET.search(body, match.end(), next_start)
-        snippet = snippet_match["snippet"] if snippet_match else ""
-        hits.append(result(title, target, snippet, "duckduckgo", len(hits) + 1))
-        if len(hits) >= k:
-            break
-    return hits
-
-
-def duckduckgo(query, k=10, timeout=_TIMEOUT) -> list:
-    """Query both DuckDuckGo HTML endpoints before returning no matches."""
-    params = urllib.parse.urlencode({"q": query})
-    form = params.encode("utf-8")
-    lite_blocked = False
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    try:
-        body = _get(
-            "https://lite.duckduckgo.com/lite/", timeout, data=form, headers=headers
-        )
-        hits = _parse_duckduckgo_lite(body, k)
-        if hits:
-            return hits
-        _raise_if_blocked(body, "duckduckgo", hits)
-    except ProviderBlocked:
-        lite_blocked = True
-    except OSError:
-        pass
-    body = _get(f"https://html.duckduckgo.com/html/?{params}", timeout)
-    hits = _parse_duckduckgo_html(body, k)
-    _raise_if_blocked(body, "duckduckgo", hits)
-    if lite_blocked and not hits:
-        raise ProviderBlocked("duckduckgo")
-    return hits
-
-
-def _google_target(href) -> str:
-    href = html.unescape(href)
-    if href.startswith("/url?"):
-        target = urllib.parse.parse_qs(urllib.parse.urlparse(href).query).get(
-            "q", [None]
-        )[0]
-        if target:
-            return target
-    return href
-
-
-def _parse_google_html(body, k=10) -> list:
-    hits = []
-    matches = list(_GOOGLE_LINK.finditer(body))
-    for match in matches:
-        target = _google_target(match["href"])
-        if not target.startswith("http"):
-            continue
-        next_start = next(
-            (other.start() for other in matches if other.start() > match.start()),
-            len(body),
-        )
-        snippet_match = _GOOGLE_SNIPPET.search(body, match.end(), next_start)
-        snippet = snippet_match["snippet"] if snippet_match else ""
-        hits.append(result(match["title"], target, snippet, "google", len(hits) + 1))
-        if len(hits) >= k:
-            break
-    return hits
-
-
-def _parse_google_json(payload, k=10) -> list:
-    hits = []
-    for item in payload.get("items", [])[:k]:
-        if item.get("link"):
-            hits.append(
-                result(
-                    item.get("title", ""),
-                    item["link"],
-                    item.get("snippet", ""),
-                    "google",
-                    len(hits) + 1,
-                )
-            )
-    return hits
-
-
-def _google_api(query, k, timeout, config):
-    if not config or not config.get("google_api_key") or not config.get("google_cx"):
-        return None
-    params = urllib.parse.urlencode(
-        {
-            "key": config["google_api_key"],
-            "cx": config["google_cx"],
-            "q": query,
-            "num": min(k, 10),
-        }
-    )
-    payload = _get(
-        f"https://customsearch.googleapis.com/customsearch/v1?{params}", timeout
-    )
-    return _parse_google_json(json.loads(payload), k)
-
-
-def google(query, k=10, timeout=_TIMEOUT, config=None) -> list:
-    """Query configured Google API access or the direct HTML endpoint."""
-    try:
-        api_hits = _google_api(query, k, timeout, config)
-        if api_hits is not None:
-            return api_hits
-    except (OSError, ValueError, TypeError):
-        pass
-    params = urllib.parse.urlencode({"q": query, "num": k})
-    body = _get(
-        f"https://www.google.com/search?{params}",
-        timeout,
-        headers={"Cookie": "CONSENT=YES+"},
-    )
-    hits = _parse_google_html(body, k)
-    _raise_if_blocked(body, "google", hits)
-    return hits
-
-
-def _parse_bing_html(body, k=10) -> list:
-    hits = []
-    for block_match in _BING_BLOCK.finditer(body):
-        link_match = _BING_LINK.search(block_match["body"])
-        caption_match = _BING_CAPTION.search(block_match["body"])
-        snippet_match = (
-            _BING_SNIPPET.search(caption_match["body"]) if caption_match else None
-        )
-        if link_match:
-            snippet = snippet_match["snippet"] if snippet_match else ""
-            hits.append(
-                result(
-                    link_match["title"],
-                    html.unescape(link_match["href"]),
-                    snippet,
-                    "bing",
-                    len(hits) + 1,
-                )
-            )
-        if len(hits) >= k:
-            break
-    return hits or _parse_bing_legacy(body, k)
-
-
-def _parse_bing_legacy(body, k):
-    hits = []
-    for rank, match in enumerate(_BING_LEGACY_RESULT.finditer(body), 1):
-        if rank > k:
-            break
-        hits.append(
-            result(
-                match["title"],
-                html.unescape(match["href"]),
-                match["snippet"],
-                "bing",
-                rank,
-            )
-        )
-    return hits
-
-
-def bing(query, k=10, timeout=_TIMEOUT) -> list:
-    """Query the Bing HTML endpoint."""
-    params = urllib.parse.urlencode({"q": query})
-    body = _get(f"https://www.bing.com/search?{params}", timeout)
-    hits = _parse_bing_html(body, k)
-    _raise_if_blocked(body, "bing", hits)
-    return hits
-
-
-def _clean_startpage_title(title) -> str:
-    cleaned = _clean(title)
-    return re.sub(r"^(?:[.#][^{]{1,80}\{[^{}]*\}\s*)+", "", cleaned).strip()
-
-
-def _parse_startpage_html(body, limit=10) -> list:
-    hits = []
-    scrubbed_body = re.sub(
-        r"<(?:style|script)\b[^>]*>.*?</(?:style|script)>",
-        "",
-        body,
-        flags=re.DOTALL | re.IGNORECASE,
-    )
-    for match in _STARTPAGE_LINK.finditer(scrubbed_body):
-        attrs = match["attrs"]
-        class_name = _attr(attrs, "class")
-        if "result" not in class_name and "w-gl__result-title" not in class_name:
-            continue
-        title = _clean_startpage_title(match["title"])
-        href = _attr(attrs, "href")
-        if not title or not href:
-            continue
-        snippet_match = _STARTPAGE_SNIPPET.search(match["tail"])
-        snippet = snippet_match["snippet"] if snippet_match else ""
-        url = _redirect_target(href, "https://www.startpage.com", ("url", "u"))
-        if url.startswith("http"):
-            hits.append(result(title, url, snippet, "startpage", len(hits) + 1))
-        if len(hits) >= limit:
-            break
-    return hits
-
-
-def startpage(query, timeout=_TIMEOUT, **options) -> list:
-    limit = options.get("k", 10)
-    params = urllib.parse.urlencode({"query": query})
-    headers = {
-        "Accept": "text/html,application/xhtml+xml,application/xml,*/*",
-        "Accept-Language": "en-US,en",
-    }
-    body = _get(
-        f"https://www.startpage.com/sp/search?{params}", timeout, headers=headers
-    )
-    hits = _parse_startpage_html(body, limit)
-    _raise_if_blocked(body, "startpage", hits)
-    return hits
-
-
-def _parse_mojeek_html(body, limit=10) -> list:
-    hits = []
-    for match in _MOJEEK_RESULT.finditer(body):
-        href = _attr(match["attrs"], "href")
-        title = _clean(match["title"])
-        if not href or not title:
-            continue
-        snippet_match = _MOJEEK_SNIPPET.search(match["tail"])
-        snippet = snippet_match["snippet"] if snippet_match else ""
-        url = _absolute_url(href, "https://www.mojeek.com")
-        if url.startswith("http"):
-            hits.append(result(title, url, snippet, "mojeek", len(hits) + 1))
-        if len(hits) >= limit:
-            break
-    return hits
-
-
-def mojeek(query, timeout=_TIMEOUT, **options) -> list:
-    limit = options.get("k", 10)
-    params = urllib.parse.urlencode({"q": query})
-    body = _get(f"https://www.mojeek.com/search?{params}", timeout)
-    hits = _parse_mojeek_html(body, limit)
-    _raise_if_blocked(body, "mojeek", hits)
-    return hits
-
 
 def _normalized_netloc(parts) -> str:
     user_info = parts.netloc.rsplit("@", 1)[0] + "@" if "@" in parts.netloc else ""
@@ -773,16 +401,16 @@ def merge(result_lists, cap=20) -> list:
 
 def _direct_callables(query, config, k) -> dict:
     callables = {
-        "duckduckgo": lambda: duckduckgo(query, k),
-        "google": lambda: google(query, k, config=config),
-        "bing": lambda: bing(query, k),
-        "startpage": lambda: startpage(query, k=k),
-        "mojeek": lambda: mojeek(query, k=k),
-        "mwmbl": lambda: mwmbl(query, k=k),
-        "wikipedia": lambda: wikipedia(query, k=k),
+        "duckduckgo": lambda: _provider("duckduckgo")(query, k),
+        "google": lambda: _provider("google")(query, k, config=config),
+        "bing": lambda: _provider("bing")(query, k),
+        "startpage": lambda: _provider("startpage")(query, k=k),
+        "mojeek": lambda: _provider("mojeek")(query, k=k),
+        "mwmbl": lambda: _provider("mwmbl")(query, k=k),
+        "wikipedia": lambda: _provider("wikipedia")(query, k=k),
     }
     if config.get("tavily_api_key"):
-        callables["tavily"] = lambda: tavily(query, k=k, config=config)
+        callables["tavily"] = lambda: _provider("tavily")(query, k=k, config=config)
     return callables
 
 
@@ -798,45 +426,11 @@ _DIRECT_DEFAULTS = {
 }
 
 
-_MIN_INTERVAL = 3.0  # arXiv's courtesy guidance asks for a 3s gap between requests
-_MAX_JITTER = 2.0
-_COOLDOWN_SECONDS = 1800.0
-_CACHE_TTL = 600.0
-_CACHE_CAP = 128
-_pace_lock = threading.Lock()
-_query_cache: dict = {}
-
-
-def _reserve_slot(name) -> float:
-    """Slots are reserved under the lock because parallel rounds would otherwise share one."""
-    with _pace_lock:
-        now = time.time()
-        interval = _MIN_INTERVAL + random.uniform(0.0, _MAX_JITTER)
-        start = engine_state.reserve_slot(name, now, interval)
-        return max(0.0, start - now)
-
-
-def _cached_call(name, query, k, thunk) -> list:
-    """Repeat queries are served from cache because burst traffic gets providers banned."""
-    key = (name, query, k)
-    with _pace_lock:
-        entry = _query_cache.get(key)
-        if entry and time.monotonic() - entry[0] < _CACHE_TTL:
-            return [dict(hit) for hit in entry[1]]
-    time.sleep(_reserve_slot(name))
-    hits = thunk()
-    with _pace_lock:
-        _query_cache[key] = (time.monotonic(), [dict(hit) for hit in hits])
-        while len(_query_cache) > _CACHE_CAP:
-            _query_cache.pop(next(iter(_query_cache)))
-    return hits
-
-
 def _build_tasks(query, config, k, outcomes=None, providers=None) -> dict:
     """Cooldown outcomes stay visible because skipped providers never create futures."""
     enabled = {}
     if config.get("searxng_url"):
-        enabled["searxng"] = lambda: searxng(query, config["searxng_url"], k)
+        enabled["searxng"] = lambda: _provider("searxng")(query, config["searxng_url"], k)
     for name, thunk in _direct_callables(query, config, k).items():
         if config.get(name, _DIRECT_DEFAULTS[name]):
             enabled[name] = thunk
@@ -882,18 +476,6 @@ def _daemon_future(fn):
 
     threading.Thread(target=run, daemon=True).start()
     return future
-
-
-def _task_outcome(name, future) -> tuple[list, dict]:
-    try:
-        hits = future.result()
-        return hits, {"status": "ok", "count": len(hits)}
-    except ProviderBlocked as exc:
-        cooldown = getattr(exc, "cooldown", None) or _COOLDOWN_SECONDS
-        engine_state.block_provider(name, time.time() + cooldown)
-        return [], {"status": "error", "error": type(exc).__name__}
-    except _PROVIDER_FAILURES as exc:
-        return [], {"status": "error", "error": type(exc).__name__}
 
 
 def _run_tasks(tasks) -> tuple[list, dict]:
@@ -947,11 +529,11 @@ def _demo_merge_and_dates() -> None:
 
 def _demo_duckduckgo_parsers() -> None:
     sample = '<a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fok.com">Hit</a><a class="result__snippet" href="#">snip</a>'
-    assert _parse_duckduckgo_html(sample)[0]["url"] == "https://ok.com", (
+    assert _provider("_parse_duckduckgo_html")(sample)[0]["url"] == "https://ok.com", (
         "ddg html decode failed"
     )
     lite = '<table><tr><td><a href="https://lite.duckduckgo.com/lite/">DuckDuckGo</a></td></tr><tr><td><a href="//duckduckgo.com/l/?uddg=https%3A%2F%2Flite.com">Lite</a></td></tr><tr><td class="result-snippet">lite <b>snip</b></td></tr></table>'
-    lite_hits = _parse_duckduckgo_lite(lite)
+    lite_hits = _provider("_parse_duckduckgo_lite")(lite)
     assert len(lite_hits) == 1 and lite_hits[0]["snippet"] == "lite snip", (
         "ddg lite parse failed"
     )
@@ -960,24 +542,24 @@ def _demo_duckduckgo_parsers() -> None:
 def _demo_parsers() -> None:
     _demo_duckduckgo_parsers()
     google_html = '<a href="/url?q=https%3A%2F%2Fg.com&sa=U"><h3>G</h3></a><div class="VwiC3b">gs</div>'
-    assert _parse_google_html(google_html)[0]["url"] == "https://g.com", (
+    assert _provider("_parse_google_html")(google_html)[0]["url"] == "https://g.com", (
         "google html parse failed"
     )
     assert (
-        _parse_google_json(
+        _provider("_parse_google_json")(
             {"items": [{"title": "GJ", "link": "https://gj.com", "snippet": "gjs"}]}
         )[0]["title"]
         == "GJ"
     ), "google json parse failed"
     bing_html = '<li class="b_algo"><h2><a href="https://b.com">B</a></h2><div class="b_caption"><p>bs</p></div></li>'
-    assert _parse_bing_html(bing_html)[0]["snippet"] == "bs", "bing parse failed"
+    assert _provider("_parse_bing_html")(bing_html)[0]["snippet"] == "bs", "bing parse failed"
     startpage_html = '<style><a class="w-gl__result-title" href="https://bad.example">Bad</a></style><a class="w-gl__result-title" href="/sp/result?url=https%3A%2F%2Fs.com">.sx{color:red}S</a><p class="w-gl__description">ss</p>'
-    startpage_hits = _parse_startpage_html(startpage_html)
+    startpage_hits = _provider("_parse_startpage_html")(startpage_html)
     assert len(startpage_hits) == 1 and startpage_hits[0]["title"] == "S", (
         "startpage parse failed"
     )
     mojeek_html = '<h2><a href="https://m.com">M</a></h2><p class="s">ms</p><a href="https://crumb.com">crumb</a>'
-    assert _parse_mojeek_html(mojeek_html)[0]["url"] == "https://m.com", (
+    assert _provider("_parse_mojeek_html")(mojeek_html)[0]["url"] == "https://m.com", (
         "mojeek parse failed"
     )
 
