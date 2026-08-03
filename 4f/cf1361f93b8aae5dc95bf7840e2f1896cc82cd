@@ -1,0 +1,23 @@
+server/tests/test_trust.py
+  s_7ffb2071303c69::t_2d2649bdaa984a 3
+  s_7ffb2071303c69::t_52f8ec84e8b808 169-174,176
+  s_7ffb2071303c69::t_17baf17e35cb83 167-168,175
+server/tests/test_engine_adapters.py
+  s_7ffb2071303c69::t_65149560996def 93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "4fcf1361f93b8aae5dc95bf7840e2f1896cc82cd",
+  "prompts": {},
+  "sessions": {
+    "s_7ffb2071303c69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36ddd213-0880-40cc-81ee-a7e5d66f3848",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
