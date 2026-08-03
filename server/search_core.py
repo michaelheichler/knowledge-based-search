@@ -111,12 +111,7 @@ def _resolve_sources(config, options) -> tuple[frozenset | None, bool]:
     )
     platforms = options.get("platform")
     if platforms is None:
-        providers = (
-            frozenset(engines._DIRECT_DEFAULTS)
-            | {"searxng"}
-            | engines.SCIENTIFIC_PLATFORMS
-        )
-        return providers, library_configured
+        return frozenset(engines.SCIENTIFIC_PLATFORMS), library_configured
     return frozenset(platforms) - {"library"}, "library" in platforms and library_configured
 
 
