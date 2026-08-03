@@ -140,11 +140,10 @@ class ScientificSearchTests(unittest.TestCase):
         with pytest.MonkeyPatch.context() as monkeypatch:
             install_stubs(monkeypatch)
 
-            baseline = search_core.quick_web_search("alpha", {}, raw=True)
             response = search_core.quick_web_search("alpha", {}, raw=True)
 
             assert "buckets" not in response
-            assert set(response) == set(baseline)
+            assert set(response) == {"query", "results", "corrections", "quality"}
 
     def test_library_hits_merge_and_outcomes(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
