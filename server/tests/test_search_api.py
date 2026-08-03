@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -301,9 +302,9 @@ def test_reformulate_pads_single_keyword_query() -> object:
 
 def _run_cli(root, environment, *arguments):
     return subprocess.run(
-        [str(root / "bin/kbs"), *arguments],
+        [sys.executable, str(root / "bin/kbs"), *arguments],
         cwd=root,
-        env=environment,
+        env={**os.environ, **environment},
         capture_output=True,
         text=True,
         timeout=45,
@@ -323,9 +324,10 @@ def test_result_reference_survives_separate_cli_processes(tmp_path) -> None:
         pytest.skip("KBS_OFFLINE=1")
 
     root = Path(__file__).resolve().parents[2]
-    environment = os.environ.copy()
-    environment["KBS_CONFIG"] = json.dumps({"duckduckgo": True})
-    environment["KBS_STATE_FILE"] = str(tmp_path / "state.json")
+    environment = {
+        "KBS_CONFIG": json.dumps({"duckduckgo": True}),
+        "KBS_STATE_FILE": str(tmp_path / "state.json"),
+    }
 
     search = _run_cli(root, environment, "search", "python documentation", "--json")
     _require_network_result(search, "search")

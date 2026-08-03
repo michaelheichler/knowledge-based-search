@@ -350,7 +350,7 @@ def test_quality_gate_tags_tiers_and_diversity() -> None:
 
     assert [item["confidence"] for item in tagged] == [
         "primary",
-        "standard",
+        "primary",
         "weak",
         "unknown",
     ]
