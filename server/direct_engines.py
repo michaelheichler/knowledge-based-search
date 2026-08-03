@@ -71,8 +71,10 @@ def wikipedia(query, k=10, timeout=_TIMEOUT) -> list:
     ]
 
 
-def tavily(query, k=10, timeout=_TIMEOUT, config=None) -> list:
+def tavily(query, k=10, timeout=_TIMEOUT, config: dict | None = None) -> list:
     """Query Tavily with the configured free API key."""
+    if config is None or not config.get("tavily_api_key"):
+        raise ValueError("tavily_api_key is required")
     request_body = json.dumps(
         {"api_key": config["tavily_api_key"], "query": query, "max_results": k}
     ).encode("utf-8")

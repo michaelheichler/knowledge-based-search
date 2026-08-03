@@ -452,7 +452,7 @@ def test_deep_research_falls_back_when_first_engine_call_empty(monkeypatch) -> o
     assert calls["n"] >= 2
 
 
-def _provider_failure() -> engines.AllProvidersFailed:
+def _provider_failure() -> OSError:
     outcomes = {"duckduckgo": {"status": "error", "error": "OSError"}}
     return engines.AllProvidersFailed(outcomes)
 
@@ -478,7 +478,7 @@ def test_refinement_stops_after_failed_correction(monkeypatch) -> None:
     """One failed correction ends the budget so a second cannot misreport all-failed."""
     calls = []
 
-    def searcher(query, config, **options) -> engines.SearchResults:
+    def searcher(query, config, **options) -> list:
         calls.append(query)
         if len(calls) == 1:
             return engines.SearchResults(

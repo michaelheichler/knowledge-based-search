@@ -215,7 +215,9 @@ def _request_snapshot(server):
 
 def _begin_shutdown(server):
     server._shutting_down = True
-    threading.Thread(target=server.shutdown, daemon=True).start()
+    shutdown = getattr(server, "shutdown", None)
+    if callable(shutdown):
+        threading.Thread(target=shutdown, daemon=True).start()
 
 
 def _model_warm():

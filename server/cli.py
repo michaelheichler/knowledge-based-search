@@ -7,6 +7,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
+from typing import NoReturn, TextIO, cast
 
 import enforce  # type: ignore[import-not-found]
 import engines  # type: ignore[import-not-found]
@@ -31,7 +32,7 @@ class BadArgsError(ValueError):
 
 
 class Parser(argparse.ArgumentParser):
-    def error(self, message) -> None:
+    def error(self, message) -> NoReturn:
         raise BadArgsError(message)
 
 
@@ -380,6 +381,7 @@ def _main_inputs(args, kwargs):
 
 def main(*args, **kwargs) -> int:
     argv, stdin, stdout, stderr = _main_inputs(args, kwargs)
+    stderr = cast(TextIO, stderr)
     started = time.perf_counter()
     try:
         return _run_command(argv, stdin, stdout)

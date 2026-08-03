@@ -7,7 +7,7 @@ import math
 import os
 import re
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -340,7 +340,7 @@ def quality_gate(results, top_n=5) -> tuple:
     }
 
 
-def _tag_source(item: Mapping[str, object]) -> dict:
+def _tag_source(item: Mapping[str, object]) -> dict[str, object]:
     tagged = dict(item)
     url = str(tagged.get("url", ""))
     tagged["trust"] = trust_score(url)
@@ -360,7 +360,7 @@ def _result_domains(results: Iterable[Mapping[str, object]]) -> set[str]:
     return domains
 
 
-def _supporting_domains(results: list[Mapping[str, object]]) -> set[str]:
+def _supporting_domains(results: Sequence[Mapping[str, object]]) -> set[str]:
     if not results:
         return set()
     top_terms = _evidence_terms(results[0])
