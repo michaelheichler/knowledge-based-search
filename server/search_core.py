@@ -261,6 +261,29 @@ def _assert_dual_primary(hits, config):
         )
 
 
+def _bucket_results(items: list[dict]) -> list[dict]:
+    groups: dict[str, list[dict]] = {}
+    first_positions: dict[str, int] = {}
+    for position, item in enumerate(items):
+        categories = item.get("categories")
+        bucket = (
+            categories[0]
+            if isinstance(categories, list)
+            and categories
+            and isinstance(categories[0], str)
+            and categories[0]
+            else "Uncategorized"
+        )
+        item["bucket"] = bucket
+        groups.setdefault(bucket, []).append(item)
+        first_positions.setdefault(bucket, position)
+    names = sorted(
+        groups,
+        key=lambda name: (name == "Uncategorized", first_positions[name]),
+    )
+    return [{"name": name, "results": groups[name]} for name in names]
+
+
 def quick_web_search(query, config, num_results=8, **options) -> dict:
     """Return ranked snippets with enforcement and source-quality metadata."""
     raw = bool(options.get("raw", False))
@@ -288,6 +311,8 @@ def quick_web_search(query, config, num_results=8, **options) -> dict:
         "corrections": corrections,
         "quality": quality,
     }
+    if options.get("scientific"):
+        data["buckets"] = _bucket_results(results)
     return _with_provider_outcomes(data, hits)
 
 
@@ -320,6 +345,8 @@ def web_search(query, config, num_results=5, **options) -> dict:
         "corrections": corrections,
         "quality": quality,
     }
+    if options.get("scientific"):
+        data["buckets"] = _bucket_results(tagged)
     return _with_provider_outcomes(data, hits)
 
 
@@ -784,6 +811,7 @@ def _brief_result(hit):
         "engines": _provenance(hit),
         "date": hit.get("date", ""),
         "relevance": hit.get("relevance", 0.0),
+        "categories": hit.get("categories", []),
         **({"citation_count": hit["citation_count"]} if "citation_count" in hit else {}),
     }
 
@@ -796,6 +824,7 @@ def _citation(hit):
         "engines": _provenance(hit),
         "date": hit.get("date", ""),
         "relevance": hit.get("relevance", 0.0),
+        "categories": hit.get("categories", []),
         "confidence": hit.get("confidence")
         or enforce.source_tier(hit.get("url", ""), hit),
         **({"citation_count": hit["citation_count"]} if "citation_count" in hit else {}),
