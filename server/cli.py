@@ -194,7 +194,10 @@ def _render(data):
 def _render_body(data):
     """Layouts stay separate because shared metadata must be appended exactly once."""
     if "buckets" in data:
-        return _render_buckets(data["buckets"])
+        parts = [_render_buckets(data["buckets"])]
+        if data.get("summary"):
+            parts.insert(0, data["summary"])
+        return "\n\n".join(parts)
     if "results" in data:
         if "already_seen_suppressed" in data:
             return _render_context(data)
