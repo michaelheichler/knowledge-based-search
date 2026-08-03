@@ -1,5 +1,6 @@
 import json
 import os
+from typing import cast
 
 import enforce
 
@@ -163,13 +164,16 @@ def test_new_science_domains_scored() -> None:
 def test_citation_count_bonus_capped_and_monotonic() -> None:
     counts = [0, 10, 1000, 10**9]
     scores = [
-        enforce._tag_source(
-            {
-                "url": "https://arxiv.org/abs/1",
-                "citation_count": count,
-                "date": "2026-01-01",
-            }
-        )["trust"]
+        cast(
+            float,
+            enforce._tag_source(
+                {
+                    "url": "https://arxiv.org/abs/1",
+                    "citation_count": count,
+                    "date": "2026-01-01",
+                }
+            )["trust"],
+        )
         for count in counts
     ]
 

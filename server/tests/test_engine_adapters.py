@@ -90,7 +90,7 @@ def test_tavily_posts_key_and_parses_results(monkeypatch) -> None:
 
 def test_tavily_tasks_require_api_key() -> None:
     """A missing Tavily key must prevent any Tavily task from being scheduled."""
-    config = {"duckduckgo": False, "mwmbl": False, "wikipedia": False}
+    config: dict[str, bool | str] = {"duckduckgo": False, "mwmbl": False, "wikipedia": False}
     assert "tavily" not in engines._build_tasks("query", config, 1)
 
     config["tavily_api_key"] = "secret"
