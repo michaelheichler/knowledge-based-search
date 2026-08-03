@@ -1,0 +1,27 @@
+server/cli.py
+  s_3f7ee6883d5ba5::t_e9ff7ed06cace7 10,35,384
+tests/test_search_core.py
+  s_3f7ee6883d5ba5::t_e973244cbbfa76 455,481
+server/rag_host.py
+  s_3f7ee6883d5ba5::t_8f92ed946b98e8 218-220
+server/direct_engines.py
+  s_3f7ee6883d5ba5::t_bdebac141c9339 74,76-77
+server/enforce.py
+  s_3f7ee6883d5ba5::t_34bcc02351a3d5 10,343,363
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "f464247deeebdf75f12bc25d3b3c9b00e89b15dc",
+  "prompts": {},
+  "sessions": {
+    "s_3f7ee6883d5ba5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d76ff2a-6200-4e08-9e11-ddc72aadca6a",
+        "model": "sol"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
