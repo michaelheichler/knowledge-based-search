@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 from collections import Counter
@@ -192,6 +193,7 @@ _QUALITY_DOWNWEIGHT = re.compile(
 )
 _TRUST_PATH = Path(__file__).with_name("data") / "trust.json"
 _TRUST_CACHE: tuple[int, dict] | None = None
+_LIBRARY_TRUST = 95
 _CATEGORY_KEYWORDS = {
     "science": {
         "study",
@@ -342,6 +344,12 @@ def _tag_source(item: Mapping[str, object]) -> dict:
     tagged = dict(item)
     url = str(tagged.get("url", ""))
     tagged["trust"] = trust_score(url)
+    trust = tagged["trust"]
+    count = tagged.get("citation_count")
+    if isinstance(trust, int) and isinstance(count, int) and count > 0:
+        tagged["trust"] = min(
+            100, trust + min(5, int(math.log10(count + 1) * 2))
+        )
     tagged["confidence"] = source_tier(url, tagged)
     return tagged
 
@@ -409,6 +417,8 @@ def query_category(query: str) -> str | None:
 
 def trust_score(url: str, category: str | None = None) -> int | None:
     """Return a maintained source score with an optional topic bonus."""
+    if url.startswith("library://"):
+        return _LIBRARY_TRUST
     data = _trust_data()
     domains = {_hostname(url).removeprefix("www."), root_domain(url)} - {""}
     categories = data["categories"]
@@ -436,13 +446,18 @@ def trust_order(query: str, ranked: list) -> list:
     def adjusted_relevance(hit: Mapping[str, object]) -> float:
         score = trust_score(str(hit.get("url", "")), category)
         bonus = 0 if score is None else (score - 50) / 500
-        return float(hit.get("relevance", 0) or 0) + bonus
+        relevance = hit.get("relevance", 0)
+        if not isinstance(relevance, (int, float)):
+            relevance = 0
+        return float(relevance) + bonus
 
     return sorted(ranked, key=adjusted_relevance, reverse=True)
 
 
 def source_tier(url: str, item: Mapping[str, object] | None = None) -> str:
     """Classify a source with maintained scores and explicit overrides."""
+    if url.startswith("library://"):
+        return "primary"
     host = _hostname(url).removeprefix("www.")
     domain = root_domain(url)
     text = "" if item is None else f"{item.get('title', '')} {item.get('snippet', '')}"
