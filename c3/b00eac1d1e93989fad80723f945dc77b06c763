@@ -1,0 +1,25 @@
+server/direct_engines.py
+  s_3f7ee6883d5ba5::t_713523fa7699ae 1-382
+server/engine_pacing.py
+  s_3f7ee6883d5ba5::t_46a7aea67d74c6 1-63
+server/engines.py
+  s_3f7ee6883d5ba5::t_49c17cea4b6bdd 11,14,16,18-19,27-36,221-243,245-271,273-277,279-283,288-290,292-295,404-410,413,433,532,536,545,549,555,557,562
+server/library_engine.py
+  s_3f7ee6883d5ba5::t_d3ad0cabb970e2 1-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "c3b00eac1d1e93989fad80723f945dc77b06c763",
+  "prompts": {},
+  "sessions": {
+    "s_3f7ee6883d5ba5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d76ff2a-6200-4e08-9e11-ddc72aadca6a",
+        "model": "sol"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
