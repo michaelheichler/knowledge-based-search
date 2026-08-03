@@ -60,6 +60,21 @@ def _assert_provenance(items) -> None:
     assert all("engine" not in item and "source" not in item for item in items)
 
 
+def install_bucket_stubs(monkeypatch) -> None:
+    install_stubs(monkeypatch)
+
+    def fake_search(query, config, **options) -> object:
+        hits = [
+            {**HITS[0], "categories": ["Physics"]},
+            {**HITS[1], "categories": ["Chemistry"]},
+        ]
+        return engines.SearchResults(
+            hits, {"stub": {"status": "ok", "count": len(hits)}}
+        )
+
+    monkeypatch.setattr(engines, "search", fake_search)
+
+
 class ScientificSearchTests(unittest.TestCase):
     def test_scientific_resolves_providers(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
@@ -90,6 +105,46 @@ class ScientificSearchTests(unittest.TestCase):
             assert "searxng" not in calls[0]
             assert calls[1] == frozenset({"arxiv"})
             assert len(library_calls) == 1
+
+    def test_scientific_quick_search_json_carries_buckets_and_existing_fields(
+        self,
+    ) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            install_bucket_stubs(monkeypatch)
+            plain = search_core.quick_web_search("science", {}, raw=True)
+            response = search_core.quick_web_search(
+                "science", {}, raw=True, scientific=True
+            )
+
+            plain_keys = set(plain)
+            assert {"results", "providers"} <= plain_keys
+            assert plain_keys <= set(response)
+            assert response["buckets"]
+            assert all(
+                {"name", "results"} <= set(bucket)
+                and bucket["results"]
+                for bucket in response["buckets"]
+            )
+
+    def test_scientific_web_search_populates_buckets(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            install_bucket_stubs(monkeypatch)
+            response = search_core.web_search(
+                "science", {}, raw=True, scientific=True
+            )
+
+            assert response["buckets"]
+            assert all(bucket["results"] for bucket in response["buckets"])
+
+    def test_non_scientific_search_has_no_buckets_key(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            install_stubs(monkeypatch)
+
+            baseline = search_core.quick_web_search("alpha", {}, raw=True)
+            response = search_core.quick_web_search("alpha", {}, raw=True)
+
+            assert "buckets" not in response
+            assert set(response) == set(baseline)
 
     def test_library_hits_merge_and_outcomes(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
