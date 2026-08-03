@@ -257,6 +257,19 @@ def crossref(query, k=10, timeout=_TIMEOUT, config=None) -> list:
     return science_engines.crossref(query, k, timeout, config)
 
 
+SCIENTIFIC_PLATFORMS = frozenset({"arxiv", "pubmed", "semanticscholar", "crossref"})
+
+
+def _scientific_callables(query, config, k) -> dict:
+    """Build scientific tasks only for an explicitly filtered search."""
+    return {
+        "arxiv": lambda: arxiv(query, k),
+        "pubmed": lambda: pubmed(query, k),
+        "semanticscholar": lambda: semanticscholar(query, k),
+        "crossref": lambda: crossref(query, k, config=config),
+    }
+
+
 def searxng(query, base, k=10, timeout=_TIMEOUT) -> list:
     """Query one SearXNG provider."""
     params = urllib.parse.urlencode({"q": query, "format": "json"})
@@ -703,7 +716,7 @@ _DIRECT_DEFAULTS = {
 }
 
 
-_MIN_INTERVAL = 2.0
+_MIN_INTERVAL = 3.0  # arXiv's courtesy guidance asks for a 3s gap between requests
 _MAX_JITTER = 2.0
 _COOLDOWN_SECONDS = 1800.0
 _CACHE_TTL = 600.0
@@ -737,7 +750,7 @@ def _cached_call(name, query, k, thunk) -> list:
     return hits
 
 
-def _build_tasks(query, config, k, outcomes=None) -> dict:
+def _build_tasks(query, config, k, outcomes=None, providers=None) -> dict:
     """Cooldown outcomes stay visible because skipped providers never create futures."""
     enabled = {}
     if config.get("searxng_url"):
@@ -745,6 +758,9 @@ def _build_tasks(query, config, k, outcomes=None) -> dict:
     for name, thunk in _direct_callables(query, config, k).items():
         if config.get(name, _DIRECT_DEFAULTS[name]):
             enabled[name] = thunk
+    if providers is not None:
+        enabled.update(_scientific_callables(query, config, k))
+        enabled = {name: thunk for name, thunk in enabled.items() if name in providers}
     cooling = engine_state.cooling_down(enabled, time.time())
     if outcomes is not None:
         outcomes.update({name: {"status": "cooldown"} for name in cooling})
@@ -814,10 +830,10 @@ def _run_tasks(tasks) -> tuple[list, dict]:
     return lists, outcomes
 
 
-def search(query, config, k=10, cap=20) -> list:
+def search(query, config, k=10, cap=20, providers=None) -> list:
     """Query only enabled providers and merge their results."""
     outcomes = {}
-    tasks = _build_tasks(query, config, k, outcomes)
+    tasks = _build_tasks(query, config, k, outcomes, providers=providers)
     if not tasks:
         if outcomes:
             raise AllProvidersFailed(outcomes)
