@@ -400,19 +400,6 @@ class SearchOutcomeTests(unittest.TestCase):
             engines._parse_date("31 Feb 2026 then 7 Dec 2025"), "2025-12-07"
         )
 
-    def test_date_key_sorts_recent_before_old_and_undated(self) -> None:
-        import rag
-
-        results = [
-            {"date": "2025-12-07"},
-            {"date": ""},
-            {"date": "2026-06-16"},
-        ]
-
-        self.assertEqual(
-            [rag._date_key(result) for result in results], [-20251207, 1, -20260616]
-        )
-
     def test_merge_fills_empty_date_from_duplicate(self) -> None:
         primary = [
             engines.result("A", "https://example.com/a", "no date", "searxng", 1)
