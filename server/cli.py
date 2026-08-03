@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 import enforce  # type: ignore[import-not-found]
+import engines  # type: ignore[import-not-found]
 import fetch  # type: ignore[import-not-found]
 import method_index  # type: ignore[import-not-found]
 import rag  # type: ignore[import-not-found]
@@ -117,6 +118,8 @@ def _query_command(sub, name, help_text, **options):
     command.add_argument("--json", action="store_true")
     if name != "plan":
         command.add_argument("--raw", action="store_true")
+        command.add_argument("--scientific", action="store_true")
+        command.add_argument("--platform", action="append", default=None)
     if default_limit is not None:
         command.add_argument("--num-results", type=int, default=default_limit)
     return command
@@ -304,15 +307,25 @@ def _daemon_status():
 
 def _dispatch_query(args, stdin, config):
     """This boundary is shared because every query command needs identical enforcement."""
+    if args.platform and not args.scientific:
+        raise BadArgsError("--platform requires --scientific")
+    valid_platforms = engines.SCIENTIFIC_PLATFORMS | {"library"}
+    invalid = sorted(item for item in (args.platform or []) if item not in valid_platforms)
+    if invalid:
+        allowed = ", ".join(sorted(valid_platforms))
+        raise BadArgsError(
+            f"unknown platform {invalid[0]!r}; valid platforms: {allowed}"
+        )
     literal = enforce.enforcement_disabled(args.raw)
     query = _query(args.query, stdin, literal)
     raw = {"raw": True} if args.raw else {}
+    sci = {"scientific": True, "platform": args.platform} if args.scientific else {}
     if args.command == "quick":
-        return search_core.quick_web_search(query, config, args.num_results, **raw)
+        return search_core.quick_web_search(query, config, args.num_results, **raw, **sci)
     if args.command == "search":
-        return search_core.web_search(query, config, args.num_results, **raw)
+        return search_core.web_search(query, config, args.num_results, **raw, **sci)
     if args.command == "deep":
-        return search_core.deep_research(query, config, args.max_rounds, **raw)
+        return search_core.deep_research(query, config, args.max_rounds, **raw, **sci)
     return search_core.deep_context_aware_search(
         query,
         config,
@@ -322,6 +335,7 @@ def _dispatch_query(args, stdin, config):
         args.fetch_top_k,
         args.session,
         **raw,
+        **sci,
     )
 
 
