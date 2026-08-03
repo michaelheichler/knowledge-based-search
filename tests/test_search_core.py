@@ -84,10 +84,10 @@ class ScientificSearchTests(unittest.TestCase):
                 "q", config, raw=True, scientific=True, platform=["arxiv"]
             )
 
-            expected = set(engines._DIRECT_DEFAULTS) | {"searxng"} | set(
-                engines.SCIENTIFIC_PLATFORMS
-            )
+            expected = set(engines.SCIENTIFIC_PLATFORMS)
             assert calls[0] == frozenset(expected)
+            assert not set(engines._DIRECT_DEFAULTS) & calls[0]
+            assert "searxng" not in calls[0]
             assert calls[1] == frozenset({"arxiv"})
             assert len(library_calls) == 1
 
@@ -614,3 +614,26 @@ def test_context_raises_when_every_provider_round_fails(monkeypatch, tmp_path) -
         search_core.deep_context_aware_search(
             "alpha", {}, max_rounds=1, fetch_top_k=0, raw=True
         )
+
+
+def test_scientific_buckets_preserve_rank_order_and_uncategorized_last() -> None:
+    items = [
+        {"title": "first", "categories": ["Physics"]},
+        {"title": "second", "categories": ["Chemistry"]},
+        {"title": "third", "categories": []},
+        {"title": "fourth", "categories": ["Physics"]},
+    ]
+
+    buckets = search_core._bucket_results(items)
+
+    assert [bucket["name"] for bucket in buckets] == [
+        "Physics",
+        "Chemistry",
+        "Uncategorized",
+    ]
+    assert [item["title"] for item in buckets[0]["results"]] == [
+        "first",
+        "fourth",
+    ]
+    assert items[0]["bucket"] == "Physics"
+    assert items[2]["bucket"] == "Uncategorized"
