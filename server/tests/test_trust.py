@@ -74,3 +74,45 @@ def test_trust_data_reloads_after_file_change(monkeypatch, tmp_path) -> None:
     os.utime(path, ns=(previous_mtime + 1, previous_mtime + 1))
 
     assert enforce.trust_score("https://example.com") == 80
+
+def test_library_scheme_gets_fixed_primary_tier() -> None:
+    url = "library://sentient-design?chunk=abc"
+    item = {"title": "Sponsored research", "snippet": "Press release"}
+
+    assert enforce.source_tier(url, item) == "primary"
+    assert enforce.trust_score(url) == 95
+
+
+def test_new_science_domains_scored() -> None:
+    urls = [
+        "https://doi.org/10.1000/x",
+        "https://semanticscholar.org/paper/x",
+        "https://api.semanticscholar.org/graph/v1/paper/x",
+    ]
+
+    for url in urls:
+        score = enforce.trust_score(url)
+        assert score is not None and score >= 90
+
+
+def test_citation_count_bonus_capped_and_monotonic() -> None:
+    counts = [0, 10, 1000, 10**9]
+    scores = [
+        enforce._tag_source(
+            {"url": "https://arxiv.org/abs/1", "citation_count": count}
+        )["trust"]
+        for count in counts
+    ]
+
+    assert scores[0] == enforce.trust_score("https://arxiv.org/abs/1")
+    assert scores == sorted(scores)
+    assert all(score <= 100 for score in scores)
+    assert scores[-1] - scores[0] <= 5
+
+
+def test_citation_bonus_needs_known_domain() -> None:
+    tagged = enforce._tag_source(
+        {"url": "https://unknown.example/paper", "citation_count": 10**9}
+    )
+
+    assert tagged["trust"] is None

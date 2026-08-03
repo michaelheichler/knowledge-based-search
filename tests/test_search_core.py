@@ -436,3 +436,23 @@ def test_context_raises_when_every_provider_round_fails(monkeypatch, tmp_path) -
         search_core.deep_context_aware_search(
             "alpha", {}, max_rounds=1, fetch_top_k=0, raw=True
         )
+
+def test_result_helpers_preserve_optional_citation_count() -> None:
+    hit = {
+        "title": "Paper",
+        "url": "https://arxiv.org/abs/1",
+        "snippet": "Abstract",
+        "engine": "arxiv",
+        "date": "2026-01-02",
+        "relevance": 0.8,
+        "citation_count": 42,
+    }
+    without_count = {key: value for key, value in hit.items() if key != "citation_count"}
+
+    for helper in (
+        search_core._brief_result,
+        search_core._citation,
+        search_core._label,
+    ):
+        assert helper(hit)["citation_count"] == 42
+        assert "citation_count" not in helper(without_count)
