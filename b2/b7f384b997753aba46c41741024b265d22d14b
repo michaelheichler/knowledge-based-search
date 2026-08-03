@@ -1,0 +1,29 @@
+server/tests/test_engine_adapters.py
+  s_03dab48949af6f::t_1848149f93b028 98-234
+server/tests/test_engine_pacing.py
+  s_b8c824f90669d1::t_6c686662b7e16b 5,115-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "b2b7f384b997753aba46c41741024b265d22d14b",
+  "prompts": {},
+  "sessions": {
+    "s_03dab48949af6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "42737b9a-0ba4-4d64-86cd-f897aa19fcc2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_b8c824f90669d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8fb68d8cf3e2f4e2",
+        "model": "unknown"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
