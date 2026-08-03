@@ -2,6 +2,7 @@
 
 import concurrent.futures
 import json
+from email.message import Message
 
 import engines
 import pytest
@@ -109,6 +110,42 @@ def test_reserve_slot_jitter_stays_bounded(monkeypatch) -> None:
     assert engines._reserve_slot("minimum") == engines._MIN_INTERVAL
     assert engines._reserve_slot("maximum") == 0.0
     assert engines._reserve_slot("maximum") == engines._MIN_INTERVAL + 2.0
+
+
+def test_429_maps_to_short_cooldown(monkeypatch) -> None:
+    """A rate-limit response clears in minutes, not the scraper-block half hour."""
+    import urllib.error
+
+    def raise_429(*_args, **_kwargs) -> str:
+        raise urllib.error.HTTPError("http://x", 429, "Too Many Requests", Message(), None)
+
+    monkeypatch.setattr(engines, "_get", raise_429)
+    with pytest.raises(engines.ProviderBlocked) as caught:
+        engines.semanticscholar("q")
+    assert caught.value.cooldown == engines._RATE_LIMIT_COOLDOWN
+
+    clock = [1000.0]
+    monkeypatch.setattr(engines.time, "time", lambda: clock[0])
+    blocked_until = {}
+    monkeypatch.setattr(
+        engines.engine_state,
+        "block_provider",
+        lambda name, until: blocked_until.setdefault(name, until),
+    )
+    engines._task_outcome("semanticscholar", _future_with_exception(caught.value))
+    assert blocked_until["semanticscholar"] == pytest.approx(1000.0 + 120.0)
+    assert blocked_until["semanticscholar"] != pytest.approx(1000.0 + engines._COOLDOWN_SECONDS)
+
+
+def _future_with_exception(exc):
+    future = concurrent.futures.Future()
+    future.set_exception(exc)
+    return future
+
+
+def test_min_interval_covers_arxiv_guidance() -> None:
+    """arXiv asks for a 3s gap between requests; the shared floor must not regress below it."""
+    assert engines._MIN_INTERVAL >= 3.0
 
 
 def test_corrupt_state_file_recovers(monkeypatch, tmp_path) -> None:
