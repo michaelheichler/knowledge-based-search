@@ -340,16 +340,71 @@ def quality_gate(results, top_n=5) -> tuple:
     }
 
 
+_RRF_K = 60
+_MISSING_DATE_PENALTY = 5
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _usable_date(item: Mapping[str, object]) -> str:
+    date = item.get("date", "")
+    value = date if isinstance(date, str) else ""
+    return value if _ISO_DATE.fullmatch(value) else ""
+
+
+def _trust_with_penalties(
+    item: Mapping[str, object], category: str | None = None
+) -> int | None:
+    trust = trust_score(str(item.get("url", "")), category)
+    count = item.get("citation_count")
+    if isinstance(trust, int) and isinstance(count, int) and count > 0:
+        trust = min(100, trust + min(5, int(math.log10(count + 1) * 2)))
+    if isinstance(trust, int) and not _usable_date(item):
+        trust = max(0, trust - _MISSING_DATE_PENALTY)
+    return trust
+
+
+def _ranking_trust(item: Mapping[str, object], category: str | None) -> int:
+    trust = _trust_with_penalties(item, category)
+    return trust if trust is not None else -1
+
+
+def _rrf(rankings: Sequence[Sequence[int]]) -> dict[int, float]:
+    scores: dict[int, float] = {}
+    for ranking in rankings:
+        for position, index in enumerate(ranking):
+            scores[index] = scores.get(index, 0.0) + 1.0 / (
+                _RRF_K + position + 1
+            )
+    return scores
+
+
+def rrf_rank(query: str, hits: list) -> list:
+    """Return descending three-list RRF scores with every hit in each list."""
+    category = query_category(query)
+    indices = range(len(hits))
+    relevance = sorted(
+        indices,
+        key=lambda index: float(hits[index].get("relevance", 0) or 0),
+        reverse=True,
+    )
+    trust = sorted(
+        indices,
+        key=lambda index: _ranking_trust(hits[index], category),
+        reverse=True,
+    )
+    dates = sorted(
+        indices,
+        key=lambda index: _usable_date(hits[index]),
+        reverse=True,
+    )
+    scores = _rrf([relevance, trust, dates])
+    return [hits[index] for index in sorted(indices, key=lambda index: -scores[index])]
+
+
 def _tag_source(item: Mapping[str, object]) -> dict[str, object]:
     tagged = dict(item)
     url = str(tagged.get("url", ""))
-    tagged["trust"] = trust_score(url)
-    trust = tagged["trust"]
-    count = tagged.get("citation_count")
-    if isinstance(trust, int) and isinstance(count, int) and count > 0:
-        tagged["trust"] = min(
-            100, trust + min(5, int(math.log10(count + 1) * 2))
-        )
+    tagged["trust"] = _trust_with_penalties(tagged)
     tagged["confidence"] = source_tier(url, tagged)
     return tagged
 
