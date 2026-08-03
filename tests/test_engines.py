@@ -59,7 +59,16 @@ MOJEEK_HTML = """
 """
 
 BLOCK_HTML = "<html><title>captcha</title><body>unusual traffic</body></html>"
-_PROVIDER_NAMES = ("searxng", "duckduckgo", "google", "bing", "startpage", "mojeek")
+_PROVIDER_NAMES = (
+    "searxng",
+    "duckduckgo",
+    "google",
+    "bing",
+    "startpage",
+    "mojeek",
+    "mwmbl",
+    "wikipedia",
+)
 
 
 def _provider_mocks():
@@ -251,7 +260,10 @@ class SearchOutcomeTests(unittest.TestCase):
         with mock.patch.multiple(engines, **providers):
             hits = engines.search("example", config, k=2, cap=5)
 
-        self.assertEqual({hit["engine"] for hit in hits}, {"searxng", "duckduckgo"})
+        self.assertEqual(
+            {hit["engine"] for hit in hits},
+            {"searxng", "duckduckgo", "mwmbl", "wikipedia"},
+        )
         providers["searxng"].assert_called_once()
         providers["duckduckgo"].assert_called_once()
         for name in ("google", "bing", "startpage", "mojeek"):
@@ -267,9 +279,9 @@ class SearchOutcomeTests(unittest.TestCase):
             "mojeek": True,
         }
         with mock.patch.multiple(engines, **providers):
-            hits = engines.search("example", config, k=2, cap=5)
+            hits = engines.search("example", config, k=2, cap=10)
 
-        expected = {"google", "bing", "startpage", "mojeek"}
+        expected = {"google", "bing", "startpage", "mojeek", "mwmbl", "wikipedia"}
         self.assertEqual({hit["engine"] for hit in hits}, expected)
         providers["duckduckgo"].assert_not_called()
 
@@ -277,12 +289,17 @@ class SearchOutcomeTests(unittest.TestCase):
         providers = _provider_mocks()
         providers["searxng"].return_value = []
         providers["duckduckgo"].return_value = []
-        config = {"searxng_url": "https://search.test", "duckduckgo": True}
+        config = {
+            "searxng_url": "https://search.test",
+            "duckduckgo": True,
+            "mwmbl": False,
+            "wikipedia": False,
+        }
         with mock.patch.multiple(engines, **providers):
             hits = engines.search("example", config, k=2, cap=5)
 
         self.assertEqual(hits, [])
-        for name in ("google", "bing", "startpage", "mojeek"):
+        for name in ("google", "bing", "startpage", "mojeek", "mwmbl", "wikipedia"):
             providers[name].assert_not_called()
         self.assertEqual(hits.outcomes["searxng"]["status"], "ok")
         self.assertEqual(hits.outcomes["duckduckgo"]["status"], "ok")
@@ -296,7 +313,12 @@ class SearchOutcomeTests(unittest.TestCase):
         providers["duckduckgo"].return_value = [
             engines.result("D", shared, "", "duckduckgo", 2)
         ]
-        config = {"searxng_url": "https://search.test", "duckduckgo": True}
+        config = {
+            "searxng_url": "https://search.test",
+            "duckduckgo": True,
+            "mwmbl": False,
+            "wikipedia": False,
+        }
         with mock.patch.multiple(engines, **providers):
             hits = engines.search("example", config)
 
@@ -307,7 +329,12 @@ class SearchOutcomeTests(unittest.TestCase):
     def test_partial_provider_failure_is_structured(self) -> None:
         providers = _provider_mocks()
         providers["searxng"].side_effect = OSError("https://secret.test failed")
-        config = {"searxng_url": "https://search.test", "duckduckgo": True}
+        config = {
+            "searxng_url": "https://search.test",
+            "duckduckgo": True,
+            "mwmbl": False,
+            "wikipedia": False,
+        }
         with mock.patch.multiple(engines, **providers):
             hits = engines.search("example", config)
 
@@ -324,10 +351,18 @@ class SearchOutcomeTests(unittest.TestCase):
             mock.patch.multiple(engines, **providers),
             self.assertRaises(engines.AllProvidersFailed),
         ):
-            engines.search("example", {"duckduckgo": True})
+            engines.search(
+                "example",
+                {"duckduckgo": True, "mwmbl": False, "wikipedia": False},
+            )
 
     def test_malformed_provider_shape_completes_future_with_error(self) -> None:
-        config = {"searxng_url": "https://search.test", "duckduckgo": False}
+        config = {
+            "searxng_url": "https://search.test",
+            "duckduckgo": False,
+            "mwmbl": False,
+            "wikipedia": False,
+        }
         with (
             mock.patch.object(engines, "_get", return_value="[]"),
             self.assertRaises(engines.AllProvidersFailed) as caught,
@@ -342,7 +377,10 @@ class SearchOutcomeTests(unittest.TestCase):
             mock.patch.object(engines, "_get", return_value=BLOCK_HTML),
             self.assertRaises(engines.AllProvidersFailed) as caught,
         ):
-            engines.search("example", {"duckduckgo": True})
+            engines.search(
+                "example",
+                {"duckduckgo": True, "mwmbl": False, "wikipedia": False},
+            )
 
         outcome = caught.exception.outcomes["duckduckgo"]
         self.assertEqual(outcome["status"], "error")
