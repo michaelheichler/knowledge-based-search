@@ -83,20 +83,22 @@ def test_rrf_rank_penalizes_and_places_undated_hits_last(monkeypatch) -> None:
     assert tagged["trust"] == 75
 
 
-def test_rrf_rank_trust_matches_displayed_trust(monkeypatch) -> None:
+def test_rrf_rank_trust_matches_displayed_trust() -> None:
     hit = {
-        "url": "https://nature.com/paper",
+        "url": "https://arxiv.org/abs/1",
         "relevance": 1.0,
-        "citation_count": 100,
     }
-    monkeypatch.setattr(enforce, "trust_score", lambda url, category=None: 90)
+    query = "science study of arxiv"
+    category = enforce.query_category(query)
 
-    ranked_trust = enforce._ranking_trust(
-        hit, enforce.query_category("general")
-    )
-    displayed_trust = enforce._tag_source(hit)["trust"]
+    ranked_trust = enforce._ranking_trust(hit, category)
+    displayed_trust = enforce.quality_gate([hit], query=query)[0][0]["trust"]
+    baseline_trust = enforce._trust_with_penalties(hit, None)
 
-    assert ranked_trust == displayed_trust == 89
+    assert ranked_trust == displayed_trust
+    assert displayed_trust is not None and baseline_trust is not None
+    assert displayed_trust > baseline_trust
+
 
 
 def test_rrf_rank_preserves_input_order_for_equal_scores(monkeypatch) -> None:
