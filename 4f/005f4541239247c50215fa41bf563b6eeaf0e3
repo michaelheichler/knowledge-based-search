@@ -1,0 +1,19 @@
+server/enforce.py
+  s_3f7ee6883d5ba5::t_7878fbca800a0b 6,196,347-351,419-420,455-456
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "4f005f4541239247c50215fa41bf563b6eeaf0e3",
+  "prompts": {},
+  "sessions": {
+    "s_3f7ee6883d5ba5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d76ff2a-6200-4e08-9e11-ddc72aadca6a",
+        "model": "sol"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
