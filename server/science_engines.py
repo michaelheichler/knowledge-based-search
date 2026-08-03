@@ -1,6 +1,7 @@
 """Keyless scientific-literature provider adapters, split out to keep engines.py under the size cap."""
 
 import json
+import time
 import urllib.parse
 import xml.etree.ElementTree as ET  # ponytail: trusted first-party API, add defusedxml if that changes
 
@@ -86,7 +87,35 @@ def _pubmed_fetch_summaries(idlist, timeout) -> dict:
     return json.loads(body).get("result", {})
 
 
-def _pubmed_hit(pmid, row, rank) -> dict | None:
+def _pubmed_fetch_mesh(idlist, timeout) -> dict:
+    delay = engines._reserve_slot(engines.engine_state.PUBMED_EFETCH)
+    if delay:
+        time.sleep(delay)
+    params = urllib.parse.urlencode(
+        {"db": "pubmed", "id": ",".join(idlist), "retmode": "xml", "rettype": "abstract"}
+    )
+    body = engines._api_get(
+        f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?{params}",
+        "pubmed",
+        timeout,
+        headers={"User-Agent": engines._SCIENCE_UA},
+    )
+    mesh_by_pmid = {}
+    for article in ET.fromstring(body).findall(".//PubmedArticle"):
+        pmid = article.findtext("./MedlineCitation/PMID")
+        if not pmid:
+            continue
+        mesh_by_pmid[pmid] = [
+            descriptor.text.strip()
+            for descriptor in article.findall(
+                "./MedlineCitation/MeshHeadingList/MeshHeading/DescriptorName"
+            )
+            if descriptor.text and descriptor.text.strip()
+        ]
+    return mesh_by_pmid
+
+
+def _pubmed_hit(pmid, row, rank, categories=None) -> dict | None:
     if not row or not row.get("title"):
         return None
     snippet = " ".join(part for part in (row.get("source"), row.get("pubdate")) if part)
@@ -94,7 +123,16 @@ def _pubmed_hit(pmid, row, rank) -> dict | None:
         row["title"], f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/", snippet, "pubmed", rank
     )
     hit["date"] = _parse_pubmed_date(row.get("pubdate", ""))
+    if categories:
+        hit["categories"] = categories
     return hit
+
+
+def _pubmed_categories(idlist, timeout) -> dict:
+    try:
+        return _pubmed_fetch_mesh(idlist, timeout)
+    except engines._PROVIDER_FAILURES:
+        return {}
 
 
 def pubmed(query, k=10, timeout=engines._TIMEOUT) -> list:
@@ -103,9 +141,10 @@ def pubmed(query, k=10, timeout=engines._TIMEOUT) -> list:
     if not idlist:
         return []
     summary = _pubmed_fetch_summaries(idlist, timeout)
+    categories = _pubmed_categories(idlist, timeout)
     hits = []
     for pmid in idlist:
-        hit = _pubmed_hit(pmid, summary.get(pmid), len(hits) + 1)
+        hit = _pubmed_hit(pmid, summary.get(pmid), len(hits) + 1, categories.get(pmid))
         if hit:
             hits.append(hit)
     return hits

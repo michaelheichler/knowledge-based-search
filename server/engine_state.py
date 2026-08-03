@@ -9,6 +9,9 @@ import tempfile
 from collections.abc import Iterator
 
 
+PUBMED_EFETCH = "pubmed-efetch"
+
+
 def _path() -> pathlib.Path:
     """Because overrides may change between calls, resolve the path each time."""
     override = os.environ.get("KBS_ENGINE_STATE")
