@@ -1,0 +1,21 @@
+server/tests/test_engine_adapters.py
+  s_3f7ee6883d5ba5::t_15d9b68344289e 308
+  s_3f7ee6883d5ba5::t_226e00555f110d 235-237,239-277,279-307,309-331,333-344,346-353
+  s_3f7ee6883d5ba5::t_3ff2f4ac4aa43f 238,278,332,345
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "cefaacd7734060431b3ed6aa932a871160557bee",
+  "prompts": {},
+  "sessions": {
+    "s_3f7ee6883d5ba5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d76ff2a-6200-4e08-9e11-ddc72aadca6a",
+        "model": "sol"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}

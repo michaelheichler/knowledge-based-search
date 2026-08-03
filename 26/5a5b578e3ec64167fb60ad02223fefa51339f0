@@ -1,0 +1,22 @@
+server/engines.py
+  s_03dab48949af6f::t_cca85263626642 719
+  s_03dab48949af6f::t_9c394d0a2933e2 260-272
+  s_03dab48949af6f::t_cf166c5ea05c75 833,836
+  s_03dab48949af6f::t_a36b4da7e1bfa7 753,761-763
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "265a5b578e3ec64167fb60ad02223fefa51339f0",
+  "prompts": {},
+  "sessions": {
+    "s_03dab48949af6f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "42737b9a-0ba4-4d64-86cd-f897aa19fcc2",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
