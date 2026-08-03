@@ -157,7 +157,6 @@ def _run_engine_search(request: _SearchRequest, corrections):
 
 
 def _append_library_hits(state: _RefinementState, request: _SearchRequest) -> None:
-    """Library failures remain visible while trusted passages join successful web hits."""
     try:
         hits = engines.library(request.query, k=request.k, config=request.config)
     except engines._PROVIDER_FAILURES as exc:
@@ -284,7 +283,7 @@ def quick_web_search(query, config, num_results=8, **options) -> dict:
         include_library,
     )
     searched, hits = _run_engine_search(request, corrections)
-    ranked = enforce.trust_order(searched, rag.rank(searched, hits))
+    ranked = enforce.rrf_rank(searched, rag.rank(searched, hits))
     results, quality = enforce.quality_gate(
         _brief_result(hit) for hit in ranked[:num_results]
     )
@@ -314,7 +313,7 @@ def web_search(query, config, num_results=5, **options) -> dict:
         include_library,
     )
     searched, hits = _run_engine_search(request, corrections)
-    ranked_hits = enforce.trust_order(searched, rag.rank(searched, hits))[:num_results]
+    ranked_hits = enforce.rrf_rank(searched, rag.rank(searched, hits))[:num_results]
     chunks, citations, result_ids = _search_details(ranked_hits)
     ranked_chunks = rag.rank(searched, chunks) if chunks else []
     tagged, quality = enforce.quality_gate(citations)
@@ -610,7 +609,7 @@ def _run_context_search(options: _ContextOptions):
     searched, pool, corrections = _gather_pool(_pool_options(options), memory)
     rank_query = _context_rank_query(searched, options.context)
     kept, suppressed = _suppress_seen(
-        enforce.trust_order(rank_query, rag.rank(rank_query, pool)), memory["seen_urls"]
+        enforce.rrf_rank(rank_query, rag.rank(rank_query, pool)), memory["seen_urls"]
     )
     labeled, quality = enforce.quality_gate(_label(hit) for hit in kept)
     _remember_context_results(labeled, memory)

@@ -494,21 +494,6 @@ def trust_score(url: str, category: str | None = None) -> int | None:
     return max(scores, default=None)
 
 
-def trust_order(query: str, ranked: list) -> list:
-    """Apply a bounded trust adjustment without replacing relevance ranking."""
-    category = query_category(query)
-
-    def adjusted_relevance(hit: Mapping[str, object]) -> float:
-        score = trust_score(str(hit.get("url", "")), category)
-        bonus = 0 if score is None else (score - 50) / 500
-        relevance = hit.get("relevance", 0)
-        if not isinstance(relevance, (int, float)):
-            relevance = 0
-        return float(relevance) + bonus
-
-    return sorted(ranked, key=adjusted_relevance, reverse=True)
-
-
 def source_tier(url: str, item: Mapping[str, object] | None = None) -> str:
     """Classify a source with maintained scores and explicit overrides."""
     if url.startswith("library://"):
