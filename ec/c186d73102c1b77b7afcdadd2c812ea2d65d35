@@ -1,0 +1,19 @@
+server/search_core.py
+  s_7ffb2071303c69::t_e8ae3e11736299 114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "ecc186d73102c1b77b7afcdadd2c812ea2d65d35",
+  "prompts": {},
+  "sessions": {
+    "s_7ffb2071303c69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36ddd213-0880-40cc-81ee-a7e5d66f3848",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
