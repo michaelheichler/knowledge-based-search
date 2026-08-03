@@ -357,15 +357,6 @@ def _dense_order(vectors):
     return [index for index, score in scores]
 
 
-def _date_key(result):
-    date = result.get("date", "") if isinstance(result, dict) else ""
-    digits = date.replace("-", "")
-    try:
-        return -int(digits) if digits.isdigit() else 1
-    except ValueError:
-        return 1
-
-
 def _cosine(left, right):
     try:
         left_norm = float(np.linalg.norm(left))
@@ -393,6 +384,6 @@ def _by_order(results, relevance_scores):
         relevance = round(score / max_score, 2) if max_score else 0.0
         if isinstance(result, dict):
             result["relevance"] = relevance
-        ranked.append((relevance, _date_key(result), index, result))
-    ranked.sort(key=lambda item: (-item[0], item[1], item[2]))
-    return [item[3] for item in ranked]
+        ranked.append((relevance, index, result))
+    ranked.sort(key=lambda item: (-item[0], item[1]))
+    return [item[2] for item in ranked]
