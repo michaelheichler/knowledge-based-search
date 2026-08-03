@@ -1,0 +1,19 @@
+server/cli.py
+  s_5bbadc3fdcc75e::t_562b77c04d1d6a 12,121-122,310-318,322,324,326,328,338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "5f20d1d7cd285ab9c7c2aac7bfe8df8e1ee51219",
+  "prompts": {},
+  "sessions": {
+    "s_5bbadc3fdcc75e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "05196566-990f-498d-ba41-55da62936b5b",
+        "model": "sol"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
