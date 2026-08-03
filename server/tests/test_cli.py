@@ -563,3 +563,23 @@ def test_plan_empty_query_bad_args() -> None:
     assert stdout == ""
     assert "bad-args:" in stderr
     assert "Traceback" not in stderr
+
+
+def test_scientific_bucket_rendering_includes_headers_and_items() -> None:
+    data = {
+        "buckets": [
+            {
+                "name": "Physics",
+                "results": [
+                    {"title": "Paper", "url": "https://example.com/paper"}
+                ],
+            },
+            {"name": "Uncategorized", "results": []},
+        ]
+    }
+
+    rendered = cli._render(data)
+
+    assert "## Physics" in rendered
+    assert "1. Paper" in rendered
+    assert "## Uncategorized" in rendered
