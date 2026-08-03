@@ -33,26 +33,91 @@ def test_query_category_uses_first_keyword_match() -> None:
     assert enforce.query_category("local weather forecast") is None
 
 
-def test_trust_order_adjusts_relevance_stably() -> None:
-    ranked = [
+def test_rrf_rank_fuses_equal_weight_signals(monkeypatch) -> None:
+    hits = [
         {
-            "title": "Unknown leader",
-            "url": "https://unknown.example/a",
-            "relevance": 0.60,
+            "title": "two-list leader",
+            "url": "https://example.com/a",
+            "relevance": 1.0,
+            "date": "2025-01-01",
         },
-        {"title": "Trusted", "url": "https://nature.com/a", "relevance": 0.52},
-        {"title": "No URL", "relevance": 0.40},
-        {"title": "Unknown peer", "url": "https://other.example/a", "relevance": 0.40},
+        {
+            "title": "one-list leader",
+            "url": "https://example.com/b",
+            "relevance": 0.5,
+            "date": "2026-01-01",
+        },
     ]
+    monkeypatch.setattr(
+        enforce,
+        "trust_score",
+        lambda url, category=None: 90 if url.endswith("/a") else 80,
+    )
 
-    ordered = enforce.trust_order("general results", ranked)
+    ordered = enforce.rrf_rank("general results", hits)
 
-    assert [hit["title"] for hit in ordered] == [
-        "Trusted",
-        "Unknown leader",
-        "No URL",
-        "Unknown peer",
+    assert ordered[0]["title"] == "two-list leader"
+
+
+def test_rrf_rank_penalizes_and_places_undated_hits_last(monkeypatch) -> None:
+    hits = [
+        {
+            "title": "dated",
+            "url": "https://example.com/dated",
+            "relevance": 1.0,
+            "date": "2026-01-01",
+        },
+        {
+            "title": "undated",
+            "url": "https://example.com/undated",
+            "relevance": 1.0,
+        },
     ]
+    monkeypatch.setattr(enforce, "trust_score", lambda url, category=None: 80)
+
+    ordered = enforce.rrf_rank("general results", hits)
+    tagged = enforce._tag_source(hits[1])
+
+    assert [hit["title"] for hit in ordered] == ["dated", "undated"]
+    assert tagged["trust"] == 75
+
+
+def test_rrf_rank_trust_matches_displayed_trust(monkeypatch) -> None:
+    hit = {
+        "url": "https://nature.com/paper",
+        "relevance": 1.0,
+        "citation_count": 100,
+    }
+    monkeypatch.setattr(enforce, "trust_score", lambda url, category=None: 90)
+
+    ranked_trust = enforce._ranking_trust(
+        hit, enforce.query_category("general")
+    )
+    displayed_trust = enforce._tag_source(hit)["trust"]
+
+    assert ranked_trust == displayed_trust == 89
+
+
+def test_rrf_rank_preserves_input_order_for_equal_scores(monkeypatch) -> None:
+    hits = [
+        {
+            "title": "first",
+            "url": "https://example.com/a",
+            "relevance": 1.0,
+            "date": "2026-01-01",
+        },
+        {
+            "title": "second",
+            "url": "https://example.com/b",
+            "relevance": 1.0,
+            "date": "2026-01-01",
+        },
+    ]
+    monkeypatch.setattr(enforce, "trust_score", lambda url, category=None: 80)
+
+    ordered = enforce.rrf_rank("general results", hits)
+
+    assert [hit["title"] for hit in ordered] == ["first", "second"]
 
 
 def test_trust_data_reloads_after_file_change(monkeypatch, tmp_path) -> None:
@@ -99,7 +164,11 @@ def test_citation_count_bonus_capped_and_monotonic() -> None:
     counts = [0, 10, 1000, 10**9]
     scores = [
         enforce._tag_source(
-            {"url": "https://arxiv.org/abs/1", "citation_count": count}
+            {
+                "url": "https://arxiv.org/abs/1",
+                "citation_count": count,
+                "date": "2026-01-01",
+            }
         )["trust"]
         for count in counts
     ]
