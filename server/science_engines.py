@@ -17,6 +17,13 @@ def _arxiv_hit(entry, rank) -> dict | None:
     summary = " ".join((entry.findtext(f"{_ARXIV_NS}summary") or "").split())
     hit = engines.result(title, entry_id, summary, "arxiv", rank)
     hit["date"] = (entry.findtext(f"{_ARXIV_NS}published") or "")[:10]
+    categories = [
+        category.attrib["term"]
+        for category in entry.findall(f"{_ARXIV_NS}category")
+        if category.attrib.get("term")
+    ]
+    if categories:
+        hit["categories"] = categories
     return hit
 
 
@@ -117,13 +124,20 @@ def _semanticscholar_hit(row, rank) -> dict | None:
     )
     hit["date"] = engines._safe_iso_date(str(year), "1", "1") if year else ""
     hit["citation_count"] = int(row.get("citationCount") or 0)
+    categories = [field for field in row.get("fieldsOfStudy") or [] if field]
+    if categories:
+        hit["categories"] = categories
     return hit
 
 
 def semanticscholar(query, k=10, timeout=engines._TIMEOUT) -> list:
     """Query the keyless Semantic Scholar Graph API."""
     params = urllib.parse.urlencode(
-        {"query": query, "limit": k, "fields": "title,abstract,year,citationCount,url,authors"}
+        {
+            "query": query,
+            "limit": k,
+            "fields": "title,abstract,year,citationCount,url,authors,fieldsOfStudy",
+        }
     )
     body = engines._api_get(
         f"https://api.semanticscholar.org/graph/v1/paper/search?{params}",
@@ -165,6 +179,9 @@ def _crossref_hit(row, rank) -> dict | None:
     hit = engines.result(titles[0], row["URL"], snippet, "crossref", rank)
     hit["date"] = _crossref_date(row)
     hit["citation_count"] = int(row.get("is-referenced-by-count") or 0)
+    categories = [subject for subject in row.get("subject", []) if subject]
+    if categories:
+        hit["categories"] = categories
     return hit
 
 
