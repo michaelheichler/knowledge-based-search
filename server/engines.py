@@ -6,6 +6,7 @@ import html
 import json
 import logging
 import random
+import urllib.error
 import re
 import threading
 import time
@@ -77,7 +78,12 @@ _LOG = logging.getLogger(__name__)
 
 
 class ProviderBlocked(RuntimeError):
-    """Signal that a provider returned an anti-automation page."""
+    """Signal that a provider returned an anti-automation page or rate-limit response."""
+
+    def __init__(self, provider, cooldown=None):
+        """Store an optional cooldown that overrides the scraper-block default."""
+        super().__init__(provider)
+        self.cooldown = cooldown
 
 
 def _raise_if_blocked(body, provider, hits) -> None:
@@ -207,6 +213,48 @@ def _get(url, timeout=_TIMEOUT, data=None, headers=None) -> str:
     request = urllib.request.Request(url, data=data, headers=request_headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return response.read().decode("utf-8", "replace")
+
+
+_SCIENCE_UA = "kbs/0.2 (keyless research CLI)"
+_RATE_LIMIT_COOLDOWN = 120.0
+
+
+def _api_get(url, provider, timeout=_TIMEOUT, headers=None) -> str:
+    """429 maps to a short cooldown because API throttles clear in minutes, not the scraper-block half hour."""
+    try:
+        return _get(url, timeout, headers=headers)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429:
+            raise ProviderBlocked(provider, cooldown=_RATE_LIMIT_COOLDOWN) from exc
+        raise
+
+
+def arxiv(query, k=10, timeout=_TIMEOUT) -> list:
+    """Load the split adapter lazily so engines.py remains directly executable."""
+    import science_engines
+
+    return science_engines.arxiv(query, k, timeout)
+
+
+def pubmed(query, k=10, timeout=_TIMEOUT) -> list:
+    """Load the split adapter lazily so engines.py remains directly executable."""
+    import science_engines
+
+    return science_engines.pubmed(query, k, timeout)
+
+
+def semanticscholar(query, k=10, timeout=_TIMEOUT) -> list:
+    """Load the split adapter lazily so engines.py remains directly executable."""
+    import science_engines
+
+    return science_engines.semanticscholar(query, k, timeout)
+
+
+def crossref(query, k=10, timeout=_TIMEOUT, config=None) -> list:
+    """Load the split adapter lazily so engines.py remains directly executable."""
+    import science_engines
+
+    return science_engines.crossref(query, k, timeout, config)
 
 
 def searxng(query, base, k=10, timeout=_TIMEOUT) -> list:
@@ -743,7 +791,8 @@ def _task_outcome(name, future) -> tuple[list, dict]:
         hits = future.result()
         return hits, {"status": "ok", "count": len(hits)}
     except ProviderBlocked as exc:
-        engine_state.block_provider(name, time.time() + _COOLDOWN_SECONDS)
+        cooldown = getattr(exc, "cooldown", None) or _COOLDOWN_SECONDS
+        engine_state.block_provider(name, time.time() + cooldown)
         return [], {"status": "error", "error": type(exc).__name__}
     except _PROVIDER_FAILURES as exc:
         return [], {"status": "error", "error": type(exc).__name__}
