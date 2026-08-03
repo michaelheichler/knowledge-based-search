@@ -649,6 +649,7 @@ def _label(hit):
         "engines": _provenance(hit),
         "relevance": hit.get("relevance", 0.0),
         "date": hit.get("date", ""),
+        **({"citation_count": hit["citation_count"]} if "citation_count" in hit else {}),
     }
 
 
@@ -677,6 +678,7 @@ def _brief_result(hit):
         "engines": _provenance(hit),
         "date": hit.get("date", ""),
         "relevance": hit.get("relevance", 0.0),
+        **({"citation_count": hit["citation_count"]} if "citation_count" in hit else {}),
     }
 
 
@@ -690,6 +692,7 @@ def _citation(hit):
         "relevance": hit.get("relevance", 0.0),
         "confidence": hit.get("confidence")
         or enforce.source_tier(hit.get("url", ""), hit),
+        **({"citation_count": hit["citation_count"]} if "citation_count" in hit else {}),
     }
 
 
