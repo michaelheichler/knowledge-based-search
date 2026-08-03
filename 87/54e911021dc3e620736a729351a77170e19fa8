@@ -1,0 +1,19 @@
+server/search_core.py
+  s_c3bf2730aba262::t_32645072f571cc 48-49,68-69,82-83,105-122,143-148,150,152-155,159-175,189-191,194,276-285,306-315,397-405,427,429-434,441-444,448,451-456,477-482,484-485,488-494,598-599,684-685,692,705-708,715-716,725-727
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "8754e911021dc3e620736a729351a77170e19fa8",
+  "prompts": {},
+  "sessions": {
+    "s_c3bf2730aba262": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a082c2cd0e7413966",
+        "model": "unknown"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
