@@ -1,0 +1,22 @@
+server/enforce.py
+  s_7ffb2071303c69::t_8c09b2cb2667db 366-370
+  s_7ffb2071303c69::t_3510ba48d56bd1 407
+  s_7ffb2071303c69::t_a39b0882f5a433 392
+  s_7ffb2071303c69::t_078031f991caa0 343-365,371-391,393-403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "548e655dc184f3c1e8025e04645e9959f82dddee",
+  "prompts": {},
+  "sessions": {
+    "s_7ffb2071303c69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36ddd213-0880-40cc-81ee-a7e5d66f3848",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
