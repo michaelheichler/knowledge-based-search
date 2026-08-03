@@ -128,7 +128,78 @@ def test_arxiv_parses_atom_entries(monkeypatch) -> None:
     ]
 
 
+_ARXIV_CATEGORIZED_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+<entry>
+<id>http://arxiv.org/abs/2001.00002v1</id>
+<title>Categorized Paper</title>
+<summary>Abstract.</summary>
+<published>2000-11-15T16:19:15Z</published>
+<category term="stat.ML" scheme="http://arxiv.org/schemas/atom"/>
+<category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+</entry>
+</feed>
+"""
+
+
+def test_arxiv_captures_all_native_categories(monkeypatch) -> None:
+    """Every Atom category term should survive as a hit category."""
+    monkeypatch.setattr(engines, "_get", lambda *_args, **_kwargs: _ARXIV_CATEGORIZED_ATOM)
+
+    hits = engines.arxiv("electron", k=1)
+
+    assert hits[0]["categories"] == ["stat.ML", "cs.LG"]
+
+
 _PUBMED_ESEARCH = json.dumps({"esearchresult": {"idlist": ["111"]}})
+
+_PUBMED_EFETCH = """<PubmedArticleSet>
+<PubmedArticle>
+<MedlineCitation>
+<PMID>111</PMID>
+<MeshHeadingList>
+<MeshHeading><DescriptorName>Chronic Disease</DescriptorName></MeshHeading>
+<MeshHeading><DescriptorName>Diabetes Mellitus</DescriptorName></MeshHeading>
+</MeshHeadingList>
+</MedlineCitation>
+</PubmedArticle>
+</PubmedArticleSet>
+"""
+
+
+_SEMANTICSCHOLAR_PAYLOAD = json.dumps(
+    {
+        "data": [
+            {
+                "title": "A Paper",
+                "url": "https://www.semanticscholar.org/paper/x",
+                "abstract": "Paper abstract",
+                "year": 2021,
+                "citationCount": 42,
+                "fieldsOfStudy": ["Computer Science", "Medicine"],
+            }
+        ]
+    }
+)
+
+
+_CROSSREF_UNCATEGORIZED = json.dumps(
+    {
+        "message": {
+            "items": [
+                {
+                    "title": ["An Uncategorized Work"],
+                    "URL": "https://doi.org/10.1/uncategorized",
+                    "subject": [],
+                },
+                {
+                    "title": ["An Absent Category Work"],
+                    "URL": "https://doi.org/10.1/absent",
+                },
+            ]
+        }
+    }
+)
 _PUBMED_ESUMMARY = json.dumps(
     {"result": {"111": {"title": "A Pubmed Title", "source": "J Test", "pubdate": "2024 Jan 15"}}}
 )
@@ -151,6 +222,58 @@ def test_pubmed_two_call_flow(monkeypatch) -> None:
     assert hits[0]["date"] == "2024-01-15"
 
 
+def test_pubmed_maps_mesh_headings_to_categories(monkeypatch) -> None:
+    """The batched efetch response contributes descriptor names to each hit."""
+    calls = []
+    responses = [_PUBMED_ESEARCH, _PUBMED_ESUMMARY, _PUBMED_EFETCH]
+
+    def fake_get(url, *_args, **_kwargs) -> str:
+        calls.append(url)
+        return responses.pop(0)
+
+    monkeypatch.setattr(engines, "_get", fake_get)
+    monkeypatch.setattr(engines, "_reserve_slot", lambda *_args: 0.0)
+
+    hits = engines.pubmed("cancer", k=1)
+
+    assert "efetch.fcgi" in calls[2]
+    assert hits[0]["categories"] == ["Chronic Disease", "Diabetes Mellitus"]
+
+
+def test_pubmed_zero_mesh_headings_is_uncategorized(monkeypatch) -> None:
+    """Records without an indexed MeshHeadingList remain usable hits."""
+    responses = [_PUBMED_ESEARCH, _PUBMED_ESUMMARY, "<PubmedArticleSet/>"]
+
+    def fake_get(*_args, **_kwargs) -> str:
+        return responses.pop(0)
+
+    monkeypatch.setattr(engines, "_get", fake_get)
+    monkeypatch.setattr(engines, "_reserve_slot", lambda *_args: 0.0)
+
+    hits = engines.pubmed("cancer", k=1)
+
+    assert "categories" not in hits[0]
+
+
+def test_pubmed_mesh_failure_is_uncategorized(monkeypatch) -> None:
+    """An efetch failure should not discard summary hits."""
+    calls = []
+
+    def fake_get(url, *_args, **_kwargs) -> str:
+        calls.append(url)
+        if len(calls) == 3:
+            raise OSError("efetch unavailable")
+        return _PUBMED_ESEARCH if len(calls) == 1 else _PUBMED_ESUMMARY
+
+    monkeypatch.setattr(engines, "_get", fake_get)
+    monkeypatch.setattr(engines, "_reserve_slot", lambda *_args: 0.0)
+
+    hits = engines.pubmed("cancer", k=1)
+
+    assert len(hits) == 1
+    assert "categories" not in hits[0]
+
+
 def test_pubmed_empty_idlist_skips_esummary(monkeypatch) -> None:
     """An empty esearch result must not trigger a wasted esummary round trip."""
     calls = []
@@ -166,21 +289,6 @@ def test_pubmed_empty_idlist_skips_esummary(monkeypatch) -> None:
     assert len(calls) == 1
 
 
-_SEMANTICSCHOLAR_PAYLOAD = json.dumps(
-    {
-        "data": [
-            {
-                "title": "A Paper",
-                "url": "https://www.semanticscholar.org/paper/x",
-                "abstract": "Paper abstract",
-                "year": 2021,
-                "citationCount": 42,
-            }
-        ]
-    }
-)
-
-
 def test_semanticscholar_maps_citation_count(monkeypatch) -> None:
     """Semantic Scholar exposes citationCount directly; it must survive as an int."""
     monkeypatch.setattr(engines, "_get", lambda *_a, **_k: _SEMANTICSCHOLAR_PAYLOAD)
@@ -190,6 +298,19 @@ def test_semanticscholar_maps_citation_count(monkeypatch) -> None:
     assert hits[0]["citation_count"] == 42
     assert isinstance(hits[0]["citation_count"], int)
     assert hits[0]["date"] == "2021-01-01"
+    assert hits[0]["categories"] == ["Computer Science", "Medicine"]
+
+
+def test_semanticscholar_missing_fields_of_study_is_uncategorized(monkeypatch) -> None:
+    """A null native field should leave the hit uncategorized without an error."""
+    payload = _SEMANTICSCHOLAR_PAYLOAD.replace(
+        '["Computer Science", "Medicine"]', "null"
+    )
+    monkeypatch.setattr(engines, "_get", lambda *_a, **_k: payload)
+
+    hits = engines.semanticscholar("quantum computing", k=1)
+
+    assert "categories" not in hits[0]
 
 
 _CROSSREF_PAYLOAD = json.dumps(
@@ -222,6 +343,16 @@ def test_crossref_parses_date_parts_and_citations(monkeypatch) -> None:
     assert hits[0]["citation_count"] == 7
 
 
+def test_crossref_empty_or_absent_subject_is_uncategorized(monkeypatch) -> None:
+    """Sparse CrossRef subject metadata should remain a normal uncategorized result."""
+    monkeypatch.setattr(engines, "_get", lambda *_a, **_k: _CROSSREF_UNCATEGORIZED)
+
+    hits = engines.crossref("machine learning", k=2)
+
+    assert len(hits) == 2
+    assert all("categories" not in hit for hit in hits)
+
+
 def test_providers_filter_selects_scientific_only() -> None:
     """The providers frozenset narrows to exactly the named platforms."""
     tasks = engines._build_tasks("q", {}, 5, providers=frozenset({"arxiv", "pubmed"}))
@@ -234,98 +365,63 @@ def test_providers_filter_selects_scientific_only() -> None:
     assert "arxiv" in tasks
 
 
-def test_library_handshake_sequence_and_auth(monkeypatch) -> None:
-    """MCP requires initialization and the returned session on later messages."""
+def _queue_mcp_responses(monkeypatch, responses) -> list:
     calls = []
-    responses = [
-        (json.dumps({"jsonrpc": "2.0", "id": 1}), {"mcp-session-id": "abc"}),
-        ("", {}),
-        (
-            "data: " + json.dumps(
-                {"jsonrpc": "2.0", "result": {"content": [{"text": json.dumps({"passages": []})}]}},
-            ),
-            {},
-        ),
-    ]
 
-    def fake_post(url, token, payload, session_id=None, timeout=engines._TIMEOUT):
-        calls.append((url, token, payload, session_id, timeout))
+    def fake_post(*args, **kwargs) -> tuple:
+        calls.append(
+            (*args, kwargs.get("session_id"), kwargs.get("timeout", engines._TIMEOUT))
+        )
         return responses.pop(0)
 
     monkeypatch.setattr(engines, "_mcp_post", fake_post)
+    return calls
+
+
+def test_library_handshake_sequence_and_auth(monkeypatch) -> None:
+    """MCP requires initialization and the returned session on later messages."""
+    responses = [
+        (json.dumps({"jsonrpc": "2.0", "id": 1}), {"mcp-session-id": "abc"}),
+        ("", {}),
+        ("data: " + json.dumps({"jsonrpc": "2.0", "result": {"content": [{"text": json.dumps({"passages": []})}]}}), {}),
+    ]
+    calls = _queue_mcp_responses(monkeypatch, responses)
     engines.library(
-        "defensive design",
-        k=3,
-        timeout=4,
+        "defensive design", k=3, timeout=4,
         config={"library_mcp_url": "http://library/mcp", "library_mcp_token": "secret"},
     )
-
-    assert [call[2]["method"] for call in calls] == [
-        "initialize",
-        "notifications/initialized",
-        "tools/call",
-    ]
+    assert [call[2]["method"] for call in calls] == ["initialize", "notifications/initialized", "tools/call"]
     assert all(call[1] == "secret" for call in calls)
     assert [call[3] for call in calls] == [None, "abc", "abc"]
     assert calls[0][2]["params"]["protocolVersion"] == "2025-03-26"
-    assert calls[2][2]["params"] == {
-        "name": "search_library",
-        "arguments": {"query": "defensive design", "k": 3},
+    assert calls[2][2]["params"] == {"name": "search_library", "arguments": {"query": "defensive design", "k": 3}}
+
+
+def _library_sse_response() -> str:
+    payload = {
+        "passages": [
+            {"chunk_id": "sentient-design-1", "book_id": "sentient-design", "book_title": "The Sentient Design", "chapter_title": "Defensive Design", "text": "x" * 301, "confidence": "high"},
+            {"chunk_id": "sentient-design-2", "book_id": "sentient-design", "book_title": "The Sentient Design", "chapter_title": "Design Rules", "text": "A shorter passage."},
+        ]
     }
+    body = {"jsonrpc": "2.0", "result": {"content": [{"text": json.dumps(payload)}]}}
+    return "event: message\n" + f"data: {json.dumps(body)}\n"
 
 
 def test_library_parses_sse_passages(monkeypatch) -> None:
     """SSE passages become capped, confidence-free library hits."""
-    long_text = "x" * 301
-    payload = {
-        "passages": [
-            {
-                "chunk_id": "sentient-design-1",
-                "book_id": "sentient-design",
-                "book_title": "The Sentient Design",
-                "chapter_title": "Defensive Design",
-                "text": long_text,
-                "confidence": "high",
-            },
-            {
-                "chunk_id": "sentient-design-2",
-                "book_id": "sentient-design",
-                "book_title": "The Sentient Design",
-                "chapter_title": "Design Rules",
-                "text": "A shorter passage.",
-            },
-        ]
-    }
-    body = json.dumps(
-        {
-            "jsonrpc": "2.0",
-            "result": {"content": [{"text": json.dumps(payload)}]},
-        }
-    )
-    responses = [
-        ("{}", {"MCP-SESSION-ID": "abc"}),
-        ("", {}),
-        ("event: message\n" + f"data: {body}\n", {}),
-    ]
-
-    def fake_post(*_args, **_kwargs):
-        return responses.pop(0)
-
-    monkeypatch.setattr(engines, "_mcp_post", fake_post)
+    responses = [("{}", {"MCP-SESSION-ID": "abc"}), ("", {}), (_library_sse_response(), {})]
+    _queue_mcp_responses(monkeypatch, responses)
     hits = engines.library(
-        "design",
-        k=2,
+        "design", k=2,
         config={"library_mcp_url": "http://library/mcp", "library_mcp_token": "secret"},
     )
-
     assert len(hits) == 2
-    assert [hit["url"] for hit in hits] == [
-        "library://sentient-design?chunk=sentient-design-1",
-        "library://sentient-design?chunk=sentient-design-2",
-    ]
+    assert [hit["url"] for hit in hits] == ["library://sentient-design?chunk=sentient-design-1", "library://sentient-design?chunk=sentient-design-2"]
     assert all(hit["engine"] == "library" for hit in hits)
     assert len(hits[0]["snippet"]) == 300
     assert "confidence" not in hits[0]
+
 
 
 def test_library_urls_survive_merge_dedup() -> None:

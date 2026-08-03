@@ -8,7 +8,6 @@ import pathlib
 import tempfile
 from collections.abc import Iterator
 
-
 PUBMED_EFETCH = "pubmed-efetch"
 
 

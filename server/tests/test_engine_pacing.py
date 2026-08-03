@@ -158,3 +158,25 @@ def test_corrupt_state_file_recovers(monkeypatch, tmp_path) -> None:
     assert engines._reserve_slot("duckduckgo") == 0.0
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["providers"]["duckduckgo"]["last_call"] == 100.0
+
+
+def test_pubmed_efetch_uses_dedicated_pacing_entry(monkeypatch) -> None:
+    """The MeSH batch call reserves its own persisted provider slot."""
+    responses = [
+        json.dumps({"esearchresult": {"idlist": ["111"]}}),
+        json.dumps({"result": {"111": {"title": "Title", "pubdate": "2024 Jan 15"}}}),
+        "<PubmedArticleSet/>",
+    ]
+    reserved = []
+
+    def fake_get(*_args, **_kwargs) -> str:
+        return responses.pop(0)
+
+    monkeypatch.setattr(engines, "_get", fake_get)
+    monkeypatch.setattr(
+        engines, "_reserve_slot", lambda name: reserved.append(name) or 0.0
+    )
+
+    engines.pubmed("query", k=1)
+
+    assert reserved == [engines.engine_state.PUBMED_EFETCH]
