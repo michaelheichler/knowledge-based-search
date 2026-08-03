@@ -1,0 +1,20 @@
+tests/test_search_core.py
+  s_7ffb2071303c69::t_3c5c8a316df740 87,89-90
+  s_7ffb2071303c69::t_29fd42be98f61a 617-639
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "67e410ea312c4399f0f4d2715c082d981f337688",
+  "prompts": {},
+  "sessions": {
+    "s_7ffb2071303c69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36ddd213-0880-40cc-81ee-a7e5d66f3848",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
