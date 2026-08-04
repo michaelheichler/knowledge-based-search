@@ -1,0 +1,35 @@
+server/search_core.py
+  s_3bdd1bf81d3b3a::t_c4c81c3f0174a0 6
+server/cli.py
+  s_3bdd1bf81d3b3a::t_49da8a8ae95ae8 17
+  s_3bdd1bf81d3b3a::t_d9dd19e4bd533e 345
+server/tests/test_deep_context_search.py
+  s_3bdd1bf81d3b3a::t_16aff30d01d053 4
+  s_3bdd1bf81d3b3a::t_cc7606ed77b8be 54,70,80,91,94,107,110,113,128,131,135,153,158,175,184,194,203
+server/tests/test_cli.py
+  s_3bdd1bf81d3b3a::t_09983f957a7cca 9
+  s_3bdd1bf81d3b3a::t_1771d2043c2d77 81
+benchmark/deep_context_bench.py
+  s_3bdd1bf81d3b3a::t_96be15f675b0f6 13
+server/search_context.py
+  s_3bdd1bf81d3b3a::t_b1695271ee99e0 1-21,23-262
+  s_3bdd1bf81d3b3a::t_16b59df75b8ee3 22
+tests/test_search_context.py
+  s_3bdd1bf81d3b3a::t_bf99be4099abd1 1-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "40707cdfef5cf8eae4db1c4f6a4a6180a5e892ba",
+  "prompts": {},
+  "sessions": {
+    "s_3bdd1bf81d3b3a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d40be5a6-ed8a-4d15-870c-212c14ed242a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
