@@ -1,0 +1,38 @@
+server/search_core.py
+  s_3bdd1bf81d3b3a::t_ca60592287692f 713-714
+  s_3bdd1bf81d3b3a::t_5198eda46bfbca 12
+  s_3bdd1bf81d3b3a::t_8b3ca8b640e064 416,510,621
+  s_3bdd1bf81d3b3a::t_f17ae009945b00 805
+  s_3bdd1bf81d3b3a::t_c4d2f260f387e2 458,466
+  s_3bdd1bf81d3b3a::t_590a9b68daa189 295,297-298,319,321,324
+  s_3bdd1bf81d3b3a::t_f194a3b32a8091 619
+server/tests/test_trust.py
+  s_3bdd1bf81d3b3a::t_853bea84147964 9-11,13,18,22-25,29-34,58,79-80,92,94-96,121,135,144,150-151,162,171,182,189
+  s_3bdd1bf81d3b3a::t_3f4a92cd747d3e 53,77,119,132-133
+  s_3bdd1bf81d3b3a::t_b2b68622226d24 5
+tests/test_enforce.py
+  s_3bdd1bf81d3b3a::t_e2ffc1318c4eea 12
+  s_3bdd1bf81d3b3a::t_2fcf31a373007d 343,371,385,416
+  s_3bdd1bf81d3b3a::t_143ed2613592a7 407
+  s_3bdd1bf81d3b3a::t_4e69bef846d883 365-366
+server/enforce.py
+  s_3bdd1bf81d3b3a::t_1efdd40fc94da5 8
+server/trust.py
+  s_3bdd1bf81d3b3a::t_fbe39a78579127 1-332
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "e4b4fcdc77513eada30227fe0c1310b7f54a15d1",
+  "prompts": {},
+  "sessions": {
+    "s_3bdd1bf81d3b3a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d40be5a6-ed8a-4d15-870c-212c14ed242a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
