@@ -199,10 +199,27 @@ def _append_context_round(pool, query, options, providers=None):
     return None, True
 
 
+def _build_search_request(options, searched):
+    """Provider selection and request construction stay together because rounds share one shape."""
+    providers, include_library = _resolve_sources(
+        options.config,
+        {"scientific": options.scientific, "platform": options.platform},
+    )
+    request = _SearchRequest(
+        searched,
+        options.config,
+        options.per_engine,
+        options.per_engine * 6,
+        not enforce.enforcement_disabled(options.raw),
+        providers,
+        include_library,
+    )
+    return request, providers
+
+
 def _gather_pool(options: _PoolOptions, memory):
     searched, corrections = _prepare_query(options.query, options.raw)
-    providers, include_library = _resolve_sources(options.config, {"scientific": options.scientific, "platform": options.platform})
-    request = _SearchRequest(searched, options.config, options.per_engine, options.per_engine * 6, not enforce.enforcement_disabled(options.raw), providers, include_library)
+    request, providers = _build_search_request(options, searched)
     searched, pool, failure, succeeded = _initial_context_pool(request, corrections)
     if searched not in memory["issued_queries"]:
         memory["issued_queries"].append(searched)

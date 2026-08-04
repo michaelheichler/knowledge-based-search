@@ -321,8 +321,8 @@ def _daemon_status():
     return status
 
 
-def _dispatch_query(args, stdin, config):
-    """This boundary is shared because every query command needs identical enforcement."""
+def _validate_platform_args(args) -> None:
+    """Query dispatch uses one validation seam because platform errors must stay identical."""
     if args.platform and not args.scientific:
         raise BadArgsError("--platform requires --scientific")
     valid_platforms = engines.SCIENTIFIC_PLATFORMS | {"library"}
@@ -332,6 +332,11 @@ def _dispatch_query(args, stdin, config):
         raise BadArgsError(
             f"unknown platform {invalid[0]!r}; valid platforms: {allowed}"
         )
+
+
+def _dispatch_query(args, stdin, config):
+    """This boundary is shared because every query command needs identical enforcement."""
+    _validate_platform_args(args)
     literal = enforce.enforcement_disabled(args.raw)
     query = _query(args.query, stdin, literal)
     raw = {"raw": True} if args.raw else {}
@@ -342,7 +347,17 @@ def _dispatch_query(args, stdin, config):
         return search_core.web_search(query, config, args.num_results, **raw, **sci)
     if args.command == "deep":
         return search_deep.deep_research(query, config, args.max_rounds, **raw, **sci)
-    return search_context.deep_context_aware_search(query, config, args.context, args.max_rounds, args.per_engine, args.fetch_top_k, args.session, **raw, **sci)
+    return search_context.deep_context_aware_search(
+        query,
+        config,
+        args.context,
+        args.max_rounds,
+        args.per_engine,
+        args.fetch_top_k,
+        args.session,
+        **raw,
+        **sci,
+    )
 
 
 def _dispatch(args, stdin):
