@@ -121,6 +121,44 @@ def _parse_mesh_records(body) -> list:
     return alternatives
 
 
+def _mesh_get(endpoint, params, timeout) -> str:
+    delay = engines._reserve_slot(engines.engine_state.PUBMED_EFETCH)
+    if delay:
+        time.sleep(delay)
+    encoded = urllib.parse.urlencode(params)
+    return engines._api_get(
+        f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/{endpoint}?{encoded}",
+        "pubmed",
+        timeout,
+        headers={"User-Agent": engines._SCIENCE_UA},
+    )
+
+
+def _mesh_alternatives(term, timeout) -> list:
+    body = _mesh_get(
+        "esearch.fcgi",
+        {"db": "mesh", "term": term, "retmode": "json", "sort": "relevance", "retmax": 5},
+        timeout,
+    )
+    idlist = json.loads(body).get("esearchresult", {}).get("idlist", [])
+    if not idlist:
+        return []
+    body = _mesh_get(
+        "efetch.fcgi",
+        {"db": "mesh", "id": ",".join(idlist), "rettype": "full", "retmode": "text"},
+        timeout,
+    )
+    return _parse_mesh_records(body)
+
+
+def mesh_alternatives(term, timeout=engines._TIMEOUT) -> list:
+    """MeSH lookup failures must not block a scientific search."""
+    try:
+        return _mesh_alternatives(term, timeout)
+    except engines._PROVIDER_FAILURES:
+        return []
+
+
 def _pubmed_fetch_mesh(idlist, timeout) -> dict:
     delay = engines._reserve_slot(engines.engine_state.PUBMED_EFETCH)
     if delay:
