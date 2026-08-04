@@ -1,0 +1,19 @@
+.vbw-planning/phases/03-module-size-refactor/03-01-PLAN.md
+  s_a1d23ecb6529a1::t_e81693743236d9 79-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "2d16b6585e6992868cd1fb06e6689131f7d6a600",
+  "prompts": {},
+  "sessions": {
+    "s_a1d23ecb6529a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83463142-262d-4dfd-bcb0-c4de581609eb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
