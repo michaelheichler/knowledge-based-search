@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 
 cli = importlib.import_module("cli")
+engines = importlib.import_module("engines")
 rag = importlib.import_module("rag")
+science_engines = importlib.import_module("science_engines")
 search_context = importlib.import_module("search_context")
 search_core = importlib.import_module("search_core")
 search_deep = importlib.import_module("search_deep")
@@ -80,6 +82,31 @@ def install_core_stubs(monkeypatch) -> None:
     monkeypatch.setattr(search_deep, "deep_research", _fake_deep)
     monkeypatch.setattr(search_context, "deep_context_aware_search", _fake_context)
     search_core.RESULT_URLS.clear()
+
+
+def install_scientific_quick_stubs(monkeypatch, alternatives) -> None:
+    hit = {
+        "title": "Scientific paper",
+        "url": "https://example.com/paper",
+        "snippet": "Evidence from a scientific source.",
+        "engine": "arxiv",
+        "engines": ["arxiv"],
+        "date": "2026-01-01",
+    }
+    monkeypatch.setattr(
+        engines,
+        "search",
+        lambda *args, **kwargs: engines.SearchResults(
+            [hit], {"arxiv": {"status": "ok", "count": 1}}
+        ),
+    )
+    monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
+    monkeypatch.setattr(
+        search_core.enforce,
+        "enforce_query",
+        lambda query, context: (query, [{"before": "heart atack", "after": query, "reason": "typo"}]),
+    )
+    monkeypatch.setattr(science_engines, "mesh_alternatives", lambda query: alternatives)
 
 
 def test_config_resolution_prefers_env_then_user_config(monkeypatch, tmp_path) -> None:
@@ -612,3 +639,37 @@ def test_missing_terminology_alternatives_renders_no_header() -> None:
     rendered = cli._render({"results": [{"title": "Paper", "url": "https://example.com/paper"}]})
 
     assert "Terminology alternatives for" not in rendered
+
+
+def test_scientific_quick_text_output_renders_terminology_before_results(monkeypatch) -> None:
+    install_scientific_quick_stubs(
+        monkeypatch,
+        [{"term": "Myocardial Infarction", "note": "Heart muscle damage."}],
+    )
+
+    code, stdout, stderr = run_cli(["quick", "heart attack", "--scientific"])
+
+    assert code == cli.SUCCESS
+    assert stderr == ""
+    assert 'Terminology alternatives for "heart attack":' in stdout
+    assert stdout.index("Terminology alternatives") < stdout.index("## Uncategorized")
+    assert "corrections: heart atack -> heart attack (typo)" in stdout
+    assert "quality:" in stdout
+
+
+def test_scientific_quick_json_output_carries_terminology_alternatives(monkeypatch) -> None:
+    alternatives = [
+        {"term": "Myocardial Infarction", "note": "Heart muscle damage."},
+        {"term": "Coronary Occlusion", "note": "Blocked coronary artery."},
+    ]
+    install_scientific_quick_stubs(monkeypatch, alternatives)
+
+    code, stdout, stderr = run_cli(["quick", "heart attack", "--scientific", "--json"])
+
+    payload = json.loads(stdout)
+    assert code == cli.SUCCESS
+    assert stderr == ""
+    assert payload["terminology_alternatives"] == alternatives
+    assert len(payload["terminology_alternatives"]) <= 5
+    assert all(set(item) == {"term", "note"} for item in payload["terminology_alternatives"])
+    assert {"query", "results", "corrections", "quality"} <= set(payload)
