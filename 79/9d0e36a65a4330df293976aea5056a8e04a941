@@ -1,0 +1,23 @@
+server/science_engines.py
+  s_cb437847d72d7c::t_fe04aa4ad6d00a 105-108,111-118
+  s_cb437847d72d7c::t_e830c6f8cf4090 90-104,109-110,119-123
+server/tests/test_engine_adapters.py
+  s_cb437847d72d7c::t_d1b71c2a9a1975 293-355
+  s_cb437847d72d7c::t_47b1a44e971d7c 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "799d0e36a65a4330df293976aea5056a8e04a941",
+  "prompts": {},
+  "sessions": {
+    "s_cb437847d72d7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1931c99f-6631-43a1-bbf1-d6e37ec11cea",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
