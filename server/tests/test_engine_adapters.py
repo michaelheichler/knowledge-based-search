@@ -3,6 +3,7 @@
 import json
 
 import engines
+import science_engines
 
 
 def test_mwmbl_parses_rich_text_segments(monkeypatch) -> None:
@@ -287,6 +288,69 @@ def test_pubmed_empty_idlist_skips_esummary(monkeypatch) -> None:
 
     assert hits == []
     assert len(calls) == 1
+
+
+def test_mesh_record_parses_wrapped_scope_note() -> None:
+    """Wrapped scope text must become one display line."""
+    body = """1: Myocardial Infarction
+NECROSIS of the MYOCARDIUM caused by an obstruction of the blood supply to the
+heart (CORONARY CIRCULATION).
+Year introduced: 1979
+"""
+
+    assert science_engines._parse_mesh_records(body) == [
+        {
+            "term": "Myocardial Infarction",
+            "note": "NECROSIS of the MYOCARDIUM caused by an obstruction of the blood supply to the heart (CORONARY CIRCULATION).",
+        }
+    ]
+
+
+def test_mesh_record_preserves_batched_descriptor_order() -> None:
+    """Efetch returns batched descriptors in the request order."""
+    body = """1: First Descriptor
+First scope note.
+Year introduced: 2000
+2: Second Descriptor
+Second scope note.
+Year introduced: 2001
+3: Third Descriptor
+Third scope note.
+Year introduced: 2002
+"""
+
+    assert science_engines._parse_mesh_records(body) == [
+        {"term": "First Descriptor", "note": "First scope note."},
+        {"term": "Second Descriptor", "note": "Second scope note."},
+        {"term": "Third Descriptor", "note": "Third scope note."},
+    ]
+
+
+def test_mesh_record_without_scope_note_keeps_descriptor() -> None:
+    """A missing scope note must not remove a valid descriptor."""
+    body = """1: Descriptor Without Note
+Year introduced: 2020
+"""
+
+    assert science_engines._parse_mesh_records(body) == [
+        {"term": "Descriptor Without Note", "note": ""}
+    ]
+
+
+def test_mesh_record_truncates_scope_note_at_word_boundary() -> None:
+    """Long scope notes need a stable compact display form."""
+    note = " ".join(["word"] * 31)
+    body = f"1: Long Descriptor\n{note}\nYear introduced: 2020\n"
+
+    assert science_engines._parse_mesh_records(body) == [
+        {"term": "Long Descriptor", "note": " ".join(["word"] * 24) + "..."}
+    ]
+
+
+def test_mesh_record_rejects_empty_and_garbage_bodies() -> None:
+    """Bodies without descriptor titles cannot produce alternatives."""
+    assert science_engines._parse_mesh_records("") == []
+    assert science_engines._parse_mesh_records("not a MeSH record") == []
 
 
 def test_semanticscholar_maps_citation_count(monkeypatch) -> None:

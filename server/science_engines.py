@@ -87,6 +87,40 @@ def _pubmed_fetch_summaries(idlist, timeout) -> dict:
     return json.loads(body).get("result", {})
 
 
+def _normalize_mesh_note(text) -> str:
+    note = " ".join(text.split())
+    if len(note) <= 120:
+        return note
+    boundary = note.rfind(" ", 0, 121)
+    return f"{note[:boundary] if boundary >= 0 else note[:120]}..."
+
+
+def _parse_mesh_records(body) -> list:
+    alternatives = []
+    term = None
+    note_lines = []
+    # Invariant: completed records stay ordered. Variant: unprocessed input lines.
+    for line in body.splitlines():
+        prefix, separator, title = line.partition(": ")
+        is_title = separator and prefix.isdigit()
+        if is_title and term is not None:
+            alternatives.append({"term": term, "note": _normalize_mesh_note(" ".join(note_lines))})
+        if is_title:
+            term = title.strip() or None
+            note_lines = []
+            continue
+        if term is None:
+            continue
+        if line.startswith("Year introduced:"):
+            alternatives.append({"term": term, "note": _normalize_mesh_note(" ".join(note_lines))})
+            term = None
+            continue
+        note_lines.append(line)
+    if term is not None:
+        alternatives.append({"term": term, "note": _normalize_mesh_note(" ".join(note_lines))})
+    return alternatives
+
+
 def _pubmed_fetch_mesh(idlist, timeout) -> dict:
     delay = engines._reserve_slot(engines.engine_state.PUBMED_EFETCH)
     if delay:
