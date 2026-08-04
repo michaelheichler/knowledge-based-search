@@ -30,7 +30,7 @@ def main():
             for fetch_top_k in FETCH_TOP_K_VALUES:
                 state.clear_session()
                 start = time.perf_counter()
-                search_core.deep_context_aware_search(query, {}, fetch_top_k=fetch_top_k)
+                search_context.deep_context_aware_search(query, {}, fetch_top_k=fetch_top_k)
                 elapsed = time.perf_counter() - start
                 print(f"{query[:44]:<45}{fetch_top_k:>2}{elapsed:>7.2f}")
 

@@ -204,14 +204,14 @@ def test_plan_rejects_scientific_flag() -> None:
 
 def test_scientific_flag_threads_to_search_core(monkeypatch) -> None:
     captured = {}
-    monkeypatch.setattr(
-        search_core,
-        "quick_web_search",
-        lambda query, config, num_results=8, **options: captured.update(
+
+    def fake_quick(query, config, num_results=8, **options) -> dict:
+        captured.update(
             query=query, config=config, num_results=num_results, options=options
         )
-        or {"results": []},
-    )
+        return {"results": []}
+
+    monkeypatch.setattr(search_core, "quick_web_search", fake_quick)
     code, stdout, stderr = run_cli(
         ["quick", "query", "--scientific", "--platform", "arxiv", "--platform", "library"]
     )
