@@ -7,6 +7,7 @@ from pathlib import Path
 cli = importlib.import_module("cli")
 rag = importlib.import_module("rag")
 search_core = importlib.import_module("search_core")
+search_deep = importlib.import_module("search_deep")
 
 
 def run_cli(argv, stdin="") -> tuple:
@@ -75,7 +76,7 @@ def install_core_stubs(monkeypatch) -> None:
     monkeypatch.setattr(search_core, "quick_web_search", _fake_quick)
     monkeypatch.setattr(search_core, "web_search", _fake_search)
     monkeypatch.setattr(search_core, "get_content", _fake_get)
-    monkeypatch.setattr(search_core, "deep_research", _fake_deep)
+    monkeypatch.setattr(search_deep, "deep_research", _fake_deep)
     monkeypatch.setattr(search_core, "deep_context_aware_search", _fake_context)
     search_core.RESULT_URLS.clear()
 
@@ -202,32 +203,21 @@ def test_plan_rejects_scientific_flag() -> None:
 
 def test_scientific_flag_threads_to_search_core(monkeypatch) -> None:
     captured = {}
-
-    def fake_quick(query, config, num_results=8, **options) -> dict:
-        captured.update(query=query, config=config, num_results=num_results, options=options)
-        return {"results": []}
-
-    monkeypatch.setattr(search_core, "quick_web_search", fake_quick)
-
-    code, stdout, stderr = run_cli(
-        [
-            "quick",
-            "query",
-            "--scientific",
-            "--platform",
-            "arxiv",
-            "--platform",
-            "library",
-        ]
+    monkeypatch.setattr(
+        search_core,
+        "quick_web_search",
+        lambda query, config, num_results=8, **options: captured.update(
+            query=query, config=config, num_results=num_results, options=options
+        )
+        or {"results": []},
     )
-
+    code, stdout, stderr = run_cli(
+        ["quick", "query", "--scientific", "--platform", "arxiv", "--platform", "library"]
+    )
     assert code == cli.SUCCESS
     assert stdout == ""
     assert stderr == ""
-    assert captured["options"] == {
-        "scientific": True,
-        "platform": ["arxiv", "library"],
-    }
+    assert captured["options"] == {"scientific": True, "platform": ["arxiv", "library"]}
 
 
 def test_injection_shaped_tokens_are_plain_query(monkeypatch) -> None:

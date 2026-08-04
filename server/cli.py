@@ -15,6 +15,7 @@ import fetch  # type: ignore[import-not-found]
 import method_index  # type: ignore[import-not-found]
 import rag  # type: ignore[import-not-found]
 import search_core  # type: ignore[import-not-found]
+import search_deep  # type: ignore[import-not-found]
 import state as context_state  # type: ignore[import-not-found]
 
 SUCCESS = 0
@@ -339,18 +340,8 @@ def _dispatch_query(args, stdin, config):
     if args.command == "search":
         return search_core.web_search(query, config, args.num_results, **raw, **sci)
     if args.command == "deep":
-        return search_core.deep_research(query, config, args.max_rounds, **raw, **sci)
-    return search_core.deep_context_aware_search(
-        query,
-        config,
-        args.context,
-        args.max_rounds,
-        args.per_engine,
-        args.fetch_top_k,
-        args.session,
-        **raw,
-        **sci,
-    )
+        return search_deep.deep_research(query, config, args.max_rounds, **raw, **sci)
+    return search_core.deep_context_aware_search(query, config, args.context, args.max_rounds, args.per_engine, args.fetch_top_k, args.session, **raw, **sci)
 
 
 def _dispatch(args, stdin):

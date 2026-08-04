@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import search_core
+import search_deep
 from fetch import fetch_clean
 
 
@@ -176,8 +177,8 @@ def test_deep_research_bounded_and_deduped(monkeypatch) -> object:
         citation = {"title": query, "url": "https://same.example/report"}
         return {"summary": f"summary for {query}", "citations": [citation]}
 
-    monkeypatch.setattr(search_core, "web_search", fake_web_search)
-    response = search_core.deep_research("best climate data report", {}, max_rounds=4)
+    monkeypatch.setattr(search_deep, "web_search", fake_web_search)
+    response = search_deep.deep_research("best climate data report", {}, max_rounds=4)
 
     assert {"corrections", "quality"} <= set(response)
     assert calls == _EXPECTED_DEEP_QUERIES
@@ -194,9 +195,9 @@ def test_deep_research_clamps_max_rounds(monkeypatch) -> object:
         calls.append(query)
         return {"summary": query, "citations": []}
 
-    monkeypatch.setattr(search_core, "web_search", fake_web_search)
+    monkeypatch.setattr(search_deep, "web_search", fake_web_search)
 
-    search_core.deep_research("alpha beta gamma report", {}, max_rounds=100)
+    search_deep.deep_research("alpha beta gamma report", {}, max_rounds=100)
 
     assert len(calls) == 6
 
@@ -211,9 +212,9 @@ def test_deep_research_summary_includes_each_round(monkeypatch) -> object:
     def fake_web_search(query, config) -> object:
         return {"summary": summaries[query], "citations": []}
 
-    monkeypatch.setattr(search_core, "web_search", fake_web_search)
+    monkeypatch.setattr(search_deep, "web_search", fake_web_search)
 
-    response = search_core.deep_research("best climate data report", {}, max_rounds=3)
+    response = search_deep.deep_research("best climate data report", {}, max_rounds=3)
 
     assert "original" in response["summary"]
     assert "quoted marker" in response["summary"]
@@ -286,9 +287,9 @@ def test_deep_research_caps_large_output_and_keeps_citations(monkeypatch) -> obj
     def fake_web_search(query, config) -> object:
         return {"summary": large_summary, "citations": citations}
 
-    monkeypatch.setattr(search_core, "web_search", fake_web_search)
+    monkeypatch.setattr(search_deep, "web_search", fake_web_search)
 
-    response = search_core.deep_research("best climate data report", {}, max_rounds=1)
+    response = search_deep.deep_research("best climate data report", {}, max_rounds=1)
 
     assert len(response["summary"]) <= 4000
     assert all(len(section["content"]) <= 700 for section in response["sections"])

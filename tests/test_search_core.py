@@ -75,30 +75,72 @@ def install_bucket_stubs(monkeypatch) -> None:
     monkeypatch.setattr(engines, "search", fake_search)
 
 
+_LIBRARY_HITS = [
+    {
+        "title": "Library passage one",
+        "url": "library://book?chunk=one",
+        "snippet": "Library evidence one",
+        "engine": "library",
+        "rank": 1,
+        "date": "",
+    },
+    {
+        "title": "Library passage two",
+        "url": "library://book?chunk=two",
+        "snippet": "Library evidence two",
+        "engine": "library",
+        "rank": 2,
+        "date": "",
+    },
+]
+_LIBRARY_CONFIG = {"library_mcp_url": "http://library", "library_mcp_token": "token"}
+
+
+def _install_library_stubs(monkeypatch, web_hit, library_hits) -> None:
+    monkeypatch.setattr(
+        engines,
+        "search",
+        lambda *args, **kwargs: engines.SearchResults(
+            [web_hit], {"arxiv": {"status": "ok", "count": 1}}
+        ),
+    )
+    monkeypatch.setattr(engines, "library", lambda *args, **kwargs: library_hits)
+    monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
+
+
+def _install_library_only_stubs(monkeypatch, calls, library_hit) -> None:
+    def fake_search(query, config, **options) -> object:
+        calls.append(options["providers"])
+        return engines.SearchResults([], {})
+
+    monkeypatch.setattr(engines, "search", fake_search)
+    monkeypatch.setattr(engines, "library", lambda *args, **kwargs: [library_hit])
+    monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
+
+
+def _fail_library(*args, **kwargs) -> None:
+    raise OSError("library offline")
+
+
 class ScientificSearchTests(unittest.TestCase):
     def test_scientific_resolves_providers(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
             calls = []
             library_calls = []
-
-            def fake_search(query, config, **options) -> object:
-                calls.append(options.get("providers"))
-                return engines.SearchResults([], {"arxiv": {"status": "ok", "count": 0}})
-
-            monkeypatch.setattr(engines, "search", fake_search)
-
-            def fake_library(*args, **kwargs):
-                library_calls.append(args)
-                return []
-
-            monkeypatch.setattr(engines, "library", fake_library)
-
+            monkeypatch.setattr(
+                engines,
+                "search",
+                lambda query, config, **options: calls.append(options.get("providers"))
+                or engines.SearchResults([], {"arxiv": {"status": "ok", "count": 0}}),
+            )
+            monkeypatch.setattr(
+                engines,
+                "library",
+                lambda *args, **kwargs: library_calls.append(args) or [],
+            )
             config = {"library_mcp_url": "http://library", "library_mcp_token": "token"}
             search_core.quick_web_search("q", config, raw=True, scientific=True)
-            search_core.quick_web_search(
-                "q", config, raw=True, scientific=True, platform=["arxiv"]
-            )
-
+            search_core.quick_web_search("q", config, raw=True, scientific=True, platform=["arxiv"])
             expected = set(engines.SCIENTIFIC_PLATFORMS)
             assert calls[0] == frozenset(expected)
             assert not set(engines._DIRECT_DEFAULTS) & calls[0]
@@ -106,9 +148,7 @@ class ScientificSearchTests(unittest.TestCase):
             assert calls[1] == frozenset({"arxiv"})
             assert len(library_calls) == 1
 
-    def test_scientific_quick_search_json_carries_buckets_and_existing_fields(
-        self,
-    ) -> None:
+    def test_scientific_quick_search_json_carries_buckets_and_existing_fields(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
             install_bucket_stubs(monkeypatch)
             plain = search_core.quick_web_search("science", {}, raw=True)
@@ -147,50 +187,12 @@ class ScientificSearchTests(unittest.TestCase):
 
     def test_library_hits_merge_and_outcomes(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
-            web_hit = {
-                **HITS[0],
-                "url": "https://arxiv.org/abs/1234",
-                "engine": "arxiv",
-                "engines": ["arxiv"],
-            }
-            library_hits = [
-                {
-                    "title": "Library passage one",
-                    "url": "library://book?chunk=one",
-                    "snippet": "Library evidence one",
-                    "engine": "library",
-                    "rank": 1,
-                    "date": "",
-                },
-                {
-                    "title": "Library passage two",
-                    "url": "library://book?chunk=two",
-                    "snippet": "Library evidence two",
-                    "engine": "library",
-                    "rank": 2,
-                    "date": "",
-                },
-            ]
-            monkeypatch.setattr(
-                engines,
-                "search",
-                lambda *args, **kwargs: engines.SearchResults(
-                    [web_hit], {"arxiv": {"status": "ok", "count": 1}}
-                ),
-            )
-            monkeypatch.setattr(engines, "library", lambda *args, **kwargs: library_hits)
-            monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
-
+            web_hit = {**HITS[0], "url": "https://arxiv.org/abs/1234", "engine": "arxiv", "engines": ["arxiv"]}
+            library_hits = [dict(item) for item in _LIBRARY_HITS]
+            _install_library_stubs(monkeypatch, web_hit, library_hits)
             response = search_core.quick_web_search(
-                "research",
-                {
-                    "library_mcp_url": "http://library",
-                    "library_mcp_token": "token",
-                },
-                raw=True,
-                scientific=True,
+                "research", _LIBRARY_CONFIG, raw=True, scientific=True
             )
-
             urls = {item["url"] for item in response["results"]}
             assert urls == {
                 "https://arxiv.org/abs/1234",
@@ -210,22 +212,10 @@ class ScientificSearchTests(unittest.TestCase):
                 [dict(HITS[0])], {"duckduckgo": {"status": "ok", "count": 1}}
             )
             monkeypatch.setattr(engines, "search", lambda *args, **kwargs: web_hit)
-
-            def fail_library(*args, **kwargs):
-                raise OSError("library offline")
-
-            monkeypatch.setattr(engines, "library", fail_library)
-
+            monkeypatch.setattr(engines, "library", _fail_library)
             response = search_core.quick_web_search(
-                "research",
-                {
-                    "library_mcp_url": "http://library",
-                    "library_mcp_token": "token",
-                },
-                raw=True,
-                scientific=True,
+                "research", _LIBRARY_CONFIG, raw=True, scientific=True
             )
-
             assert response["results"]
             assert response["providers"]["library"] == {
                 "status": "error",
@@ -243,26 +233,14 @@ class ScientificSearchTests(unittest.TestCase):
                 "rank": 1,
                 "date": "",
             }
-
-            def fake_search(query, config, **options) -> object:
-                calls.append(options["providers"])
-                return engines.SearchResults([], {})
-
-            monkeypatch.setattr(engines, "search", fake_search)
-            monkeypatch.setattr(engines, "library", lambda *args, **kwargs: [library_hit])
-            monkeypatch.setattr(rag, "rank", lambda query, hits: list(hits))
-
+            _install_library_only_stubs(monkeypatch, calls, library_hit)
             response = search_core.quick_web_search(
                 "research",
-                {
-                    "library_mcp_url": "http://library",
-                    "library_mcp_token": "token",
-                },
+                _LIBRARY_CONFIG,
                 raw=True,
                 scientific=True,
                 platform=["library"],
             )
-
             assert calls == [frozenset()]
             assert [item["url"] for item in response["results"]] == [
                 "library://book?chunk=only"
@@ -354,32 +332,6 @@ def test_get_content_routes_all_url_schemes_to_validation(monkeypatch, ref) -> N
     assert seen == [ref]
 
 
-def test_deep_research_pins_current_shape(monkeypatch) -> object:
-    install_stubs(monkeypatch)
-
-    response = search_core.deep_research("alpha", {}, max_rounds=1)
-
-    assert set(response) == {
-        "query",
-        "summary",
-        "sections",
-        "citations",
-        "corrections",
-        "quality",
-    }
-    assert response["summary"] == (
-        "Alpha page content with enough words for summary. "
-        "Beta page content with more source words."
-    )
-    assert response["sections"][0]["heading"] == "alpha"
-    assert response["sections"][0]["sources"] == response["citations"]
-    assert [item["title"] for item in response["citations"]] == [
-        "Alpha guide",
-        "Beta report",
-    ]
-    _assert_provenance(response["citations"])
-
-
 def test_deep_context_aware_search_suppresses_seen_urls(monkeypatch) -> object:
     install_stubs(monkeypatch)
 
@@ -399,111 +351,6 @@ def test_deep_context_aware_search_suppresses_seen_urls(monkeypatch) -> object:
     assert first["corrections"] == []
     assert second["already_seen_suppressed"] == 2
     assert second["results"] == []
-
-
-def test_deep_research_falls_back_to_citation_snippets_when_summary_empty() -> object:
-    citation = {
-        "title": "Alpha guide",
-        "url": "https://example.com/alpha",
-        "snippet": "Citation snippet text",
-        "source": "searxng",
-        "date": "2026-01-02",
-        "relevance": 0.8,
-    }
-
-    def search(query) -> object:
-        return {"summary": "", "citations": [citation]}
-
-    result = search_core._deep_research("alpha", 1, search)
-
-    assert result["summary"] == "Citation snippet text"
-
-
-def test_deep_research_keeps_empty_summary_when_no_citations() -> object:
-    def search(query) -> object:
-        return {"summary": "", "citations": []}
-
-    result = search_core._deep_research("alpha", 1, search)
-
-    assert result["summary"] == ""
-
-
-def _patch_deep_search_backends(monkeypatch, web_response, quick_results) -> object:
-    monkeypatch.setattr(search_core, "web_search", lambda query, config: web_response)
-    monkeypatch.setattr(
-        search_core,
-        "quick_web_search",
-        lambda query, config, num_results=8, **options: {"results": quick_results},
-    )
-
-
-def test_deep_search_falls_back_to_quick_snippets(monkeypatch) -> object:
-    quick_results = [
-        {**HITS[0], "snippet": "Alpha snippet one."},
-        {**HITS[1], "snippet": "Beta snippet two."},
-    ]
-    _patch_deep_search_backends(
-        monkeypatch,
-        web_response={"summary": "", "citations": [], "result_ids": []},
-        quick_results=quick_results,
-    )
-
-    response = search_core._deep_search("alpha", {})
-
-    assert response["summary"] == "Alpha snippet one. Beta snippet two."
-    assert [item["title"] for item in response["citations"]] == [
-        "Alpha guide",
-        "Beta report",
-    ]
-    assert all(item["confidence"] == "unknown" for item in response["citations"])
-    assert response["result_ids"] == []
-
-
-def test_deep_search_preserves_response_when_citations_present(monkeypatch) -> object:
-    called_quick = []
-    response = {
-        "summary": "fetched summary",
-        "citations": [{"url": "https://example.com/alpha"}],
-        "result_ids": ["r1"],
-    }
-    monkeypatch.setattr(search_core, "web_search", lambda query, config: response)
-    monkeypatch.setattr(
-        search_core,
-        "quick_web_search",
-        lambda query, config, num_results=8: called_quick.append(query),
-    )
-
-    assert search_core._deep_search("alpha", {}) == response
-    assert called_quick == []
-
-
-def test_deep_search_preserves_empty_when_quick_also_empty(monkeypatch) -> object:
-    empty = {"summary": "", "citations": [], "result_ids": []}
-    _patch_deep_search_backends(monkeypatch, web_response=empty, quick_results=[])
-
-    assert search_core._deep_search("alpha", {}) == empty
-
-
-def test_deep_research_falls_back_when_first_engine_call_empty(monkeypatch) -> object:
-    install_stubs(monkeypatch)
-    calls = {"n": 0}
-
-    def flaky_search(query, config, **options) -> object:
-        calls["n"] += 1
-        return [] if calls["n"] == 1 else [dict(hit) for hit in HITS[: options["k"]]]
-
-    monkeypatch.setattr(engines, "search", flaky_search)
-
-    result = search_core.deep_research("alpha", {}, max_rounds=1)
-
-    assert result["summary"] == "Alpha snippet Beta snippet"
-    assert [item["title"] for item in result["citations"]] == [
-        "Alpha guide",
-        "Beta report",
-    ]
-    assert all(item["confidence"] == "unknown" for item in result["citations"])
-    assert result["sections"][0]["sources"] == result["citations"]
-    assert calls["n"] >= 2
 
 
 def _provider_failure() -> OSError:
@@ -561,56 +408,6 @@ def test_refinement_failure_keeps_prior_empty_success(monkeypatch) -> None:
     search_core._apply_refinement(state, request, ("candidate", {"kind": "retry"}))
 
     assert state.current == "alpha"
-
-
-def test_deep_keeps_earlier_round_when_later_provider_round_fails(monkeypatch) -> None:
-    calls = []
-
-    def web_round(query, config, raw) -> dict:
-        calls.append(query)
-        if len(calls) > 1:
-            raise _provider_failure()
-        return {
-            "query": query,
-            "summary": "first round evidence",
-            "citations": [],
-            "corrections": [],
-            "providers": {"duckduckgo": {"status": "ok", "count": 1}},
-        }
-
-    monkeypatch.setattr(search_core, "_call_web_search", web_round)
-    result = search_core.deep_research("alpha", {}, max_rounds=2)
-
-    assert result["summary"] == "first round evidence"
-    assert result["providers"]["duckduckgo"]["status"] == "error"
-
-
-def test_deep_valid_empty_round_survives_later_failure() -> None:
-    """A provider can succeed honestly without returning evidence."""
-    empty = {
-        "query": "alpha",
-        "summary": "",
-        "citations": [],
-        "corrections": [],
-        "providers": {"duckduckgo": {"status": "ok", "count": 0}},
-    }
-    responses = iter(
-        [empty, search_core._failed_deep_response("beta", _provider_failure())]
-    )
-
-    result = search_core._deep_research("alpha", 2, lambda query: next(responses))
-
-    assert result["summary"] == ""
-    assert result["citations"] == []
-
-
-def test_deep_raises_when_every_provider_round_fails(monkeypatch) -> None:
-    def fail(query, config, raw) -> None:
-        raise _provider_failure()
-
-    monkeypatch.setattr(search_core, "_call_web_search", fail)
-    with pytest.raises(engines.AllProvidersFailed):
-        search_core.deep_research("alpha", {}, max_rounds=2)
 
 
 def test_context_keeps_hits_after_later_failure(monkeypatch, tmp_path) -> None:

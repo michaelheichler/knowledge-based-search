@@ -13,6 +13,7 @@ trust = importlib.import_module("trust")
 engines = importlib.import_module("engines")
 rag = importlib.import_module("rag")
 search_core = importlib.import_module("search_core")
+search_deep = importlib.import_module("search_deep")
 
 _BOOK_TAG = re.compile(
     r"(?:osint-techniques|osint-resources) ch\d+\b|exposingtheinvisible google-dorking"
@@ -221,12 +222,12 @@ def test_deep_fallback_does_not_reopen_exhausted_budget(monkeypatch) -> None:
     _install_rank_stub(monkeypatch)
     monkeypatch.setattr(engines, "search", empty_search)
 
-    response = search_core._deep_search(
+    response = search_deep._deep_search(
         '"John Smith" site:example.com filetype:pdf', {}
     )
 
     assert len(calls) == 3
-    assert search_core._corrective_rounds(response) == 2
+    assert search_deep._corrective_rounds(response) == 2
     _assert_book_tags(response["corrections"])
 
 
@@ -331,7 +332,7 @@ def test_deep_raw_dispatches_literal_query_once(monkeypatch, use_flag) -> None:
     if not use_flag:
         monkeypatch.setenv("KBS_NO_ENFORCE", "1")
 
-    response = search_core._deep_search(" literal ", {}, raw=use_flag)
+    response = search_deep._deep_search(" literal ", {}, raw=use_flag)
 
     assert calls == [" literal "]
     assert response["query"] == " literal "
