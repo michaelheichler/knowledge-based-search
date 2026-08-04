@@ -1,0 +1,21 @@
+benchmark/deep_context_bench.py
+  s_3bdd1bf81d3b3a::t_1d5e7b72a55f6e 33
+server/tests/test_cli.py
+  s_3bdd1bf81d3b3a::t_2f798bc7dee758 207-209,212-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "d14058e4d6489b71754325a3a0df40d6345a4513",
+  "prompts": {},
+  "sessions": {
+    "s_3bdd1bf81d3b3a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d40be5a6-ed8a-4d15-870c-212c14ed242a",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
