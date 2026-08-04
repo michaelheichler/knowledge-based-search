@@ -1,0 +1,23 @@
+.vbw-planning/phases/04-terminology-alternatives/remediation/qa/round-01/R01-PLAN.md
+  s_cb437847d72d7c::t_5fe4f640919458 18
+  s_cb437847d72d7c::t_35e5008e71a705 30,50
+  s_cb437847d72d7c::t_a8a92f6c55180a 1-17,19-29,31-38,41-49,51-63,65-93
+  s_cb437847d72d7c::t_26f9390ca6e82c 64
+  s_cb437847d72d7c::t_8ec46c726a41af 39-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "108caefb77adbd1d227babb3a8c9ec2ced99c81b",
+  "prompts": {},
+  "sessions": {
+    "s_cb437847d72d7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1931c99f-6631-43a1-bbf1-d6e37ec11cea",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
