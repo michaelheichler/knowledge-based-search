@@ -1,0 +1,30 @@
+.vbw-planning/phases/03-module-size-refactor/remediation/qa/round-02/R02-PLAN.md
+  s_a1d23ecb6529a1::t_c2bc73cf024415 73
+  s_a1d23ecb6529a1::t_0f6b366646aa98 1-22,25-37,39-47,49,63-70,72,74,76-89,91,93-120,123-141
+  s_a1d23ecb6529a1::t_37f0ab53f86166 38
+  s_a1d23ecb6529a1::t_3b6eb75c75c5c6 53-59
+  s_a1d23ecb6529a1::t_7a08b79e61fb4d 71
+  s_a1d23ecb6529a1::t_d5a65a91390cb9 48
+  s_a1d23ecb6529a1::t_e43ecb3addabee 75
+  s_a1d23ecb6529a1::t_d01d70f71407b7 23-24
+  s_a1d23ecb6529a1::t_eb5c2faa99ed36 121-122
+  s_a1d23ecb6529a1::t_6b6bdfc69bc895 50-52,61-62
+  s_a1d23ecb6529a1::t_b7ff45aebb69fa 60
+  s_a1d23ecb6529a1::t_3ea357eced0143 90,92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "e12610d10d052f758e9a419de97c128bf81640e9",
+  "prompts": {},
+  "sessions": {
+    "s_a1d23ecb6529a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83463142-262d-4dfd-bcb0-c4de581609eb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
