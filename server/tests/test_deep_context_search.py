@@ -1,6 +1,7 @@
 import engines
 import pytest
 import rag
+import search_context
 import search_core
 import state
 
@@ -50,7 +51,7 @@ def base_hits() -> object:
 def test_results_carry_required_labels(monkeypatch, base_hits) -> object:
     monkeypatch.setattr(engines, "search", lambda q, cfg, k, cap: base_hits)
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
-    response = search_core.deep_context_aware_search("alpha", {}, fetch_top_k=0)
+    response = search_context.deep_context_aware_search("alpha", {}, fetch_top_k=0)
     assert response["query"] == "alpha" and response["context"] == ""
     for result in response["results"]:
         assert "relevance" in result and "date" in result
@@ -66,7 +67,7 @@ def test_fetch_zero_skips_details(monkeypatch, base_hits) -> None:
     monkeypatch.setattr(
         search_core, "fetch_clean", lambda url, n: fetch_calls.append(url) or ""
     )
-    response = search_core.deep_context_aware_search("alpha", {}, fetch_top_k=0)
+    response = search_context.deep_context_aware_search("alpha", {}, fetch_top_k=0)
     assert (
         response["summary"] == "" and response["citations"] == [] and fetch_calls == []
     )
@@ -76,7 +77,7 @@ def test_fetch_positive_returns_details(monkeypatch, base_hits) -> None:
     monkeypatch.setattr(engines, "search", lambda q, cfg, k, cap: base_hits)
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
     monkeypatch.setattr(search_core, "fetch_clean", lambda url, n: "word " * 200)
-    response = search_core.deep_context_aware_search("alpha", {}, fetch_top_k=2)
+    response = search_context.deep_context_aware_search("alpha", {}, fetch_top_k=2)
     assert response["summary"] != "" and len(response["citations"]) > 0
     assert all("engines" in citation for citation in response["citations"])
     assert all(
@@ -87,10 +88,10 @@ def test_fetch_positive_returns_details(monkeypatch, base_hits) -> None:
 def test_memory_suppresses_seen_urls_on_second_call(monkeypatch, base_hits) -> object:
     monkeypatch.setattr(engines, "search", lambda q, cfg, k, cap: list(base_hits))
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
-    first = search_core.deep_context_aware_search(
+    first = search_context.deep_context_aware_search(
         "alpha", {}, context="ctx", fetch_top_k=0
     )
-    second = search_core.deep_context_aware_search(
+    second = search_context.deep_context_aware_search(
         "alpha", {}, context="ctx", fetch_top_k=0
     )
     first_urls = {result["url"] for result in first["results"]}
@@ -103,13 +104,13 @@ def test_context_memory_is_session_scoped(monkeypatch, base_hits) -> object:
     monkeypatch.setattr(engines, "search", lambda q, cfg, k, cap: list(base_hits))
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
 
-    first_a = search_core.deep_context_aware_search(
+    first_a = search_context.deep_context_aware_search(
         "alpha", {}, context="ctx", fetch_top_k=0, session="a"
     )
-    second_a = search_core.deep_context_aware_search(
+    second_a = search_context.deep_context_aware_search(
         "alpha", {}, context="ctx", fetch_top_k=0, session="a"
     )
-    first_b = search_core.deep_context_aware_search(
+    first_b = search_context.deep_context_aware_search(
         "alpha", {}, context="ctx", fetch_top_k=0, session="b"
     )
 
@@ -124,14 +125,14 @@ def test_context_memory_uses_kbs_session_env(monkeypatch, base_hits) -> object:
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
 
     monkeypatch.setenv("KBS_SESSION", "env-a")
-    first = search_core.deep_context_aware_search(
+    first = search_context.deep_context_aware_search(
         "alpha", {}, context="ctx", fetch_top_k=0
     )
-    second = search_core.deep_context_aware_search(
+    second = search_context.deep_context_aware_search(
         "alpha", {}, context="ctx", fetch_top_k=0
     )
     monkeypatch.setenv("KBS_SESSION", "env-b")
-    third = search_core.deep_context_aware_search(
+    third = search_context.deep_context_aware_search(
         "alpha", {}, context="ctx", fetch_top_k=0
     )
 
@@ -149,12 +150,12 @@ def test_memory_does_not_repeat_issued_reformulations(monkeypatch, base_hits) ->
 
     monkeypatch.setattr(engines, "search", recording_search)
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
-    search_core.deep_context_aware_search(
+    search_context.deep_context_aware_search(
         "climate data", {}, context="ctx", max_rounds=3, fetch_top_k=0
     )
     queries_first = list(search_queries)
     search_queries.clear()
-    search_core.deep_context_aware_search(
+    search_context.deep_context_aware_search(
         "climate data", {}, context="ctx", max_rounds=3, fetch_top_k=0
     )
     for query in search_queries:
@@ -171,7 +172,7 @@ def test_context_appended_to_rank_query(monkeypatch, base_hits) -> object:
 
     monkeypatch.setattr(engines, "search", lambda q, cfg, k, cap: list(base_hits))
     monkeypatch.setattr(rag, "rank", capturing_rank)
-    search_core.deep_context_aware_search(
+    search_context.deep_context_aware_search(
         "alpha query", {}, context="important context text", fetch_top_k=0
     )
     assert any("important context text" in query for query in captured)
@@ -180,7 +181,7 @@ def test_context_appended_to_rank_query(monkeypatch, base_hits) -> object:
 def test_already_seen_suppressed_zero_on_first_call(monkeypatch, base_hits) -> object:
     monkeypatch.setattr(engines, "search", lambda q, cfg, k, cap: list(base_hits))
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
-    response = search_core.deep_context_aware_search("alpha", {}, fetch_top_k=0)
+    response = search_context.deep_context_aware_search("alpha", {}, fetch_top_k=0)
     assert response["already_seen_suppressed"] == 0
 
 
@@ -190,7 +191,7 @@ def test_results_capped_at_60(monkeypatch) -> object:
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
     assert (
         len(
-            search_core.deep_context_aware_search("alpha", {}, fetch_top_k=0)["results"]
+            search_context.deep_context_aware_search("alpha", {}, fetch_top_k=0)["results"]
         )
         <= 60
     )
@@ -199,7 +200,7 @@ def test_results_capped_at_60(monkeypatch) -> object:
 def test_return_shape_keys(monkeypatch, base_hits) -> object:
     monkeypatch.setattr(engines, "search", lambda q, cfg, k, cap: list(base_hits))
     monkeypatch.setattr(rag, "rank", lambda q, docs: list(docs))
-    response = search_core.deep_context_aware_search("alpha", {}, fetch_top_k=0)
+    response = search_context.deep_context_aware_search("alpha", {}, fetch_top_k=0)
     assert set(response) == {
         "query",
         "context",

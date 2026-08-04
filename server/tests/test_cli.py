@@ -6,6 +6,7 @@ from pathlib import Path
 
 cli = importlib.import_module("cli")
 rag = importlib.import_module("rag")
+search_context = importlib.import_module("search_context")
 search_core = importlib.import_module("search_core")
 search_deep = importlib.import_module("search_deep")
 
@@ -77,7 +78,7 @@ def install_core_stubs(monkeypatch) -> None:
     monkeypatch.setattr(search_core, "web_search", _fake_search)
     monkeypatch.setattr(search_core, "get_content", _fake_get)
     monkeypatch.setattr(search_deep, "deep_research", _fake_deep)
-    monkeypatch.setattr(search_core, "deep_context_aware_search", _fake_context)
+    monkeypatch.setattr(search_context, "deep_context_aware_search", _fake_context)
     search_core.RESULT_URLS.clear()
 
 

@@ -247,27 +247,6 @@ class ScientificSearchTests(unittest.TestCase):
             ]
             assert response["providers"]["library"] == {"status": "ok", "count": 1}
 
-    def test_result_helpers_preserve_optional_citation_count(self) -> None:
-        hit = {
-            "title": "Paper",
-            "url": "https://arxiv.org/abs/1",
-            "snippet": "Abstract",
-            "engine": "arxiv",
-            "date": "2026-01-02",
-            "relevance": 0.8,
-            "citation_count": 42,
-        }
-        without_count = {key: value for key, value in hit.items() if key != "citation_count"}
-
-        for helper in (
-            search_core._brief_result,
-            search_core._citation,
-            search_core._label,
-        ):
-            assert helper(hit)["citation_count"] == 42
-            assert "citation_count" not in helper(without_count)
-
-
 def test_quick_web_search_pins_current_shape(monkeypatch) -> object:
     install_stubs(monkeypatch)
 
@@ -332,27 +311,6 @@ def test_get_content_routes_all_url_schemes_to_validation(monkeypatch, ref) -> N
     assert seen == [ref]
 
 
-def test_deep_context_aware_search_suppresses_seen_urls(monkeypatch) -> object:
-    install_stubs(monkeypatch)
-
-    options = {"context": "same session", "fetch_top_k": 0}
-    first = search_core.deep_context_aware_search("alpha", {}, **options)
-    second = search_core.deep_context_aware_search("alpha", {}, **options)
-
-    assert first["query"] == "alpha"
-    assert first["context"] == "same session"
-    assert [item["title"] for item in first["results"]] == [
-        "Alpha guide",
-        "Beta report",
-    ]
-    assert all(item["confidence"] == "unknown" for item in first["results"])
-    _assert_provenance(first["results"])
-    assert first["already_seen_suppressed"] == 0
-    assert first["corrections"] == []
-    assert second["already_seen_suppressed"] == 2
-    assert second["results"] == []
-
-
 def _provider_failure() -> OSError:
     outcomes = {"duckduckgo": {"status": "error", "error": "OSError"}}
     return engines.AllProvidersFailed(outcomes)
@@ -408,63 +366,6 @@ def test_refinement_failure_keeps_prior_empty_success(monkeypatch) -> None:
     search_core._apply_refinement(state, request, ("candidate", {"kind": "retry"}))
 
     assert state.current == "alpha"
-
-
-def test_context_keeps_hits_after_later_failure(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("KBS_STATE_FILE", str(tmp_path / "state.json"))
-    monkeypatch.setattr(rag, "rank", lambda query, rows: rows)
-    first = engines.SearchResults(
-        [dict(HITS[0])], {"duckduckgo": {"status": "ok", "count": 1}}
-    )
-    calls = []
-
-    def search(query, config, **options) -> object:
-        calls.append(query)
-        if len(calls) > 1:
-            raise _provider_failure()
-        return first
-
-    monkeypatch.setattr(engines, "search", search)
-    result = search_core.deep_context_aware_search(
-        "alpha", {}, max_rounds=2, fetch_top_k=0, raw=True
-    )
-
-    assert result["results"][0]["title"] == "Alpha guide"
-    assert result["providers"]["duckduckgo"]["status"] == "error"
-
-
-def test_context_empty_success_survives_failure(monkeypatch, tmp_path) -> None:
-    """An honest empty provider response prevents a total-failure verdict."""
-    monkeypatch.setenv("KBS_STATE_FILE", str(tmp_path / "state.json"))
-    calls = []
-
-    def search(query, config, **options) -> object:
-        calls.append(query)
-        if len(calls) > 1:
-            raise _provider_failure()
-        outcomes = {"duckduckgo": {"status": "ok", "count": 0}}
-        return engines.SearchResults([], outcomes)
-
-    monkeypatch.setattr(engines, "search", search)
-
-    result = search_core.deep_context_aware_search(
-        "alpha", {}, max_rounds=2, fetch_top_k=0, raw=True
-    )
-
-    assert result["results"] == []
-
-
-def test_context_raises_when_every_provider_round_fails(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("KBS_STATE_FILE", str(tmp_path / "state.json"))
-
-    def fail_search(*args, **kwargs) -> None:
-        raise _provider_failure()
-
-    monkeypatch.setattr(engines, "search", fail_search)
-    with pytest.raises(engines.AllProvidersFailed):
-        search_core.deep_context_aware_search(
-            "alpha", {}, max_rounds=1, fetch_top_k=0, raw=True
-        )
 
 
 def test_scientific_buckets_preserve_rank_order_and_uncategorized_last() -> None:

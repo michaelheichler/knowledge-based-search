@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "server"))
-search_core = importlib.import_module("search_core")
+search_context = importlib.import_module("search_context")
 state = importlib.import_module("state")
 
 QUERIES = [
