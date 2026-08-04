@@ -574,3 +574,41 @@ def test_scientific_bucket_rendering_includes_headers_and_items() -> None:
     assert "## Physics" in rendered
     assert "1. Paper" in rendered
     assert "## Uncategorized" in rendered
+
+
+def test_terminology_alternatives_render_before_results() -> None:
+    data = {
+        "terminology_query": "heart attack",
+        "terminology_alternatives": [
+            {"term": "Myocardial Infarction", "note": "Heart muscle damage."},
+            {"term": "Coronary Occlusion", "note": "Blocked coronary artery."},
+        ],
+        "results": [{"title": "Paper", "url": "https://example.com/paper"}],
+    }
+
+    rendered = cli._render(data)
+
+    assert rendered.splitlines()[:3] == [
+        'Terminology alternatives for "heart attack":',
+        "  1. Myocardial Infarction (Heart muscle damage.)",
+        "  2. Coronary Occlusion (Blocked coronary artery.)",
+    ]
+    assert rendered.index("Terminology alternatives") < rendered.index("1. Paper")
+
+
+def test_terminology_alternative_without_note_omits_parentheses() -> None:
+    rendered = cli._render(
+        {
+            "terminology_query": "heart attack",
+            "terminology_alternatives": [{"term": "Myocardial Infarction", "note": ""}],
+            "results": [],
+        }
+    )
+
+    assert rendered == 'Terminology alternatives for "heart attack":\n  1. Myocardial Infarction'
+
+
+def test_missing_terminology_alternatives_renders_no_header() -> None:
+    rendered = cli._render({"results": [{"title": "Paper", "url": "https://example.com/paper"}]})
+
+    assert "Terminology alternatives for" not in rendered

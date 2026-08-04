@@ -185,7 +185,11 @@ def _render_context(data):
 
 def _render(data):
     """This stays centralized because every command must expose enforcement metadata."""
-    parts = [_render_body(data)]
+    alternatives = data.get("terminology_alternatives")
+    parts = []
+    if alternatives:
+        parts.append(_render_terminology_alternatives(data.get("terminology_query", ""), alternatives))
+    parts.append(_render_body(data))
     parts.extend(_render_correction(item) for item in data.get("corrections", []))
     quality = data.get("quality")
     if quality:
@@ -229,6 +233,16 @@ def _render_quality(quality):
     metric = quality.get("domain_metric", "root domains")
     flag = "low diversity" if quality.get("low_diversity") else "diverse"
     return f"quality: {flag}, {diversity} {metric}, {quality.get('verification', 'single-source')}"
+
+
+def _render_terminology_alternatives(query, items) -> str:
+    """Terms appear before results because they frame the search context."""
+    lines = [f'Terminology alternatives for "{query}":']
+    for index, item in enumerate(items, 1):
+        note = item.get("note", "")
+        suffix = f" ({note})" if note else ""
+        lines.append(f"  {index}. {item.get('term', '')}{suffix}")
+    return "\n".join(lines)
 
 
 def _render_plan(data):
