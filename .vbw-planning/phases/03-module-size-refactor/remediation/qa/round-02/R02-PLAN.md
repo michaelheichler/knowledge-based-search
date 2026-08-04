@@ -50,7 +50,7 @@ The amended contract must stay falsifiable. Do not replace MH-05 with a vague be
 Hard constraints for this round: do not revert either extraction, do not add any hook-suppression token, do not edit any file outside .vbw-planning/, and do not reintroduce known-issue registry entries.
 
 Amendment (R03): originally read: "Planning artifacts are untracked, so this round produces edits only, no commits."
-The planning artifacts are tracked.
+The two files this round edited, 03-01-PLAN.md and 03-01-SUMMARY.md, are tracked.
 Tasks 1 and 2 each produced a commit, 5ee90e0 and 5c99261.
 They followed the project's one-commit-per-task rule.
 Those commits carry only .vbw-planning paths.
