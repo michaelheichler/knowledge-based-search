@@ -353,6 +353,88 @@ def test_mesh_record_rejects_empty_and_garbage_bodies() -> None:
     assert science_engines._parse_mesh_records("not a MeSH record") == []
 
 
+def test_mesh_alternatives_requests_relevance_sorted_descriptors(monkeypatch) -> None:
+    """MeSH ordering must follow NCBI relevance rather than UID order."""
+    calls = []
+    responses = [
+        json.dumps({"esearchresult": {"idlist": ["1", "2"]}}),
+        """1: First Descriptor
+First scope note.
+Year introduced: 2000
+2: Second Descriptor
+Second scope note.
+Year introduced: 2001
+""",
+    ]
+    def fake_get(url, *_args, **_kwargs) -> str:
+        calls.append(url)
+        return responses.pop(0)
+    monkeypatch.setattr(engines, "_get", fake_get)
+    monkeypatch.setattr(engines, "_reserve_slot", lambda *_args: 0.0)
+    assert science_engines.mesh_alternatives("heart attack") == [
+        {"term": "First Descriptor", "note": "First scope note."},
+        {"term": "Second Descriptor", "note": "Second scope note."},
+    ]
+    assert len(calls) == 2
+    assert all(fragment in calls[0] for fragment in ("esearch.fcgi", "db=mesh", "sort=relevance", "retmax=5"))
+    assert all(fragment in calls[1] for fragment in ("efetch.fcgi", "rettype=full", "retmode=text"))
+
+
+def test_mesh_alternatives_empty_idlist_skips_efetch(monkeypatch) -> None:
+    """Empty MeSH matches must avoid an unnecessary descriptor request."""
+    calls = []
+
+    def fake_get(url, *_args, **_kwargs) -> str:
+        calls.append(url)
+        return json.dumps({"esearchresult": {"idlist": []}})
+
+    monkeypatch.setattr(engines, "_get", fake_get)
+    monkeypatch.setattr(engines, "_reserve_slot", lambda *_args: 0.0)
+
+    assert science_engines.mesh_alternatives("no results") == []
+    assert len(calls) == 1
+
+
+def test_mesh_alternatives_failure_degrades_to_empty(monkeypatch) -> None:
+    """A failed descriptor request must not become a search failure."""
+    calls = []
+
+    def fake_get(url, *_args, **_kwargs) -> str:
+        calls.append(url)
+        if len(calls) == 2:
+            raise OSError("efetch unavailable")
+        return json.dumps({"esearchresult": {"idlist": ["1"]}})
+
+    monkeypatch.setattr(engines, "_get", fake_get)
+    monkeypatch.setattr(engines, "_reserve_slot", lambda *_args: 0.0)
+
+    assert science_engines.mesh_alternatives("heart attack") == []
+
+
+def test_mesh_alternatives_keeps_five_requested_descriptors(monkeypatch) -> None:
+    """The source-side retmax cap must preserve all five fetched descriptors."""
+    idlist = [str(index) for index in range(1, 6)]
+    records = "".join(
+        f"{index}: Descriptor {index}\nScope note {index}.\nYear introduced: 2000\n"
+        for index in range(1, 6)
+    )
+    responses = [json.dumps({"esearchresult": {"idlist": idlist}}), records]
+
+    monkeypatch.setattr(engines, "_get", lambda *_args, **_kwargs: responses.pop(0))
+    monkeypatch.setattr(engines, "_reserve_slot", lambda *_args: 0.0)
+
+    alternatives = science_engines.mesh_alternatives("heart attack")
+
+    assert len(alternatives) == 5
+    assert [alternative["term"] for alternative in alternatives] == [
+        "Descriptor 1",
+        "Descriptor 2",
+        "Descriptor 3",
+        "Descriptor 4",
+        "Descriptor 5",
+    ]
+
+
 def test_semanticscholar_maps_citation_count(monkeypatch) -> None:
     """Semantic Scholar exposes citationCount directly; it must survive as an int."""
     monkeypatch.setattr(engines, "_get", lambda *_a, **_k: _SEMANTICSCHOLAR_PAYLOAD)
