@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 engines = importlib.import_module("engines")
+science_engines = importlib.import_module("science_engines")
 search_core = importlib.import_module("search_core")
 rag = importlib.import_module("rag")
 
@@ -73,6 +74,7 @@ def install_bucket_stubs(monkeypatch) -> None:
         )
 
     monkeypatch.setattr(engines, "search", fake_search)
+    monkeypatch.setattr(science_engines, "mesh_alternatives", lambda query: [])
 
 
 _LIBRARY_HITS = [
@@ -125,6 +127,7 @@ def _fail_library(*args, **kwargs) -> None:
 class ScientificSearchTests(unittest.TestCase):
     def test_scientific_resolves_providers(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr(science_engines, "mesh_alternatives", lambda query: [])
             calls = []
             library_calls = []
             monkeypatch.setattr(
@@ -185,8 +188,77 @@ class ScientificSearchTests(unittest.TestCase):
             assert "buckets" not in response
             assert set(response) == {"query", "results", "corrections", "quality"}
 
+    def test_scientific_search_adds_terminology_metadata(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            install_bucket_stubs(monkeypatch)
+            alternatives = [
+                {"term": "Myocardial Infarction", "note": "Heart muscle damage."},
+                {"term": "Coronary Occlusion", "note": "Blocked coronary artery."},
+            ]
+            monkeypatch.setattr(
+                science_engines, "mesh_alternatives", lambda query: alternatives
+            )
+
+            quick = search_core.quick_web_search("heart attack", {}, raw=True, scientific=True)
+            detailed = search_core.web_search("heart attack", {}, raw=True, scientific=True)
+
+            for response in (quick, detailed):
+                assert response["terminology_alternatives"] == alternatives
+                assert response["terminology_query"] == "heart attack"
+
+    def test_empty_terminology_alternatives_omit_metadata(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            install_bucket_stubs(monkeypatch)
+
+            quick = search_core.quick_web_search("heart attack", {}, raw=True, scientific=True)
+            detailed = search_core.web_search("heart attack", {}, raw=True, scientific=True)
+
+            for response in (quick, detailed):
+                assert "terminology_alternatives" not in response
+                assert "terminology_query" not in response
+
+    def test_non_scientific_search_skips_terminology_lookup(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            install_stubs(monkeypatch)
+            calls = []
+            monkeypatch.setattr(
+                science_engines, "mesh_alternatives", lambda query: calls.append(query)
+            )
+
+            quick = search_core.quick_web_search("alpha", {}, raw=True)
+            detailed = search_core.web_search("alpha", {}, raw=True)
+
+            assert calls == []
+            assert set(quick) == {"query", "results", "corrections", "quality"}
+            assert "terminology_alternatives" not in detailed
+            assert "terminology_query" not in detailed
+
+    def test_terminology_lookup_uses_original_query_after_enforcement(self) -> None:
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            install_bucket_stubs(monkeypatch)
+            calls = []
+            monkeypatch.setattr(
+                search_core.enforce,
+                "enforce_query",
+                lambda query, context: ("corrected query", []),
+            )
+            monkeypatch.setattr(
+                science_engines,
+                "mesh_alternatives",
+                lambda query: calls.append(query) or [{"term": "Term", "note": "Note"}],
+            )
+
+            quick = search_core.quick_web_search("original query", {}, scientific=True)
+            detailed = search_core.web_search("original query", {}, scientific=True)
+
+            assert calls == ["original query", "original query"]
+            for response in (quick, detailed):
+                assert response["query"] == "corrected query"
+                assert response["terminology_query"] == "original query"
+
     def test_library_hits_merge_and_outcomes(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr(science_engines, "mesh_alternatives", lambda query: [])
             web_hit = {**HITS[0], "url": "https://arxiv.org/abs/1234", "engine": "arxiv", "engines": ["arxiv"]}
             library_hits = [dict(item) for item in _LIBRARY_HITS]
             _install_library_stubs(monkeypatch, web_hit, library_hits)
@@ -208,6 +280,7 @@ class ScientificSearchTests(unittest.TestCase):
 
     def test_library_error_is_structured_outcome(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr(science_engines, "mesh_alternatives", lambda query: [])
             web_hit = engines.SearchResults(
                 [dict(HITS[0])], {"duckduckgo": {"status": "ok", "count": 1}}
             )
@@ -224,6 +297,7 @@ class ScientificSearchTests(unittest.TestCase):
 
     def test_platform_library_only(self) -> None:
         with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr(science_engines, "mesh_alternatives", lambda query: [])
             calls = []
             library_hit = {
                 "title": "Library passage",

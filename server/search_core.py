@@ -84,6 +84,19 @@ def _prepare_query(query: str, raw: bool, context=None):
     return enforce.enforce_query(query, context)
 
 
+def _terminology_alternatives(query) -> list:
+    import science_engines
+
+    return science_engines.mesh_alternatives(query)
+
+
+def _terminology_metadata(query) -> dict:
+    alternatives = _terminology_alternatives(query)
+    if not alternatives:
+        return {}
+    return {"terminology_alternatives": alternatives, "terminology_query": query}
+
+
 def _run_engine_search(request: _SearchRequest, corrections):
     search_options = (
         {"providers": request.providers} if request.providers is not None else {}
@@ -255,6 +268,7 @@ def quick_web_search(query, config, num_results=8, **options) -> dict:
     }
     if options.get("scientific"):
         data["buckets"] = _bucket_results(results)
+        data.update(_terminology_metadata(query))
     return _with_provider_outcomes(data, hits)
 
 
@@ -281,6 +295,7 @@ def web_search(query, config, num_results=5, **options) -> dict:
     }
     if options.get("scientific"):
         data["buckets"] = _bucket_results(tagged)
+        data.update(_terminology_metadata(query))
     return _with_provider_outcomes(data, hits)
 
 
