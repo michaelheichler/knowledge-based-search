@@ -1,0 +1,21 @@
+server/tests/test_cli.py
+  s_cb437847d72d7c::t_fa829b9827cc0a 87-111
+  s_cb437847d72d7c::t_298824a29a14ec 8,10
+  s_cb437847d72d7c::t_96cd55bc59d005 642-675
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "64a3cab33879f291302d2d16758fb42764abcb24",
+  "prompts": {},
+  "sessions": {
+    "s_cb437847d72d7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1931c99f-6631-43a1-bbf1-d6e37ec11cea",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
