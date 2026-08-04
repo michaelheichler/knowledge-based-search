@@ -9,6 +9,7 @@ import enforce
 import engines
 import rag
 import state as context_state  # type: ignore[import-not-found]
+import trust
 from fetch import fetch_clean
 
 RESULT_URLS = {}
@@ -291,18 +292,10 @@ def quick_web_search(query, config, num_results=8, **options) -> dict:
     searched, corrections = _prepare_query(query, raw, options.get("context"))
     refine = not enforce.enforcement_disabled(raw)
     providers, include_library = _resolve_sources(config, options)
-    request = _SearchRequest(
-        searched,
-        config,
-        num_results,
-        num_results,
-        refine,
-        providers,
-        include_library,
-    )
+    request = _SearchRequest(searched, config, num_results, num_results, refine, providers, include_library)
     searched, hits = _run_engine_search(request, corrections)
-    ranked = enforce.rrf_rank(searched, rag.rank(searched, hits))
-    results, quality = enforce.quality_gate(
+    ranked = trust.rrf_rank(searched, rag.rank(searched, hits))
+    results, quality = trust.quality_gate(
         (_brief_result(hit) for hit in ranked[:num_results]), query=searched
     )
     data = {
@@ -323,20 +316,12 @@ def web_search(query, config, num_results=5, **options) -> dict:
     searched, corrections = _prepare_query(query, raw, options.get("context"))
     refine = not enforce.enforcement_disabled(raw)
     providers, include_library = _resolve_sources(config, options)
-    request = _SearchRequest(
-        searched,
-        config,
-        num_results,
-        num_results,
-        refine,
-        providers,
-        include_library,
-    )
+    request = _SearchRequest(searched, config, num_results, num_results, refine, providers, include_library)
     searched, hits = _run_engine_search(request, corrections)
-    ranked_hits = enforce.rrf_rank(searched, rag.rank(searched, hits))[:num_results]
+    ranked_hits = trust.rrf_rank(searched, rag.rank(searched, hits))[:num_results]
     chunks, citations, result_ids = _search_details(ranked_hits)
     ranked_chunks = rag.rank(searched, chunks) if chunks else []
-    tagged, quality = enforce.quality_gate(citations, query=searched)
+    tagged, quality = trust.quality_gate(citations, query=searched)
     data = {
         "query": searched,
         "summary": _cap_chars(_summary(ranked_chunks), _SUMMARY_MAX_CHARS),
@@ -428,7 +413,7 @@ def deep_research(query, config, max_rounds=3, **options) -> dict:
 
 def _failed_deep_response(query, failure, response=None):
     if response is None:
-        _, quality = enforce.quality_gate([])
+        _, quality = trust.quality_gate([])
         response = {
             "query": query,
             "summary": "",
@@ -470,9 +455,7 @@ def _deep_fallback(sub_query, config, response, scientific=False, platform=None)
     fallback_query = response.get("query", sub_query)
     try:
         if scientific or platform is not None:
-            quick = _call_literal_quick(
-                fallback_query, config, scientific=True, platform=platform
-            )
+            quick = _call_literal_quick(fallback_query, config, scientific=True, platform=platform)
         else:
             quick = _call_literal_quick(fallback_query, config)
     except engines.AllProvidersFailed as exc:
@@ -480,9 +463,7 @@ def _deep_fallback(sub_query, config, response, scientific=False, platform=None)
     results = quick.get("results", [])
     if not results:
         return response
-    citations, quality = enforce.quality_gate(
-        (_citation(result) for result in results), query=fallback_query
-    )
+    citations, quality = trust.quality_gate((_citation(result) for result in results), query=fallback_query)
     data = {
         "query": quick.get("query", sub_query),
         "summary": _cap_chars(_summary(results), _SUMMARY_MAX_CHARS),
@@ -526,7 +507,7 @@ def _corrective_rounds(response) -> int:
 
 def _deep_research(query: str, max_rounds: int, search):
     searches, queries = _deep_searches(query, max_rounds, search)
-    citations, quality = enforce.quality_gate(
+    citations, quality = trust.quality_gate(
         _dedupe_citations(searches), query=query
     )
     sections = _deep_sections(searches, queries)
@@ -635,9 +616,9 @@ def _run_context_search(options: _ContextOptions):
     searched, pool, corrections = _gather_pool(_pool_options(options), memory)
     rank_query = _context_rank_query(searched, options.context)
     kept, suppressed = _suppress_seen(
-        enforce.rrf_rank(rank_query, rag.rank(rank_query, pool)), memory["seen_urls"]
+        trust.rrf_rank(rank_query, rag.rank(rank_query, pool)), memory["seen_urls"]
     )
-    labeled, quality = enforce.quality_gate(
+    labeled, quality = trust.quality_gate(
         (_label(hit) for hit in kept), query=rank_query
     )
     _remember_context_results(labeled, memory)
@@ -729,19 +710,8 @@ def _append_context_round(pool, query, options, providers=None):
 
 def _gather_pool(options: _PoolOptions, memory):
     searched, corrections = _prepare_query(options.query, options.raw)
-    providers, include_library = _resolve_sources(
-        options.config,
-        {"scientific": options.scientific, "platform": options.platform},
-    )
-    request = _SearchRequest(
-        searched,
-        options.config,
-        options.per_engine,
-        options.per_engine * 6,
-        not enforce.enforcement_disabled(options.raw),
-        providers,
-        include_library,
-    )
+    providers, include_library = _resolve_sources(options.config, {"scientific": options.scientific, "platform": options.platform})
+    request = _SearchRequest(searched, options.config, options.per_engine, options.per_engine * 6, not enforce.enforcement_disabled(options.raw), providers, include_library)
     searched, pool, failure, succeeded = _initial_context_pool(request, corrections)
     if searched not in memory["issued_queries"]:
         memory["issued_queries"].append(searched)
@@ -832,7 +802,7 @@ def _citation(hit):
         "relevance": hit.get("relevance", 0.0),
         "categories": hit.get("categories", []),
         "confidence": hit.get("confidence")
-        or enforce.source_tier(hit.get("url", ""), hit),
+        or trust.source_tier(hit.get("url", ""), hit),
         **({"citation_count": hit["citation_count"]} if "citation_count" in hit else {}),
     }
 

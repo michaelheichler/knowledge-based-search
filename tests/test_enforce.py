@@ -9,6 +9,7 @@ import pytest
 
 cli = importlib.import_module("cli")
 enforce = importlib.import_module("enforce")
+trust = importlib.import_module("trust")
 engines = importlib.import_module("engines")
 rag = importlib.import_module("rag")
 search_core = importlib.import_module("search_core")
@@ -339,7 +340,7 @@ def test_deep_raw_dispatches_literal_query_once(monkeypatch, use_flag) -> None:
 
 def test_quality_gate_tags_tiers_and_diversity() -> None:
     """Expose cheap source tiers and distinct-domain corroboration."""
-    tagged, quality = enforce.quality_gate(
+    tagged, quality = trust.quality_gate(
         [
             _hit("https://data.gov/report"),
             _hit("https://reuters.com/story"),
@@ -361,13 +362,13 @@ def test_quality_gate_tags_tiers_and_diversity() -> None:
 
 def test_untrusted_docs_subdomain_stays_unknown() -> None:
     """Do not grant trust from a docs or developer hostname prefix alone."""
-    assert enforce.source_tier("https://docs.attacker.example/page") == "unknown"
-    assert enforce.source_tier("https://data.gov.au/report") == "primary"
+    assert trust.source_tier("https://docs.attacker.example/page") == "unknown"
+    assert trust.source_tier("https://data.gov.au/report") == "primary"
 
 
 def test_unrelated_domains_do_not_claim_corroboration() -> None:
     """Require lexical support as well as independent domains."""
-    _, quality = enforce.quality_gate(
+    _, quality = trust.quality_gate(
         [
             _hit("https://one.example/a", title="Alpha climate", snippet="warming"),
             _hit("https://two.example/b", title="Beta finance", snippet="markets"),
@@ -381,7 +382,7 @@ def test_unrelated_domains_do_not_claim_corroboration() -> None:
 
 def test_generic_report_terms_do_not_claim_corroboration() -> None:
     """Publication labels cannot establish shared claim support."""
-    _, quality = enforce.quality_gate(
+    _, quality = trust.quality_gate(
         [
             _hit(
                 "https://one.example/a",
@@ -403,7 +404,7 @@ def test_generic_report_terms_do_not_claim_corroboration() -> None:
 def test_root_domain_handles_country_and_tenant_suffixes() -> None:
     """Keep independent country and hosted-project domains distinct."""
     urls = ["https://a.co.nz", "https://b.co.nz", "https://foo.github.io"]
-    assert [enforce.root_domain(url) for url in urls] == [
+    assert [trust.root_domain(url) for url in urls] == [
         "a.co.nz",
         "b.co.nz",
         "foo.github.io",
@@ -412,7 +413,7 @@ def test_root_domain_handles_country_and_tenant_suffixes() -> None:
 
 def test_quality_gate_flags_collapsed_domains() -> None:
     """Flag a top set whose URLs collapse to two root domains."""
-    _, quality = enforce.quality_gate(
+    _, quality = trust.quality_gate(
         [
             _hit("https://a.example.com/one"),
             _hit("https://b.example.com/two"),
