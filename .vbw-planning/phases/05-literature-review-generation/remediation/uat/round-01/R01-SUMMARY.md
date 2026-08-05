@@ -5,11 +5,13 @@ title: "Analysis section quote redesign, attribution integrity gate, Conduct/met
 type: remediation
 status: partial
 completed: 2026-08-05
-tasks_completed: 3
+tasks_completed: 5
 tasks_total: 7
 commit_hashes:
   - c7cf4dafd3db555daedd3c4eb682fc31696e5082
   - 2baec3b
+  - a107e7e
+  - 18a0c81
 files_modified:
   - server/science_engines.py
   - server/review_synthesis.py
@@ -84,3 +86,32 @@ Task 1 marks CrossRef snippets as metadata and excludes them from claim generati
 - `python3 -m pytest server/tests/` passed: 221 passed, 1 skipped.
 - Legacy integrity names are absent from `server/` Python sources.
 - AST parsing passed for all three changed review modules.
+
+## Task 4: Fix Conduct section model shape
+
+### What Was Built
+- Conduct now renders one Title Case Search Scope subsection with composed pool-count prose, while machine-readable source pool counts remain available at the model top level.
+- Non-empty terminology alternatives render as numbered term-plus-note lines, and empty alternatives omit the subsection.
+- Verified with 30 targeted tests, 223 server tests plus 1 skip, and direct render checks for empty and populated alternatives.
+
+### Files Modified
+- `server/review_synthesis.py` -- separates machine Conduct data from the generic rendered mapping.
+- `server/tests/test_review_synthesis.py` -- covers heading, count, and terminology rendering contracts.
+- Commit: `a107e7e`.
+
+## Task 5: Rewrite methodology.md generation
+
+### What Was Built
+- Replaced the fixed methodology skeleton with connected Classification, Design, Conduct, Analysis, Write-up, Integrity check, and Limitations sections.
+- Methodology output now narrates real source-pool counts, trust tiers from `server/data/trust.json`, terminology alternatives, theme names, page outcomes, and quote and citation integrity guarantees. Only Limitations contains the `[AGENT:` placeholder.
+
+### Files Modified
+- `server/review.py` -- generates the Kitchenham-shaped methodology narrative and reports configured pool trust tiers.
+- `server/tests/test_review.py` -- verifies every section, run data, empty and populated terminology alternatives, and the sole agent placeholder.
+
+### Verification
+- `python3 -m pytest server/tests/test_review.py -x` passed: 9 passed.
+- `python3 -m pytest server/tests/ -x` passed: 224 passed, 1 skipped.
+- Manual generation with five hits across arXiv, PubMed, Semantic Scholar, and CrossRef produced connected narrative with real counts and trust values, one terminology list, and one `[AGENT:` placeholder confined to Limitations.
+- `python3 -m py_compile server/review.py server/tests/test_review.py` passed.
+- Commit: `18a0c81`.
