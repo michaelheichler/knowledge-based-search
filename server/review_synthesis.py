@@ -285,3 +285,110 @@ def integrity_result(claims) -> dict:
     """Required because the synthesis boundary exposes the existing fail-closed gate."""
     return review_integrity.check_claims(claims)
 
+
+MIN_CLAIMS = 2
+
+
+def _pool_counts(hits) -> dict:
+    """Required because provider provenance keeps conduct counts auditable."""
+    counts = Counter()
+    for hit in hits:
+        engines = hit.get("engines") or hit.get("engine") or "unknown"
+        engines = [engines] if isinstance(engines, str) else engines
+        counts.update(str(engine) for engine in engines if str(engine).strip())
+    return dict(counts)
+
+
+def _rebuild_views(model, claims, withheld=None) -> dict:
+    """Required because rebuilding views from claims prevents orphaned citations after page fitting."""
+    active = list(claims)
+    pool = list(model.get("_bibliography_pool", model.get("bib", [])))
+    keys = {claim.get("citation_key") for claim in active}
+    bibliography = [entry for entry in pool if entry.get("key") in keys]
+    analysis = defaultdict(list)
+    for claim in active:
+        analysis[claim.get("theme", RELATED_THEME)].append(claim.get("claim_sentence", ""))
+    result = dict(model)
+    result.update({
+        "claims": active, "bib": bibliography, "analysis": dict(analysis),
+        "write_up": [claim.get("claim_sentence", "") for claim in active],
+        "write_up_order": list(analysis), "chart": chart_from_bibliography(bibliography),
+        "formulas": _unique(f for claim in active for f in _formula_matches(str(claim.get("source_text") or ""))),
+        "_withheld_claims": list(withheld or []),
+    })
+    return result
+
+
+def build_model(query, hits, alternatives=None) -> dict:
+    """The four Snyder phases keep method, evidence, synthesis, and output distinct."""
+    selected = list(hits)
+    themes = group_themes(selected, query=query)
+    bibliography = build_bibliography(selected)
+    claims = build_claims(themes, query, bibliography)
+    if len(claims) < MIN_CLAIMS:
+        return {"status": "error", "error": "minimum_claims", "minimum_claims": MIN_CLAIMS}
+    question = f"What does the available literature report about {str(query).strip()}?"
+    pools = _pool_counts(selected)
+    model = {
+        "status": "ok", "title": f"Rapid Review: {str(query).strip()}", "question": question,
+        "design": {"topic": str(query).strip(), "question": question, "classification":
+                   "This report is a Rapid Review, not a Systematic Review, and does not claim exhaustive retrieval."},
+        "conduct": {"source_pools": pools, "search_scope":
+                    {pool: f"{count} ranked hit(s) from {pool}." for pool, count in pools.items()},
+                    "terminology_alternatives": list(alternatives or [])},
+        "analysis": {}, "write_up": [], "bib": bibliography, "chart": {}, "formulas": [],
+        "claims": claims, "_bibliography_pool": bibliography,
+    }
+    return _rebuild_views(model, claims)
+
+
+def shrink(model) -> dict:
+    """Page fitting removes complete claims so citation boundaries remain intact."""
+    if model.get("status") != "ok":
+        return model
+    claims = list(model.get("claims", []))
+    if len(claims) <= MIN_CLAIMS:
+        return model
+    index = max(range(len(claims)), key=lambda i: claims[i].get("rank", i))
+    withheld = list(model.get("_withheld_claims", []))
+    withheld.append(claims.pop(index))
+    return _rebuild_views(model, claims, withheld)
+
+
+def grow(model) -> dict:
+    """Page fitting restores withheld evidence without rewriting its attribution."""
+    if model.get("status") != "ok":
+        return model
+    withheld = list(model.get("_withheld_claims", []))
+    if not withheld:
+        return model
+    index = min(range(len(withheld)), key=lambda i: withheld[i].get("rank", i))
+    claims = list(model.get("claims", []))
+    claims.append(withheld.pop(index))
+    claims.sort(key=lambda claim: claim.get("rank", len(claims)))
+    return _rebuild_views(model, claims, withheld)
+
+
+def claims_for_integrity(model) -> list:
+    """The integrity gate must not receive synthesis-only metadata."""
+    return [{key: claim.get(key, "") for key in ("claim_sentence", "source_id", "source_text")}
+            for claim in model.get("claims", [])]
+
+
+def drop_flagged(model, flags) -> dict:
+    """Flagged evidence must disappear with its citation rather than leave an orphan."""
+    if model.get("status") != "ok":
+        return model
+    flags = list(flags or [])
+    ids = {flag.get("source_id") for flag in flags}
+    sentences = {flag.get("claim_sentence") for flag in flags}
+    keep = lambda claim: claim.get("source_id") not in ids and claim.get("claim_sentence") not in sentences
+    claims = [claim for claim in model.get("claims", []) if keep(claim)]
+    withheld = [claim for claim in model.get("_withheld_claims", []) if keep(claim)]
+    if len(claims) < MIN_CLAIMS:
+        return {"status": "error", "error": "minimum_claims", "minimum_claims": MIN_CLAIMS}
+    keys = {claim.get("citation_key") for claim in [*claims, *withheld]}
+    result = dict(model)
+    result["_bibliography_pool"] = [entry for entry in model.get("_bibliography_pool", model.get("bib", [])) if entry.get("key") in keys]
+    return _rebuild_views(result, claims, withheld)
+

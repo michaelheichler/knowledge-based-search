@@ -1,6 +1,7 @@
 """Pin deterministic theme and bibliography assembly for review synthesis."""
 
 import rag
+import review_latex
 import review_synthesis
 
 
@@ -170,3 +171,121 @@ def test_review_integrity_accepts_claim_shape(monkeypatch) -> None:
         "pass",
         "flagged",
     }
+
+
+def _model_hits() -> list:
+    return [
+        _hit(
+            "https://physics.example/one",
+            title="Physics one",
+            categories=["Physics"],
+            date="2020-01-01",
+            snippet="Quantum retrieval improves measured accuracy in controlled trials.",
+        ),
+        _hit(
+            "https://physics.example/two",
+            title="Physics two",
+            categories=["Physics"],
+            date="2021-01-01",
+            snippet="Quantum retrieval reduces error across repeated measurements.",
+        ),
+        _hit(
+            "https://medicine.example/one",
+            title="Medicine one",
+            categories=["Medicine"],
+            date="2021-06-01",
+            snippet="Clinical teams report stronger outcomes after retrieval training.",
+        ),
+        _hit(
+            "https://medicine.example/two",
+            title="Medicine two",
+            categories=["Medicine"],
+            date="2022-06-01",
+            snippet="Clinical studies associate retrieval practice with better outcomes.",
+        ),
+    ]
+
+
+def test_build_model_contains_four_phases_and_source_pool_counts() -> None:
+    alternatives = [{"term": "information retrieval", "note": "broader term"}]
+
+    model = review_synthesis.build_model("quantum retrieval", _model_hits(), alternatives)
+
+    assert model["status"] == "ok"
+    assert {"design", "conduct", "analysis", "write_up"} <= model.keys()
+    assert model["conduct"]["source_pools"] == {"arxiv": 4}
+    assert model["conduct"]["terminology_alternatives"] == alternatives
+    assert set(model["analysis"]) == {"physics", "medicine"}
+    assert review_latex.render_tex(model)
+
+
+def test_shrink_and_grow_drop_whole_claims_and_restore_bibliography() -> None:
+    model = review_synthesis.build_model("quantum retrieval", _model_hits(), [])
+    original_keys = {entry["key"] for entry in model["bib"]}
+
+    smaller = review_synthesis.shrink(model)
+    grown = review_synthesis.grow(smaller)
+
+    assert len(smaller["claims"]) == len(model["claims"]) - 1
+    assert {entry["key"] for entry in smaller["bib"]} < original_keys
+    assert len(grown["claims"]) == len(model["claims"])
+    assert {entry["key"] for entry in grown["bib"]} == original_keys
+
+
+def test_drop_flagged_removes_orphaned_bibliography_entries() -> None:
+    model = review_synthesis.build_model("quantum retrieval", _model_hits(), [])
+    flagged = [{"source_id": model["claims"][0]["source_id"]}]
+
+    filtered = review_synthesis.drop_flagged(model, flagged)
+    claimed_keys = {claim["citation_key"] for claim in filtered["claims"]}
+
+    assert filtered["status"] == "ok"
+    assert all(entry["key"] in claimed_keys for entry in filtered["bib"])
+    assert len(filtered["claims"]) == len(model["claims"]) - 1
+
+
+def test_build_model_returns_error_below_minimum_claim_floor() -> None:
+    model = review_synthesis.build_model("quantum retrieval", _model_hits()[:1], [])
+
+    assert model["status"] == "error"
+    assert model["error"] == "minimum_claims"
+    assert model["minimum_claims"] == review_synthesis.MIN_CLAIMS
+
+
+def test_claims_for_integrity_exposes_only_gate_contract() -> None:
+    model = review_synthesis.build_model("quantum retrieval", _model_hits(), [])
+
+    claims = review_synthesis.claims_for_integrity(model)
+
+    assert all(
+        set(claim) == {"claim_sentence", "source_id", "source_text"}
+        for claim in claims
+    )
+    assert len(claims) == len(model["claims"])
+
+
+def test_drop_flagged_returns_error_when_floor_would_be_breached() -> None:
+    model = review_synthesis.build_model("quantum retrieval", _model_hits()[:2], [])
+    flags = [{"source_id": claim["source_id"]} for claim in model["claims"]]
+
+    result = review_synthesis.drop_flagged(model, flags)
+
+    assert result["status"] == "error"
+    assert result["error"] == "minimum_claims"
+
+
+def test_shrink_at_floor_and_grow_without_withheld_claims_are_unchanged() -> None:
+    model = review_synthesis.build_model("quantum retrieval", _model_hits()[:2], [])
+
+    assert review_synthesis.shrink(model) == model
+    assert review_synthesis.grow(model) == model
+
+
+def test_render_tex_accepts_the_assembled_model() -> None:
+    model = review_synthesis.build_model("quantum retrieval", _model_hits(), [])
+
+    tex = review_latex.render_tex(model)
+
+    assert "\\section{Analysis}" in tex
+    assert "\\citep{" in tex
+    assert "\\bibliography{review}" in tex
