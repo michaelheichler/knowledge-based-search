@@ -1,0 +1,19 @@
+server/science_engines.py
+  s_3c155de8533c9a::t_fc75fd993fc055 197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "4220363af17387940759cef28e4fece68e3f3344",
+  "prompts": {},
+  "sessions": {
+    "s_3c155de8533c9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e72df891-4c72-40d8-b214-4236c48adad8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
