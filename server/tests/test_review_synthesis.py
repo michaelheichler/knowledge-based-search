@@ -276,7 +276,7 @@ def test_build_model_contains_four_phases_and_source_pool_counts() -> None:
     assert {"design", "conduct", "analysis", "write_up"} <= model.keys()
     assert model["source_pools"] == {"arxiv": 4}
     assert model["terminology_alternatives"] == alternatives
-    assert model["conduct"]["Search Scope"] == ["4 ranked hit(s) from arxiv."]
+    assert model["conduct"]["Search Scope"] == "This review searched arxiv (4 ranked hit(s))."
     assert model["conduct"]["Terminology Alternatives"] == [
         "1. information retrieval (broader term)"
     ]
@@ -300,6 +300,21 @@ def test_rendered_conduct_has_one_search_scope_and_no_empty_alternatives() -> No
     assert "\\subsection{arxiv}" not in block
     assert not re.search(r"(?m)^\\d+$", block)
     assert "\\subsection{Terminology Alternatives}" not in block
+
+
+def test_rendered_conduct_keeps_multi_pool_scope_in_one_paragraph() -> None:
+    hits = _model_hits()
+    for hit in hits[2:]:
+        hit["engines"] = ["pubmed"]
+    model = review_synthesis.build_model("quantum retrieval", hits, [])
+
+    scope_body = _conduct_block(model).split("\\subsection{Search Scope}\n", 1)[1]
+    scope_body = scope_body.split("\n\n\\subsection", 1)[0]
+
+    assert "\n\n" not in scope_body
+    assert scope_body.strip() == (
+        "This review searched arxiv (2 ranked hit(s)), pubmed (2 ranked hit(s))."
+    )
 
 
 def test_rendered_conduct_formats_nonempty_terminology_alternatives() -> None:

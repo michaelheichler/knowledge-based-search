@@ -311,7 +311,14 @@ def _rendered_conduct(pools, alternatives) -> tuple:
     search_scope = {
         pool: f"{count} ranked hit(s) from {pool}." for pool, count in pools.items()
     }
-    conduct = {"Search Scope": list(search_scope.values())}
+    pool_summary = ", ".join(
+        f"{pool} ({count} ranked hit(s))" for pool, count in pools.items()
+    )
+    conduct = {
+        "Search Scope": f"This review searched {pool_summary}."
+        if pool_summary
+        else "No source pools were recorded."
+    }
     if alternatives:
         conduct["Terminology Alternatives"] = [
             f"{index}. {item.get('term', '')}"
