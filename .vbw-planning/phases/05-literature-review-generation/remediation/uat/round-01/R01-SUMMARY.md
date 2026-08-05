@@ -71,7 +71,7 @@ Task 1 marks CrossRef snippets as metadata and excludes them from claim generati
 - None.
 
 ### Deviations
-- Two prior execution attempts at this task were interrupted mid-stream by an unrelated infrastructure error (API response stalled), leaving `review_latex.py` briefly with a syntax error on the first attempt. That broken, uncommitted work was reverted with `git restore` before retrying. The final landed diff shown in commit `2baec3b` is the complete, tested implementation, not a residual of either failed attempt.
+- Two execution attempts at Task 2 were interrupted mid-stream by an unrelated infrastructure error (API response stalled). The first left review_latex.py briefly with a syntax error, and both attempts' broken, uncommitted work were reverted with git restore before retrying. The landed commit 2baec3b is the complete, tested implementation.
 
 ## Task 3: Replace check_claims with the check_quotes attribution gate
 
@@ -164,7 +164,8 @@ Task 1 marks CrossRef snippets as metadata and excludes them from claim generati
 - None.
 
 ### Deviations
-- See the round-level `deviations` array in this file's frontmatter for the PubMed-metadata finding and the discarded follow-on refactor. Both are recorded there, not duplicated here.
+- The Task 7 smoke run surfaced a real defect the research/plan did not anticipate: PubMed's ESummary snippet (server/science_engines.py's _pubmed_hit) is journal-name-plus-date metadata, not abstract prose, the same defect class as CrossRef. Fixed by reusing the existing source_text_is_metadata guard (commit 4220363).
+- A follow-on, uncommitted refactor attempt (adding a _view_bibliography helper to retain metadata-flagged hits' bibliography entries in the final rendered bib) was started during that same interrupted Task 7 attempt but never fully wired in. Direct testing confirmed completing it as started would have reintroduced review_latex.py's uncited-bibliography-entries render failure, since retained-but-uncited entries fail _validate_citations. Discarded with git restore rather than completed. The correct, already-consistent behavior is unchanged: metadata-flagged hits count in _pool_counts/Conduct search scope but are not retained in the final citable bibliography, since nothing quotes them.
 
 ### Verification
 - `python3 -m pytest server/tests/ -q`: 224 passed, 1 skipped (unchanged from Task 6, this task added no new test-suite changes beyond the PubMed one-line guard already covered by Task 1's existing CrossRef-pattern tests).
