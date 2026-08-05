@@ -1,7 +1,11 @@
 """Local LaTeX boundary; contract: raw title/question, cited Snyder prose, bib records, year counts, extracted formulas."""
 
+import contextlib
+import os
 import re
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -21,6 +25,10 @@ _LATEX_ESCAPES = {
     "~": r"\textasciitilde{}",
     "^": r"\textasciicircum{}",
 }
+PAGE_MIN = 2
+PAGE_MAX = 4
+# ponytail: fixed retry budget, raise only after measured layout failures.
+PAGE_RETRY_BUDGET = 3
 
 
 def _escape_raw(value) -> str:
@@ -206,3 +214,102 @@ def run_compile(tex_dir, jobname) -> dict:
 def page_count(pdf_path) -> int:
     """pypdf avoids a second external process for page-bound checks."""
     return len(PdfReader(pdf_path).pages)
+
+
+def _atomic_publish(source, destination) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=destination.name + ".", dir=destination.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as handle, Path(source).open("rb") as origin:
+            shutil.copyfileobj(origin, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, destination)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.close(fd)
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
+
+
+def _compile_attempt(model, directory) -> dict:
+    directory.mkdir(parents=True, exist_ok=True)
+    tex_path = directory / "review.tex"
+    bib_path = directory / "review.bib"
+    tex_path.write_text(render_tex(model), encoding="utf-8")
+    bib_path.write_text(render_bib(model), encoding="utf-8")
+    result = run_compile(directory, "review")
+    if result["status"] != "ok":
+        return result
+    result["pages"] = page_count(result["pdf_path"])
+    result["tex_path"] = str(tex_path)
+    result["bib_path"] = str(bib_path)
+    return result
+
+
+def _in_page_range(pages) -> bool:
+    return PAGE_MIN <= pages <= PAGE_MAX
+
+
+def _publish_attempt(attempt, output) -> dict:
+    paths = {
+        "tex_path": output / "review.tex",
+        "bib_path": output / "review.bib",
+        "pdf_path": output / "review.pdf",
+    }
+    for key, destination in paths.items():
+        _atomic_publish(attempt[key], destination)
+    return {
+        "status": "ok",
+        "pdf_path": str(paths["pdf_path"]),
+        "tex_path": str(paths["tex_path"]),
+        "pages": attempt["pages"],
+    }
+
+
+def _publish_selected(selected, attempts, output) -> dict:
+    """Warnings describe the chosen artifact because later attempts may be farther away."""
+    result = _publish_attempt(selected, output)
+    if not _in_page_range(selected["pages"]):
+        result["warning"] = (
+            f"final page count {selected['pages']} remained outside "
+            f"the {PAGE_MIN}-{PAGE_MAX} page range after {len(attempts)} attempts"
+        )
+    return result
+
+
+def _compile_candidates(model, directory, callbacks) -> list:
+    shrink, grow = callbacks
+    current = model
+    attempts = []
+    remaining = PAGE_RETRY_BUDGET
+    while remaining:
+        remaining -= 1
+        attempt = _compile_attempt(current, directory / f"attempt-{len(attempts) + 1}")
+        attempts.append(attempt)
+        if attempt["status"] != "ok" or _in_page_range(attempt["pages"]):
+            break
+        if remaining:
+            current = grow(current) if attempt["pages"] < PAGE_MIN else shrink(current)
+    return attempts
+
+
+def compile_review(model, out_dir, shrink, grow) -> dict:
+    """Compile, bound page count, and publish the nearest valid review attempt."""
+    output = Path(out_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".review-", dir=output) as temporary:
+        attempts = _compile_candidates(model, Path(temporary), (shrink, grow))
+        if attempts[-1]["status"] != "ok":
+            return attempts[-1]
+        selected = next(
+            (attempt for attempt in attempts if _in_page_range(attempt["pages"])),
+            None,
+        ) or min(attempts, key=lambda item: _page_distance(item["pages"]))
+        return _publish_selected(selected, attempts, output)
+
+
+def _page_distance(pages) -> int:
+    return max(PAGE_MIN - pages, 0, pages - PAGE_MAX)

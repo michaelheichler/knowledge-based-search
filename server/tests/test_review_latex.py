@@ -2,6 +2,7 @@
 
 import shutil
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 import review_latex
@@ -149,4 +150,96 @@ def test_rendered_model_compiles_with_the_validated_toolchain(tmp_path: Path) ->
     assert result["status"] == "ok"
     assert Path(result["pdf_path"]).is_file()
     assert review_latex.page_count(result["pdf_path"]) >= 1
+
+
+def _stub_compile(directory, jobname) -> dict:
+    """Subprocesses remain mocked because page-count scenarios must be deterministic."""
+    pdf_path = Path(directory) / f"{jobname}.pdf"
+    pdf_path.write_bytes(b"compiled-pdf")
+    return {"status": "ok", "pdf_path": str(pdf_path)}
+
+
+def _assert_final_artifacts(output: Path) -> None:
+    assert {path.name for path in output.iterdir()} == {
+        "review.tex",
+        "review.bib",
+        "review.pdf",
+    }
+
+
+def test_compile_review_publishes_first_in_range_attempt_atomically(tmp_path, monkeypatch) -> None:
+    """Intermediate attempts stay private so consumers only see final artifacts."""
+    run_compile = Mock(side_effect=_stub_compile)
+    monkeypatch.setattr(review_latex, "run_compile", run_compile)
+    monkeypatch.setattr(review_latex, "page_count", lambda _path: 3)
+    shrink = Mock()
+    grow = Mock()
+
+    result = review_latex.compile_review(_MODEL, tmp_path, shrink, grow)
+
+    assert result["status"] == "ok"
+    assert result["pages"] == 3
+    assert run_compile.call_count == 1
+    assert not shrink.called
+    assert not grow.called
+    _assert_final_artifacts(tmp_path)
+    assert (tmp_path / "review.pdf").read_bytes() == b"compiled-pdf"
+
+
+def test_compile_review_shrinks_once_before_accepting_in_range_attempt(tmp_path, monkeypatch) -> None:
+    """A page overflow must be corrected before another compile is accepted."""
+    pages = iter((5, 3))
+    run_compile = Mock(side_effect=_stub_compile)
+    monkeypatch.setattr(review_latex, "run_compile", run_compile)
+    monkeypatch.setattr(review_latex, "page_count", lambda _path: next(pages))
+    shrink = Mock(side_effect=lambda model: model)
+    grow = Mock(side_effect=lambda model: model)
+
+    result = review_latex.compile_review(_MODEL, tmp_path, shrink, grow)
+
+    assert result["status"] == "ok"
+    assert result["pages"] == 3
+    assert run_compile.call_count == 2
+    assert shrink.call_count == 1
+    assert grow.call_count == 0
+
+
+def test_compile_review_uses_nearest_attempt_after_retry_budget(tmp_path, monkeypatch) -> None:
+    """Preserve the nearest artifact when the fixed retry budget cannot fit layout."""
+    pages = iter((1, 6, 6))
+    run_compile = Mock(side_effect=_stub_compile)
+    monkeypatch.setattr(review_latex, "run_compile", run_compile)
+    monkeypatch.setattr(review_latex, "page_count", lambda _path: next(pages))
+    shrink = Mock(side_effect=lambda model: model)
+    grow = Mock(side_effect=lambda model: model)
+
+    result = review_latex.compile_review(_MODEL, tmp_path, shrink, grow)
+
+    assert result["status"] == "ok"
+    assert result["pages"] == 1
+    assert "final page count 1" in result["warning"]
+    assert run_compile.call_count == review_latex.PAGE_RETRY_BUDGET
+    assert shrink.call_count == 1
+    assert grow.call_count == 1
+    _assert_final_artifacts(tmp_path)
+
+
+def test_compile_review_returns_compile_error_without_publishing(tmp_path, monkeypatch) -> None:
+    """A compile error is returned unchanged and cannot publish partial artifacts."""
+    error = {"status": "error", "error": "CalledProcessError", "log_tail": "fatal"}
+    run_compile = Mock(return_value=error)
+    monkeypatch.setattr(review_latex, "run_compile", run_compile)
+    page_count = Mock()
+    monkeypatch.setattr(review_latex, "page_count", page_count)
+    shrink = Mock()
+    grow = Mock()
+
+    result = review_latex.compile_review(_MODEL, tmp_path, shrink, grow)
+
+    assert result == error
+    assert run_compile.call_count == 1
+    assert not page_count.called
+    assert not shrink.called
+    assert not grow.called
+    assert list(tmp_path.iterdir()) == []
 
