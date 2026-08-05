@@ -123,6 +123,7 @@ def _query_command(sub, name, help_text, **options):
         command.add_argument("--raw", action="store_true")
         command.add_argument("--scientific", action="store_true")
         command.add_argument("--platform", action="append", default=None)
+        command.add_argument("--literature-review", action="store_true")
     if default_limit is not None:
         command.add_argument("--num-results", type=int, default=default_limit)
     return command
@@ -336,9 +337,11 @@ def _daemon_status():
 
 
 def _validate_platform_args(args) -> None:
-    """Query dispatch uses one validation seam because platform errors must stay identical."""
+    """Query dispatch uses one validation seam because gated flags must stay identical."""
     if args.platform and not args.scientific:
         raise BadArgsError("--platform requires --scientific")
+    if getattr(args, "literature_review", False) and not args.scientific:
+        raise BadArgsError("--literature-review requires --scientific")
     valid_platforms = engines.SCIENTIFIC_PLATFORMS | {"library"}
     invalid = sorted(item for item in (args.platform or []) if item not in valid_platforms)
     if invalid:
@@ -348,19 +351,28 @@ def _validate_platform_args(args) -> None:
         )
 
 
+def _query_options(args) -> dict:
+    """Why: one option map prevents query commands from drifting apart."""
+    options = {"raw": True} if args.raw else {}
+    if args.scientific:
+        options.update({"scientific": True, "platform": args.platform})
+    if args.literature_review:
+        options["literature_review"] = True
+    return options
+
+
 def _dispatch_query(args, stdin, config):
     """This boundary is shared because every query command needs identical enforcement."""
     _validate_platform_args(args)
     literal = enforce.enforcement_disabled(args.raw)
     query = _query(args.query, stdin, literal)
-    raw = {"raw": True} if args.raw else {}
-    sci = {"scientific": True, "platform": args.platform} if args.scientific else {}
+    options = _query_options(args)
     if args.command == "quick":
-        return search_core.quick_web_search(query, config, args.num_results, **raw, **sci)
+        return search_core.quick_web_search(query, config, args.num_results, **options)
     if args.command == "search":
-        return search_core.web_search(query, config, args.num_results, **raw, **sci)
+        return search_core.web_search(query, config, args.num_results, **options)
     if args.command == "deep":
-        return search_deep.deep_research(query, config, args.max_rounds, **raw, **sci)
+        return search_deep.deep_research(query, config, args.max_rounds, **options)
     return search_context.deep_context_aware_search(
         query,
         config,
@@ -369,8 +381,7 @@ def _dispatch_query(args, stdin, config):
         args.per_engine,
         args.fetch_top_k,
         args.session,
-        **raw,
-        **sci,
+        **options,
     )
 
 

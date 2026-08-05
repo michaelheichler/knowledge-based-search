@@ -4,10 +4,12 @@
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 import enforce
 import engines
 import rag
+import review
 import state as context_state  # type: ignore[import-not-found]
 import trust
 from fetch import fetch_clean
@@ -95,6 +97,12 @@ def _terminology_metadata(query) -> dict:
     if not alternatives:
         return {}
     return {"terminology_alternatives": alternatives, "terminology_query": query}
+
+
+def _generate_literature_review(query, ranked_hits) -> dict:
+    """Why: the review must reuse ranked scientific hits without another search path."""
+    alternatives = _terminology_alternatives(query)
+    return review.generate_review(query, ranked_hits, alternatives, Path.cwd())
 
 
 def _run_engine_search(request: _SearchRequest, corrections):
@@ -257,6 +265,8 @@ def quick_web_search(query, config, num_results=8, **options) -> dict:
     request = _SearchRequest(searched, config, num_results, num_results, refine, providers, include_library)
     searched, hits = _run_engine_search(request, corrections)
     ranked = trust.rrf_rank(searched, rag.rank(searched, hits))
+    if options.get("literature_review"):
+        return _generate_literature_review(query, ranked)
     results, quality = trust.quality_gate(
         (_brief_result(hit) for hit in ranked[:num_results]), query=searched
     )
@@ -272,22 +282,15 @@ def quick_web_search(query, config, num_results=8, **options) -> dict:
     return _with_provider_outcomes(data, hits)
 
 
-def web_search(query, config, num_results=5, **options) -> dict:
-    """Fetch and summarize ranked results with transparent enforcement metadata."""
-    raw = bool(options.get("raw", False))
-    num_results = _bounded_int(num_results, 1, 10)
-    searched, corrections = _prepare_query(query, raw, options.get("context"))
-    refine = not enforce.enforcement_disabled(raw)
-    providers, include_library = _resolve_sources(config, options)
-    request = _SearchRequest(searched, config, num_results, num_results, refine, providers, include_library)
-    searched, hits = _run_engine_search(request, corrections)
-    ranked_hits = trust.rrf_rank(searched, rag.rank(searched, hits))[:num_results]
-    chunks, citations, result_ids = _search_details(ranked_hits)
-    ranked_chunks = rag.rank(searched, chunks) if chunks else []
+def _web_response(searched, details, corrections, query, options, hits) -> dict:
+    """Why: one response builder keeps review and ordinary search metadata aligned."""
+    chunks, citations, result_ids = details
     tagged, quality = trust.quality_gate(citations, query=searched)
     data = {
         "query": searched,
-        "summary": _cap_chars(_summary(ranked_chunks), _SUMMARY_MAX_CHARS),
+        "summary": _cap_chars(
+            _summary(rag.rank(searched, chunks) if chunks else []), _SUMMARY_MAX_CHARS
+        ),
         "citations": tagged,
         "result_ids": result_ids,
         "corrections": corrections,
@@ -298,6 +301,21 @@ def web_search(query, config, num_results=5, **options) -> dict:
         data.update(_terminology_metadata(query))
     return _with_provider_outcomes(data, hits)
 
+
+def web_search(query, config, num_results=5, **options) -> dict:
+    """Fetch and summarize ranked results with transparent enforcement metadata."""
+    raw = bool(options.get("raw", False))
+    num_results = _bounded_int(num_results, 1, 10)
+    searched, corrections = _prepare_query(query, raw, options.get("context"))
+    refine = not enforce.enforcement_disabled(raw)
+    providers, include_library = _resolve_sources(config, options)
+    request = _SearchRequest(searched, config, num_results, num_results, refine, providers, include_library)
+    searched, hits = _run_engine_search(request, corrections)
+    ranked_hits = trust.rrf_rank(searched, rag.rank(searched, hits))[:num_results]
+    details = _search_details(ranked_hits)
+    if options.get("literature_review"):
+        return _generate_literature_review(query, ranked_hits)
+    return _web_response(searched, details, corrections, query, options, hits)
 
 def _search_details(ranked_hits):
     chunks = []

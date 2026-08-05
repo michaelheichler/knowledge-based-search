@@ -673,3 +673,85 @@ def test_scientific_quick_json_output_carries_terminology_alternatives(monkeypat
     assert len(payload["terminology_alternatives"]) <= 5
     assert all(set(item) == {"term", "note"} for item in payload["terminology_alternatives"])
     assert {"query", "results", "corrections", "quality"} <= set(payload)
+
+
+def _install_review_stub(monkeypatch, response) -> dict:
+    captured = {}
+
+    def fake_quick(query, config, num_results=8, **options) -> dict:
+        captured.update(query=query, config=config, num_results=num_results, options=options)
+        return response
+
+    monkeypatch.setattr(search_core, "quick_web_search", fake_quick)
+    return captured
+
+
+def test_literature_review_requires_scientific() -> None:
+    code, stdout, stderr = run_cli(["quick", "topic", "--literature-review"])
+
+    assert code == cli.BAD_ARGS
+    assert stdout == ""
+    assert "--literature-review requires --scientific" in stderr
+
+
+def test_literature_review_threads_through_scientific_dispatch(monkeypatch) -> None:
+    captured = _install_review_stub(monkeypatch, {"status": "ok", "pdf_path": "/tmp/review.pdf"})
+
+    code, stdout, stderr = run_cli(["quick", "topic", "--scientific", "--literature-review"])
+
+    assert code == cli.SUCCESS
+    assert stderr == ""
+    assert captured["options"] == {"scientific": True, "platform": None, "literature_review": True}
+    assert "/tmp/review.pdf" in stdout
+
+
+def test_literature_review_success_renders_json_paths(monkeypatch) -> None:
+    response = {"status": "ok", "pdf_path": "/tmp/review.pdf", "pages": 3}
+    _install_review_stub(monkeypatch, response)
+
+    code, stdout, stderr = run_cli(
+        ["quick", "topic", "--scientific", "--literature-review", "--json"]
+    )
+
+    assert code == cli.SUCCESS
+    assert stderr == ""
+    assert json.loads(stdout) == response
+
+
+def test_literature_review_floor_error_renders_flags(monkeypatch) -> None:
+    response = {
+        "status": "error",
+        "error": "IntegrityFloor",
+        "flags": [{"claim_sentence": "copied", "source_id": "paper"}],
+    }
+    _install_review_stub(monkeypatch, response)
+
+    code, stdout, stderr = run_cli(["quick", "topic", "--scientific", "--literature-review"])
+
+    assert code == cli.SUCCESS
+    assert "IntegrityFloor" in stdout
+    assert "copied" in stdout
+    assert "Traceback" not in stderr
+
+
+def test_literature_review_search_core_calls_generator(monkeypatch) -> None:
+    alternatives = [{"term": "myocardial infarction", "note": "clinical term"}]
+    install_scientific_quick_stubs(monkeypatch, alternatives)
+    captured = {}
+
+    def fake_generate(query, hits, terms, out_root) -> dict:
+        captured.update(query=query, hits=hits, terms=terms, out_root=out_root)
+        return {"status": "ok", "pdf_path": "/tmp/review.pdf", "pages": 3}
+
+    monkeypatch.setattr(search_core.review, "generate_review", fake_generate)
+    code, stdout, stderr = run_cli(
+        ["quick", "heart attack", "--scientific", "--literature-review"]
+    )
+
+    assert code == cli.SUCCESS
+    assert stderr == ""
+    assert captured["query"] == "heart attack"
+    assert captured["terms"] == alternatives
+    assert captured["hits"][0]["url"] == "https://example.com/paper"
+    assert captured["out_root"] == Path.cwd()
+    assert "/tmp/review.pdf" in stdout
