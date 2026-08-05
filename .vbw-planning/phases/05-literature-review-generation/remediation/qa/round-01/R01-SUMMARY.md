@@ -112,7 +112,7 @@ No deviations.
 
 ### What Was Built
 - Hardened the unmocked review test with URL-bearing hits, 16-plus-word snippets, reordered themes, direct bibliography rendering, and strict page bounds.
-- Verified the full suite with 393 passed, 0 failed, and 1 skipped.
+- Verified the full suite with 403 passed, 0 failed, and 1 skipped.
 
 ### Files Modified
 - `server/tests/test_review.py` - exercise production-shaped review inputs and published artifacts.
