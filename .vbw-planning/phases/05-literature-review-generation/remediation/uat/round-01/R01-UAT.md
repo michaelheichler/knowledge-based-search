@@ -1,13 +1,13 @@
 ---
 phase: 5
 plan_count: 1
-status: in_progress
+status: issues_found
 started: 2026-08-05
-completed:
+completed: 2026-08-05
 total_tests: 7
-passed: 0
+passed: 3
 skipped: 3
-issues: 0
+issues: 1
 ---
 
 Phase 5 remediation round 1 re-verification. Review 3 documented implementation deviations from R01's execution, then check whether the round's fixes actually resolve the original UAT failures (scrambled Analysis prose, boilerplate methodology.md, duplicate Conduct subsections) using the real regenerated review at `reviews/quantum-sensing-20260805-214437/`.
@@ -67,32 +67,35 @@ Accepted summary deviations may include an optional `Tracking:` line when the hu
 - **Plan:** R01, Analysis section quote redesign, attribution integrity gate, Conduct/methodology cleanup, REQ-20 rewording
 - **Scenario:** The original issue was: Analysis-section claim sentences were word-scrambled gibberish, not paraphrased prose (critical, checkpoints P01-T01/P03-T01). Open `reviews/quantum-sensing-20260805-214437/review.pdf` and read the Analysis section.
 - **Expected:** Each piece of evidence reads as a coherent, real quoted sentence (in quotation marks) with a citation, not scrambled or word-reordered text, and not a citation-metadata fragment (journal name, author list) presented as if it were evidence.
-- **Result:**
+- **Result:** pass
 
 ### PR01-T02: The agent-synthesis handoff feels workable, not broken
 
 - **Plan:** R01, Analysis section quote redesign, attribution integrity gate, Conduct/methodology cleanup, REQ-20 rewording
 - **Scenario:** Still in the Analysis section of the same PDF, notice that each theme ends with quoted evidence but no connecting summary sentence written by kbs (that's now intentionally left to a calling agent, see `% AGENT-SYNTHESIS` in `review.tex`).
 - **Expected:** This reads as an intentional, sensible handoff point (quotes presented, then a clear place for synthesis) rather than as if the review is unfinished or broken.
-- **Result:**
+- **Result:** pass
 
 ### PR01-T03: methodology.md reads as a genuinely useful guide, not boilerplate
 
 - **Plan:** R01, Analysis section quote redesign, attribution integrity gate, Conduct/methodology cleanup, REQ-20 rewording
 - **Scenario:** The original issue was: methodology.md read as a sparse bullet-point skeleton, not a genuinely useful narrative guide (major, checkpoint P04-T02). Open `reviews/quantum-sensing-20260805-214437/methodology.md`.
 - **Expected:** Reads as connected narrative prose (Classification, Design, Conduct with search scope/trust appraisal/terminology subsections, Analysis, Write-up, Integrity check, Limitations), not disconnected bullet fragments, with only "Limitations" left as an explicit placeholder for a human or agent to fill in.
-- **Result:**
+- **Result:** pass
 
 ### PR01-T04: Conduct section has no duplicate or empty subsections
 
 - **Plan:** R01, Analysis section quote redesign, attribution integrity gate, Conduct/methodology cleanup, REQ-20 rewording
 - **Scenario:** In the same `review.pdf`, read the Conduct section.
 - **Expected:** Exactly one "Search Scope" subsection with real per-pool counts, no raw field-name headings (like `source_pools`), no duplicated counts, and no empty "Terminology Alternatives" heading when there are no alternatives.
-- **Result:**
+- **Result:** issue
+- **Issue:**
+  - Description: The heading, count-duplication, and empty-heading defects are resolved (single "Search Scope" heading, real counts, no source_pools duplicate, no empty Terminology Alternatives). But the three per-pool sentences (crossref, arxiv, pubmed) render as separate LaTeX paragraphs, and LaTeX's default paragraph indentation flush-lefts only the first paragraph after a heading, so the arxiv and pubmed lines appear visually indented under crossref, as if crossref were a parent item and arxiv/pubmed were nested children, even though the three pools are independent, parallel facts with no hierarchy between them. Confirmed by screenshot of the compiled PDF.
+  - Severity: minor
 
 ## Summary
 
-- Passed: 0
+- Passed: 3
 - Skipped: 3
-- Issues: 0
+- Issues: 1
 - Total: 7
