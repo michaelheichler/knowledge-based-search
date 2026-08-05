@@ -1,6 +1,13 @@
-"""Pin lexical integrity thresholds and fail-closed reporting behavior."""
+"""Pin lexical and optional semantic integrity signals."""
 
+import pytest
 import review_integrity
+
+
+@pytest.fixture(autouse=True)
+def _disable_embeddings(monkeypatch) -> None:
+    """Test invariant: lexical tests do not depend on local model availability."""
+    monkeypatch.setattr(review_integrity.rag, "embed", lambda _texts: None)
 
 
 def _result(claim, source, source_id="source") -> dict:
@@ -18,7 +25,10 @@ def test_word_ratio_threshold_flags_exact_boundary() -> None:
     )
 
     assert result["status"] == "flagged"
-    assert any(flag["signal"] == "word_ratio" and flag["score"] == 0.7 for flag in result["flags"])
+    assert any(
+        flag["signal"] == "word_ratio" and flag["score"] == 0.7
+        for flag in result["flags"]
+    )
 
 
 def test_word_ratio_threshold_allows_just_below_boundary() -> None:
@@ -110,3 +120,48 @@ def test_multiple_flagged_claims_are_returned_in_one_report() -> None:
 
     assert result["status"] == "flagged"
     assert {flag["source_id"] for flag in result["flags"]} == {"one", "two"}
+
+
+def test_embedding_flags_reorder_only_copy_and_embeds_unique_sentences(monkeypatch) -> None:
+    """Semantic invariant: reordered copies can flag without lexical overlap."""
+    claim = "kappa iota theta eta zeta epsilon delta gamma beta alpha"
+    source = "alpha beta gamma delta epsilon zeta eta theta iota kappa"
+    calls = []
+
+    def fake_embed(texts) -> list:
+        calls.append(list(texts))
+        return [[1.0, 0.0] if text == claim else [0.95, 0.3122499] for text in texts]
+
+    monkeypatch.setattr(review_integrity.rag, "embed", fake_embed)
+
+    result = _result(claim, source)
+
+    assert {flag["signal"] for flag in result["flags"]} == {"embedding_cosine"}
+    assert calls == [[claim, source]]
+
+
+def test_embedding_none_degrades_to_layer_one_only(monkeypatch) -> None:
+    """Degrade invariant: missing model vectors never add an error or raise."""
+    monkeypatch.setattr(review_integrity.rag, "embed", lambda _texts: None)
+
+    result = _result("The source sentence is copied exactly.", "The source sentence is copied exactly.")
+
+    assert result["status"] == "flagged"
+    assert {flag["signal"] for flag in result["flags"]} == {"word_ratio"}
+
+
+def test_embedding_cosine_threshold_has_exact_and_below_boundaries(monkeypatch) -> None:
+    """Boundary invariant: cosine equality flags and a lower score passes."""
+    claim = "claim words differ from source terms"
+    source = "source terms describe another finding"
+    score = {"value": 0.90}
+
+    monkeypatch.setattr(review_integrity.rag, "embed", lambda texts: [[score["value"]] for _ in texts])
+    monkeypatch.setattr(review_integrity.rag, "_cosine", lambda left, _right: left[0])
+    assert any(
+        flag["signal"] == "embedding_cosine"
+        for flag in _result(claim, source)["flags"]
+    )
+
+    score["value"] = 0.899
+    assert _result(claim, source) == {"status": "pass"}
