@@ -314,7 +314,7 @@ def _rendered_conduct(pools, alternatives) -> tuple:
     pool_summary = ", ".join(
         f"{pool} ({count} ranked hit(s))" for pool, count in pools.items()
     )
-    conduct = {
+    conduct: dict[str, str | list[str]] = {
         "Search Scope": f"This review searched {pool_summary}."
         if pool_summary
         else "No source pools were recorded."
