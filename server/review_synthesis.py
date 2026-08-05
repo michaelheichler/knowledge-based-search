@@ -239,27 +239,32 @@ def _formula_matches(text) -> list:
     return _unique(values)
 
 
+def _claim_for_hit(theme, hit, query, entry, ordinal) -> dict | None:
+    """Keep source text and citation together because claims must stay attributable."""
+    source_text = _source_text(hit)
+    if not (source_sentence := _select_sentence(source_text, query)):
+        return None
+    return {
+        "claim_sentence": _reporting_frame(theme, source_sentence, entry["key"]),
+        "source_id": hit.get("source_id") or hit.get("url") or "",
+        "source_text": source_text, "citation_key": entry["key"],
+        "theme": _normalise_theme(theme), "rank": ordinal,
+    }
+
+
 def build_claims(themes, query="", bibliography=None) -> list:
     """Required because every emitted sentence must retain one source attribution."""
     grouped = themes.items() if hasattr(themes, "items") else [(RELATED_THEME, themes)]
     flattened = [(theme, hit) for theme, hits in grouped for hit in hits]
     entries = list(bibliography or build_bibliography([hit for _, hit in flattened]))
+    entry_pool = defaultdict(list)
+    for entry in entries:
+        entry_pool[str(entry.get("source_id") or "")].append(entry)
     claims = []
-    for ordinal, ((theme, hit), entry) in enumerate(zip(flattened, entries)):
-        source_text = _source_text(hit)
-        source_sentence = _select_sentence(source_text, query)
-        if not source_sentence:
-            continue
-        claims.append(
-            {
-                "claim_sentence": _reporting_frame(theme, source_sentence, entry["key"]),
-                "source_id": hit.get("source_id") or hit.get("url") or "",
-                "source_text": source_text,
-                "citation_key": entry["key"],
-                "theme": _normalise_theme(theme),
-                "rank": ordinal,
-            }
-        )
+    # Invariant: processed hits retain matching source entries. Variant: remaining hits decrease.
+    for ordinal, (theme, hit) in enumerate(flattened):
+        if matching_entries := entry_pool.get(str(hit.get("source_id") or hit.get("url") or ""), []):
+            claims.extend(filter(None, [_claim_for_hit(theme, hit, query, matching_entries.pop(0), ordinal)]))
     return claims
 
 

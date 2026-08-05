@@ -109,6 +109,25 @@ def test_claims_keep_attribution_and_use_one_real_citation() -> None:
     assert bibliography[0]["key"] in claim["claim_sentence"]
 
 
+def test_claims_keep_bibliography_pairing_after_theme_reordering() -> None:
+    hits = [
+        _claim_hit("https://science.example/a", title="A physics paper", categories=["physics"]),
+        _claim_hit("https://science.example/b", title="A biology paper", categories=["biology"]),
+        _claim_hit("https://science.example/c", title="Another physics paper", categories=["physics"]),
+    ]
+    themes = review_synthesis.group_themes(hits, query_category="science")
+    bibliography = review_synthesis.build_bibliography(hits)
+
+    claims = review_synthesis.build_claims(themes, "quantum retrieval", bibliography)
+    entries = {entry["key"]: entry for entry in bibliography}
+
+    assert [hit["url"] for _, hit in [(theme, hit) for theme, items in themes.items() for hit in items]] != [
+        hit["url"] for hit in hits
+    ]
+    assert len(claims) == len(hits)
+    assert all(entries[claim["citation_key"]]["source_id"] == claim["source_id"] for claim in claims)
+
+
 def test_library_claims_use_deepened_text_and_keep_snippet_on_failure(monkeypatch) -> None:
     hit = _claim_hit("library://book-1?chunk=2", snippet="Short library snippet.")
     themes = {"physics": [hit]}
