@@ -174,14 +174,16 @@ def render_bib(model) -> str:
             authors = " and ".join(str(author) for author in authors)
         venue = entry.get("venue", entry.get("journal", ""))
         fields = [
-            f"  author = {{{_escape_raw(authors)}}},",
-            f"  title = {{{_escape_raw(entry.get('title', ''))}}},",
-            f"  journal = {{{_escape_raw(venue)}}},",
+            f"  author = {{{_escape_raw(authors)}}}",
+            f"  title = {{{_escape_raw(entry.get('title', ''))}}}",
+            f"  journal = {{{_escape_raw(venue)}}}",
             f"  year = {{{_escape_raw(entry.get('year', ''))}}}",
         ]
         if entry.get("url"):
             fields.append(f"  url = {{{_escape_raw(entry['url'])}}}")
-        rendered.append("@article{" + str(key) + ",\n" + "\n".join(fields) + "\n}")
+        rendered.append(
+            "@article{" + str(key) + ",\n" + ",\n".join(fields) + "\n}"
+        )
     return "\n\n".join(rendered) + ("\n" if rendered else "")
 
 

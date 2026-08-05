@@ -130,11 +130,17 @@ def test_render_tex_gates_chart_and_formula_fragments_on_data() -> None:
 def test_render_bib_and_render_tex_require_citation_coverage() -> None:
     """Bibliography output carries agsm fields and rejects an uncited source."""
     bib = review_latex.render_bib(_MODEL)
+    with_url = {
+        **_MODEL,
+        "bib": [{**_MODEL["bib"][0], "url": "https://example.test/paper"}, _MODEL["bib"][1]],
+    }
+    url_bib = review_latex.render_bib(with_url)
     uncited = {**_MODEL, "bib": [*_MODEL["bib"], {"key": "orphan"}]}
 
     assert "author = {Grant, Maria J. and Booth, Andrew}" in bib
     assert "year = {2009}" in bib
     assert "journal = {Review Journal}" in bib
+    assert "  year = {2009},\n  url = {https://example.test/paper}" in url_bib
     with pytest.raises(ValueError, match="uncited bibliography entries"):
         review_latex.render_tex(uncited)
 
