@@ -286,6 +286,9 @@ def _rebuild_views(model, claims, withheld=None) -> dict:
     pool = list(model.get("_bibliography_pool", model.get("bib", [])))
     keys = {claim.get("citation_key") for claim in active}
     bibliography = [entry for entry in pool if entry.get("key") in keys]
+    source_pools = model.get("source_pools")
+    if not isinstance(source_pools, dict):
+        source_pools = model.get("conduct", {}).get("source_pools", {})
     analysis = defaultdict(list)
     for claim in active:
         analysis[claim.get("theme", RELATED_THEME)].append(claim)
@@ -295,7 +298,7 @@ def _rebuild_views(model, claims, withheld=None) -> dict:
     result.update({
         "claims": active, "bib": bibliography, "analysis": dict(analysis),
         "write_up": [f"{model.get('design', {}).get('classification', '')} This review synthesizes {len(active)} claims across {', '.join(f'{theme} ({len(items) - 1} quotes)' for theme, items in analysis.items())}. "
-                     + f"Sources came from {', '.join(f'{pool} ({count})' for pool, count in model.get('conduct', {}).get('source_pools', {}).items())}. {'A publication-year chart is included.' if chart_from_bibliography(bibliography) else 'No publication-year chart is available.'} {'Formula candidates are included.' if any(_formula_matches(str(claim.get('source_text') or '')) for claim in active) else 'No formula candidates are available.'}"],
+                     + f"Sources came from {', '.join(f'{pool} ({count})' for pool, count in source_pools.items())}. {'A publication-year chart is included.' if chart_from_bibliography(bibliography) else 'No publication-year chart is available.'} {'Formula candidates are included.' if any(_formula_matches(str(claim.get('source_text') or '')) for claim in active) else 'No formula candidates are available.'}"],
         "write_up_order": list(analysis), "chart": chart_from_bibliography(bibliography),
         "formulas": _unique(f for claim in active for f in _formula_matches(str(claim.get("source_text") or ""))),
         "_withheld_claims": list(withheld or []),
@@ -303,8 +306,23 @@ def _rebuild_views(model, claims, withheld=None) -> dict:
     return result
 
 
+def _rendered_conduct(pools, alternatives) -> tuple:
+    """Keep method data out of LaTeX sections because generic recursion exposes nested mappings."""
+    search_scope = {
+        pool: f"{count} ranked hit(s) from {pool}." for pool, count in pools.items()
+    }
+    conduct = {"Search Scope": list(search_scope.values())}
+    if alternatives:
+        conduct["Terminology Alternatives"] = [
+            f"{index}. {item.get('term', '')}"
+            + (f" ({item.get('note')})" if item.get("note") else "")
+            for index, item in enumerate(alternatives, 1)
+        ]
+    return conduct, search_scope
+
+
 def build_model(query, hits, alternatives=None) -> dict:
-    """The four Snyder phases keep method, evidence, synthesis, and output distinct."""
+    """Review stages stay distinct because each artifact has a separate evidence contract."""
     selected = list(hits)
     themes = group_themes(selected, query=query)
     bibliography = build_bibliography(selected)
@@ -313,13 +331,13 @@ def build_model(query, hits, alternatives=None) -> dict:
         return {"status": "error", "error": "minimum_claims", "minimum_claims": MIN_CLAIMS}
     question = f"What does the available literature report about {str(query).strip()}?"
     pools = _pool_counts(selected)
+    conduct, search_scope = _rendered_conduct(pools, alternatives)
     model = {
         "status": "ok", "title": f"Rapid Review: {str(query).strip()}", "question": question,
         "design": {"topic": str(query).strip(), "question": question, "classification":
                    "This report is a Rapid Review, not a Systematic Review, and does not claim exhaustive retrieval."},
-        "conduct": {"source_pools": pools, "search_scope":
-                    {pool: f"{count} ranked hit(s) from {pool}." for pool, count in pools.items()},
-                    "terminology_alternatives": list(alternatives or [])},
+        "conduct": conduct, "source_pools": pools, "search_scope": search_scope,
+        "terminology_alternatives": list(alternatives or []),
         "analysis": {}, "write_up": [], "bib": bibliography, "chart": {}, "formulas": [],
         "claims": claims, "_bibliography_pool": bibliography,
     }

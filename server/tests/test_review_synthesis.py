@@ -1,5 +1,7 @@
 """Pin deterministic theme and bibliography assembly for review synthesis."""
 
+import re
+
 import review_latex
 import review_synthesis
 
@@ -272,10 +274,43 @@ def test_build_model_contains_four_phases_and_source_pool_counts() -> None:
 
     assert model["status"] == "ok"
     assert {"design", "conduct", "analysis", "write_up"} <= model.keys()
-    assert model["conduct"]["source_pools"] == {"arxiv": 4}
-    assert model["conduct"]["terminology_alternatives"] == alternatives
+    assert model["source_pools"] == {"arxiv": 4}
+    assert model["terminology_alternatives"] == alternatives
+    assert model["conduct"]["Search Scope"] == ["4 ranked hit(s) from arxiv."]
+    assert model["conduct"]["Terminology Alternatives"] == [
+        "1. information retrieval (broader term)"
+    ]
     assert set(model["analysis"]) == {"physics", "medicine"}
     assert review_latex.render_tex(model)
+
+
+def _conduct_block(model) -> str:
+    tex = review_latex.render_tex(model)
+    return tex.split("\\section{Conduct}\n", 1)[1].split(
+        "\n\n\\section{Analysis}", 1
+    )[0]
+
+
+def test_rendered_conduct_has_one_search_scope_and_no_empty_alternatives() -> None:
+    block = _conduct_block(review_synthesis.build_model("quantum retrieval", _model_hits(), []))
+
+    assert block.count("\\subsection{Search Scope}") == 1
+    assert "\\subsection{source_pools}" not in block
+    assert "\\subsection{search_scope}" not in block
+    assert "\\subsection{arxiv}" not in block
+    assert not re.search(r"(?m)^\\d+$", block)
+    assert "\\subsection{Terminology Alternatives}" not in block
+
+
+def test_rendered_conduct_formats_nonempty_terminology_alternatives() -> None:
+    alternatives = [{"term": "information retrieval", "note": "broader term"}]
+    model = review_synthesis.build_model("quantum retrieval", _model_hits(), alternatives)
+
+    block = _conduct_block(model)
+
+    assert block.count("\\subsection{Search Scope}") == 1
+    assert block.count("\\subsection{Terminology Alternatives}") == 1
+    assert "1. information retrieval (broader term)" in block
 
 
 def test_write_up_is_dense_synthesis_not_analysis_copy() -> None:
