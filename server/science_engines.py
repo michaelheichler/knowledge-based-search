@@ -288,6 +288,7 @@ def _crossref_hit(row, rank) -> dict | None:
     )
     snippet = " - ".join(part for part in (container, authors) if part)
     hit = engines.result(titles[0], row["URL"], snippet, "crossref", rank)
+    hit["source_text_is_metadata"] = True
     hit["date"] = _crossref_date(row)
     hit["citation_count"] = int(row.get("is-referenced-by-count") or 0)
     categories = [subject for subject in row.get("subject", []) if subject]

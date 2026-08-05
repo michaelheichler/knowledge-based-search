@@ -240,6 +240,8 @@ def _formula_matches(text) -> list:
 
 def _claim_for_hit(theme, hit, query, entry, ordinal) -> dict | None:
     """Keep source text and citation together because claims must stay attributable."""
+    if hit.get("source_text_is_metadata", False) and not str(hit.get("url") or "").startswith("library://"):
+        return None
     source_text = _source_text(hit)
     if not (source_sentence := _select_sentence(source_text, query)):
         return None

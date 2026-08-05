@@ -109,6 +109,44 @@ def test_claims_keep_attribution_and_use_one_real_citation() -> None:
     assert bibliography[0]["key"] in claim["claim_sentence"]
 
 
+def _scientific_provider_hits() -> list:
+    return [
+        _claim_hit(
+            f"https://{provider}.example/paper",
+            title=f"{provider} paper",
+            snippet=f"{provider} reports a measured quantum retrieval result.",
+            engines=[provider],
+        )
+        for provider in ("arxiv", "pubmed", "semanticscholar")
+    ]
+
+
+def test_crossref_metadata_skips_claims_but_remains_counted_and_bibliographed() -> None:
+    provider_hits = _scientific_provider_hits()
+    hits = [
+        _claim_hit(
+            "https://doi.org/10.1234/crossref",
+            title="CrossRef metadata work",
+            snippet="Journal of Quantum Studies - Lovelace",
+            engines=["crossref"],
+            source_text_is_metadata=True,
+        ),
+        *provider_hits,
+    ]
+    bibliography = review_synthesis.build_bibliography(hits)
+    claims = review_synthesis.build_claims({"science": hits}, "quantum retrieval", bibliography)
+
+    assert review_synthesis._pool_counts(hits) == {
+        "crossref": 1,
+        "arxiv": 1,
+        "pubmed": 1,
+        "semanticscholar": 1,
+    }
+    assert {entry["source_id"] for entry in bibliography} == {hit["url"] for hit in hits}
+    assert {claim["source_id"] for claim in claims} == {hit["url"] for hit in provider_hits}
+    assert len(claims) == len(provider_hits)
+
+
 def test_claims_keep_bibliography_pairing_after_theme_reordering() -> None:
     hits = [
         _claim_hit("https://science.example/a", title="A physics paper", categories=["physics"]),
