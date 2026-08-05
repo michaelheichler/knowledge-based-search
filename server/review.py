@@ -100,11 +100,9 @@ def _guide_content(model, integrity_summary) -> str:
         f"### Analysis\n\nThemes: {_guide_theme_names(model)}\n\n"
         f"### Write-up\n\n{source_count} source(s) remained cited. {_guide_page_outcome(integrity_summary)}\n\n"
         "## Integrity check\n\n"
-        f"Status: {integrity_summary.get('status', 'unknown')}. Claims are compared with their "
-        f"attributed source text. Word ratio threshold: {review_integrity.WORD_RATIO_THRESHOLD}; "
-        f"longest matching block threshold: {review_integrity.LONGEST_BLOCK_WORDS} words; "
-        f"optional embedding cosine threshold: {review_integrity.EMBEDDING_COSINE_THRESHOLD}. "
-        "Flagged claims are dropped and checked again before compilation.\n"
+        f"Status: {integrity_summary.get('status', 'unknown')}. Quoted excerpts are checked "
+        "against sentences in their attributed source text. Flagged quotes are dropped and "
+        "checked again before compilation.\n"
     )
 
 
@@ -123,10 +121,10 @@ def _floor_result(flags) -> dict:
 
 def _integrity_loop(model) -> tuple[dict, dict]:
     """Why: compilation is safe only after every completed check reports a clean model."""
-    # Invariant: clean claims only, variant: claim count decreases after flags.
+    # Invariant: only attributable quotes reach compilation. Variant: model items decrease after flags.
     while True:
-        claims = review_synthesis.claims_for_integrity(model)
-        integrity_summary = review_integrity.check_claims(claims)
+        quotes = review_synthesis.quotes_for_integrity(model)
+        integrity_summary = review_integrity.check_quotes(quotes)
         if integrity_summary.get("status") == "pass":
             return model, integrity_summary
         if integrity_summary.get("status") != "flagged":

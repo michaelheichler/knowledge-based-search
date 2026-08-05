@@ -7,7 +7,6 @@ from unittest.mock import Mock
 
 import pytest
 import review
-import review_integrity
 import review_latex
 import review_synthesis
 
@@ -16,7 +15,15 @@ def _model(claims=3):
     return {
         "status": "ok",
         "analysis": {"physics": []},
-        "claims": [{"claim_sentence": f"claim {index}"} for index in range(claims)],
+        "claims": [
+            {
+                "quote_text": f"Quote {index}.",
+                "source_id": "paper",
+                "source_text": f"Quote {index}.",
+                "citation_key": "paper2024",
+            }
+            for index in range(claims)
+        ],
         "bib": [{"key": "paper2024"}],
     }
 
@@ -32,7 +39,7 @@ def _compiled(out_dir):
 
 def _patch_success(monkeypatch, calls, model):
     build = Mock(side_effect=lambda *args: calls.append("build") or model)
-    claims = Mock(side_effect=lambda value: calls.append("claims") or value["claims"])
+    quotes = Mock(side_effect=lambda value: calls.append("quotes") or value["claims"])
     check = Mock(side_effect=lambda value: calls.append("check") or {"status": "pass"})
     compile_review = Mock(
         side_effect=lambda value, directory, shrink, grow: calls.append("compile")
@@ -43,8 +50,8 @@ def _patch_success(monkeypatch, calls, model):
         or str(Path(directory) / "methodology.md")
     )
     monkeypatch.setattr(review.review_synthesis, "build_model", build)
-    monkeypatch.setattr(review.review_synthesis, "claims_for_integrity", claims)
-    monkeypatch.setattr(review.review_integrity, "check_claims", check)
+    monkeypatch.setattr(review.review_synthesis, "quotes_for_integrity", quotes)
+    monkeypatch.setattr(review.review_integrity, "check_quotes", check)
     monkeypatch.setattr(review.review_latex, "compile_review", compile_review)
     monkeypatch.setattr(review, "write_methodology_guide", guide)
     return check
@@ -61,17 +68,17 @@ def test_generate_review_keeps_synthesis_gate_compile_order(tmp_path, monkeypatc
     assert result["guide_path"] == str(output / "methodology.md")
     assert result["themes"] == ["physics"]
     assert result["sources_cited"] == 1
-    assert [call for call in calls] == ["build", "claims", "check", "compile", "guide"]
+    assert [call for call in calls] == ["build", "quotes", "check", "compile", "guide"]
     assert check.call_count == 1
 
 
-def test_generate_review_drops_flagged_claims_before_rechecking(tmp_path, monkeypatch) -> None:
+def test_generate_review_drops_flagged_quotes_before_rechecking(tmp_path, monkeypatch) -> None:
     calls = []
     first, clean = _model(), _model(2)
-    flags = [{"claim_sentence": "claim 0", "source_id": "paper"}]
+    flags = [{"quote_text": "Quote 0.", "source_id": "paper"}]
     check = Mock(side_effect=[{"status": "flagged", "flags": flags}, {"status": "pass"}])
     _patch_success(monkeypatch, calls, first)
-    monkeypatch.setattr(review.review_integrity, "check_claims", check)
+    monkeypatch.setattr(review.review_integrity, "check_quotes", check)
     monkeypatch.setattr(
         review.review_synthesis,
         "drop_flagged",
@@ -81,7 +88,7 @@ def test_generate_review_drops_flagged_claims_before_rechecking(tmp_path, monkey
     result = review.generate_review("topic", [], [], tmp_path)
 
     assert result["status"] == "ok"
-    assert calls == ["build", "claims", "drop", "claims", "compile", "guide"]
+    assert calls == ["build", "quotes", "drop", "quotes", "compile", "guide"]
     assert check.call_count == 2
 
 
@@ -90,8 +97,8 @@ def test_generate_review_stops_at_integrity_floor_without_output_directory(tmp_p
     _patch_success(monkeypatch, calls, _model(2))
     monkeypatch.setattr(
         review.review_integrity,
-        "check_claims",
-        lambda claims: {"status": "flagged", "flags": [{"claim_sentence": "copy"}]},
+        "check_quotes",
+        lambda quotes: {"status": "flagged", "flags": [{"quote_text": "Copy."}]},
     )
     monkeypatch.setattr(
         review.review_synthesis,
@@ -102,9 +109,9 @@ def test_generate_review_stops_at_integrity_floor_without_output_directory(tmp_p
     result = review.generate_review("topic", [], [], tmp_path)
 
     assert result["error"] == "IntegrityFloor"
-    assert result["flags"] == [{"claim_sentence": "copy"}]
+    assert result["flags"] == [{"quote_text": "Copy."}]
     assert not (tmp_path / "reviews").exists()
-    assert calls == ["build", "claims"]
+    assert calls == ["build", "quotes"]
 
 
 def test_generate_review_returns_compile_error_without_guide(tmp_path, monkeypatch) -> None:
@@ -147,12 +154,8 @@ def _assert_methodology_content(content: str) -> None:
         assert value in content
     for value in ("measurement", "simulation", "3 page(s)"):
         assert value in content
-    for threshold in (
-        review_integrity.WORD_RATIO_THRESHOLD,
-        review_integrity.LONGEST_BLOCK_WORDS,
-        review_integrity.EMBEDDING_COSINE_THRESHOLD,
-    ):
-        assert str(threshold) in content
+    assert "Quoted excerpts are checked against sentences in their attributed source text." in content
+    assert "Flagged quotes are dropped and checked again before compilation." in content
 
 
 def test_methodology_guide_records_run_data_and_writes_atomically(tmp_path, monkeypatch) -> None:
@@ -189,8 +192,8 @@ def _install_real_guide_stubs(monkeypatch):
         }
 
     monkeypatch.setattr(review.review_synthesis, "build_model", lambda *args: model)
-    monkeypatch.setattr(review.review_synthesis, "claims_for_integrity", lambda value: [])
-    monkeypatch.setattr(review.review_integrity, "check_claims", lambda claims: {"status": "pass"})
+    monkeypatch.setattr(review.review_synthesis, "quotes_for_integrity", lambda value: [])
+    monkeypatch.setattr(review.review_integrity, "check_quotes", lambda quotes: {"status": "pass"})
     monkeypatch.setattr(review.review_latex, "compile_review", compile_stub)
 
 

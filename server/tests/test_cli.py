@@ -722,7 +722,7 @@ def test_literature_review_floor_error_renders_flags(monkeypatch) -> None:
     response = {
         "status": "error",
         "error": "IntegrityFloor",
-        "flags": [{"claim_sentence": "copied", "source_id": "paper"}],
+        "flags": [{"quote_text": "copied", "source_id": "paper"}],
     }
     _install_review_stub(monkeypatch, response)
 

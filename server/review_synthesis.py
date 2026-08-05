@@ -262,9 +262,9 @@ def chart_from_bibliography(bibliography) -> dict:
     return dict(sorted(counts.items()))
 
 
-def integrity_result(claims) -> dict:
-    """Required because the synthesis boundary exposes the existing fail-closed gate."""
-    return review_integrity.check_claims(claims)
+def integrity_result(quotes) -> dict:
+    """Required because the synthesis boundary exposes the attribution gate."""
+    return review_integrity.check_quotes(quotes)
 
 
 MIN_CLAIMS = 2

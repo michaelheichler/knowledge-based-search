@@ -1,6 +1,5 @@
 """Pin deterministic theme and bibliography assembly for review synthesis."""
 
-import rag
 import review_latex
 import review_synthesis
 
@@ -187,12 +186,12 @@ def test_realistic_claims_clear_integrity_gate(monkeypatch) -> None:
     )
     themes = {"physics": [hit]}
     bibliography = review_synthesis.build_bibliography([hit])
-    monkeypatch.setattr(rag, "embed", lambda _texts: None)
-
     claims = review_synthesis.build_claims(themes, "targeted retrieval", bibliography)
 
     assert len(hit["snippet"].split()) >= 20
-    assert review_synthesis.review_integrity.check_claims(claims)["status"] == "pass"
+    assert review_synthesis.review_integrity.check_quotes(
+        review_synthesis.quotes_for_integrity({"claims": claims})
+    )["status"] == "pass"
 
 
 def test_library_claims_use_deepened_text_and_keep_snippet_on_failure(monkeypatch) -> None:
