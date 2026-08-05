@@ -1,0 +1,27 @@
+server/tests/test_library_engine.py
+  s_a680ad9514551b::t_d894b0975b8b10 1-95
+server/library_engine.py
+  s_a680ad9514551b::t_ed22e38424bcba 4
+  s_a680ad9514551b::t_6439ba2ca0b29c 66-67,75,80-82,100
+  s_a680ad9514551b::t_303a486766fe93 206,208,210
+  s_a680ad9514551b::t_1e9f4b18cc0238 207,209,211-216
+  s_a680ad9514551b::t_56dfa00a73ff69 116
+  s_a680ad9514551b::t_1935efcf6e78ab 51-55,102-115,117-121,136-158,160-205
+  s_a680ad9514551b::t_f0db5b32f6ccbd 39-40,63-65,83-99,122-125,159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "0f0f0b33356a53d14f407d355b21ade522523e74",
+  "prompts": {},
+  "sessions": {
+    "s_a680ad9514551b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13cb5ba9-261c-44fb-a667-c81cd26d0dbe",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
