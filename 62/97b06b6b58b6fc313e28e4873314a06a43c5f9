@@ -1,0 +1,29 @@
+server/review_latex.py
+  s_a680ad9514551b::t_e1aa1b81e90167 283-298,304-310
+  s_a680ad9514551b::t_aeb9b76a78ab32 28-31
+  s_a680ad9514551b::t_38ab2f5d5303c7 217-271,299-303
+  s_a680ad9514551b::t_33d39d8d3af33c 272-282,311-315
+  s_a680ad9514551b::t_d8e28d5469a43e 4,6,8
+  s_a680ad9514551b::t_f916aa0ed42ebc 3
+server/tests/test_review_latex.py
+  s_a680ad9514551b::t_b4469f98620a35 171
+  s_a680ad9514551b::t_4693dc3ce0171c 154,170,174-181,183-184,187-189,191,194-201,203-207,209,212-220,222-223,225-245
+  s_a680ad9514551b::t_287d51f869284a 155-169,172-173,182,185-186,190,192-193,202,208,210-211,221,224
+  s_a680ad9514551b::t_77e87278020241 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "6297b06b6b58b6fc313e28e4873314a06a43c5f9",
+  "prompts": {},
+  "sessions": {
+    "s_a680ad9514551b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13cb5ba9-261c-44fb-a667-c81cd26d0dbe",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
