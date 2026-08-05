@@ -1,0 +1,34 @@
+.vbw-planning/phases/05-literature-review-generation/remediation/uat/round-01/R01-SUMMARY.md
+  s_3c155de8533c9a::t_fbb4c09fa85f7c 8
+  s_3c155de8533c9a::t_7dff50d395335d 130
+  s_3c155de8533c9a::t_7d9a955b38c9d1 118-129
+.vbw-planning/REQUIREMENTS.md
+  s_fd53b09ebcd7b8::t_e99f6a3890b550 1-45,53-72
+  s_3c155de8533c9a::t_4a4dcd9ead112b 49
+  s_3c155de8533c9a::t_60fe52d2d0f236 50-52
+  s_3c155de8533c9a::t_ec9f6326bcaed7 46-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "6233dbfcf8deee5823e6bfc0bc5ce4efaf7336df",
+  "prompts": {},
+  "sessions": {
+    "s_3c155de8533c9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e72df891-4c72-40d8-b214-4236c48adad8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    },
+    "s_fd53b09ebcd7b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a44aeb4b707fe03a5",
+        "model": "unknown"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
