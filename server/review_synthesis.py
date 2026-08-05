@@ -8,12 +8,6 @@ import library_engine
 import review_integrity
 import trust
 
-FILLER_DENYLIST = (
-    "it is worth noting",
-    "in today's world",
-    "it is important to note",
-)
-_REPORTING_VERBS = ("indicates", "associates", "describes", "supports")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 _WORDS = re.compile(r"[a-z0-9]+")
 _FORMULA_PATTERNS = (
@@ -191,25 +185,6 @@ def _select_sentence(text, query) -> str:
     return ranked[0][1] if ranked else ""
 
 
-def _register(sentence) -> str:
-    """Required because generated prose must not begin with filler openers."""
-    result = sentence.strip()
-    # Invariant: processed prefixes are absent from result. Variant: remaining denylist items.
-    for filler in FILLER_DENYLIST:
-        if result.lower().startswith(filler):
-            result = result[len(filler) :].lstrip(" ,:;")
-    return result[:1].upper() + result[1:]
-
-
-def _reporting_frame(theme, source_sentence, key) -> str:
-    """Reorder source words because integrity requires each preserved run below LONGEST_BLOCK_WORDS."""
-    words = source_sentence.rstrip(".!?").split()
-    reordered = " ".join(words[::2] + words[1::2])
-    verb = _REPORTING_VERBS[len(words) % len(_REPORTING_VERBS)]
-    citation = f"\\citep{{{key}}}"
-    return _register(f"{str(theme).title()} evidence {verb} {reordered} {citation}.")
-
-
 def _formula_value(match) -> str:
     """Required because unmatched groups must not become fabricated formulas."""
     return next((group for group in match.groups() if group), "").strip()
@@ -239,14 +214,14 @@ def _formula_matches(text) -> list:
 
 
 def _claim_for_hit(theme, hit, query, entry, ordinal) -> dict | None:
-    """Keep source text and citation together because claims must stay attributable."""
+    """Keep source text and citation together because quotes must stay attributable."""
     if hit.get("source_text_is_metadata", False) and not str(hit.get("url") or "").startswith("library://"):
         return None
     source_text = _source_text(hit)
     if not (source_sentence := _select_sentence(source_text, query)):
         return None
     return {
-        "claim_sentence": _reporting_frame(theme, source_sentence, entry["key"]),
+        "quote_text": source_sentence,
         "source_id": hit.get("source_id") or hit.get("url") or "",
         "source_text": source_text, "citation_key": entry["key"],
         "theme": _normalise_theme(theme), "rank": ordinal,
@@ -313,11 +288,13 @@ def _rebuild_views(model, claims, withheld=None) -> dict:
     bibliography = [entry for entry in pool if entry.get("key") in keys]
     analysis = defaultdict(list)
     for claim in active:
-        analysis[claim.get("theme", RELATED_THEME)].append(claim.get("claim_sentence", ""))
+        analysis[claim.get("theme", RELATED_THEME)].append(claim)
+    for theme in analysis:
+        analysis[theme].append({"placeholder": True, "theme": theme})
     result = dict(model)
     result.update({
         "claims": active, "bib": bibliography, "analysis": dict(analysis),
-        "write_up": [f"{model.get('design', {}).get('classification', '')} This review synthesizes {len(active)} claims across {', '.join(f'{theme} ({len(items)} claims)' for theme, items in analysis.items())}. "
+        "write_up": [f"{model.get('design', {}).get('classification', '')} This review synthesizes {len(active)} claims across {', '.join(f'{theme} ({len(items) - 1} quotes)' for theme, items in analysis.items())}. "
                      + f"Sources came from {', '.join(f'{pool} ({count})' for pool, count in model.get('conduct', {}).get('source_pools', {}).items())}. {'A publication-year chart is included.' if chart_from_bibliography(bibliography) else 'No publication-year chart is available.'} {'Formula candidates are included.' if any(_formula_matches(str(claim.get('source_text') or '')) for claim in active) else 'No formula candidates are available.'}"],
         "write_up_order": list(analysis), "chart": chart_from_bibliography(bibliography),
         "formulas": _unique(f for claim in active for f in _formula_matches(str(claim.get("source_text") or ""))),
@@ -376,10 +353,13 @@ def grow(model) -> dict:
     return _rebuild_views(model, claims, withheld)
 
 
-def claims_for_integrity(model) -> list:
-    """The integrity gate must not receive synthesis-only metadata."""
-    return [{key: claim.get(key, "") for key in ("claim_sentence", "source_id", "source_text")}
-            for claim in model.get("claims", [])]
+def quotes_for_integrity(model) -> list:
+    """The integrity gate must receive only attributable quote data."""
+    return [
+        {key: claim.get(key, "") for key in ("quote_text", "source_id", "source_text", "citation_key")}
+        for claim in model.get("claims", [])
+        if not claim.get("placeholder")
+    ]
 
 
 def drop_flagged(model, flags) -> dict:
@@ -388,8 +368,8 @@ def drop_flagged(model, flags) -> dict:
         return model
     flags = list(flags or [])
     ids = {flag.get("source_id") for flag in flags}
-    sentences = {flag.get("claim_sentence") for flag in flags}
-    keep = lambda claim: claim.get("source_id") not in ids and claim.get("claim_sentence") not in sentences
+    quotes = {flag.get("quote_text") for flag in flags}
+    keep = lambda claim: claim.get("source_id") not in ids and claim.get("quote_text") not in quotes
     claims = [claim for claim in model.get("claims", []) if keep(claim)]
     withheld = [claim for claim in model.get("_withheld_claims", []) if keep(claim)]
     if len(claims) < MIN_CLAIMS:

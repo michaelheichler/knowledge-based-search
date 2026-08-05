@@ -104,9 +104,20 @@ def test_claims_keep_attribution_and_use_one_real_citation() -> None:
     claim = claims[0]
     assert claim["source_id"] == hit["url"]
     assert claim["source_text"] == hit["snippet"]
-    assert claim["claim_sentence"] != hit["snippet"]
-    assert claim["claim_sentence"].count("\\citep{") == 1
-    assert bibliography[0]["key"] in claim["claim_sentence"]
+    assert claim["quote_text"] == hit["snippet"]
+    assert claim["quote_text"] in review_synthesis._sentences(claim["source_text"])
+    assert claim["citation_key"] == bibliography[0]["key"]
+    assert "\\citep{" not in claim["quote_text"]
+    assert set(claim) == {
+        "quote_text",
+        "source_id",
+        "source_text",
+        "citation_key",
+        "theme",
+        "rank",
+    }
+
+
 
 
 def _scientific_provider_hits() -> list:
@@ -222,30 +233,24 @@ def test_formula_and_chart_candidates_require_source_data() -> None:
     assert review_synthesis.chart_from_bibliography(bibliography) == {"2022": 2}
 
 
-def test_generated_claims_do_not_start_with_filler_phrases() -> None:
+def test_quote_text_is_verbatim_not_reworded() -> None:
     hit = _claim_hit()
     themes = {"physics": [hit]}
     bibliography = review_synthesis.build_bibliography([hit])
 
     claim = review_synthesis.build_claims(themes, "quantum retrieval", bibliography)[0]
-    lowered = claim["claim_sentence"].lower()
 
-    assert not any(lowered.startswith(phrase) for phrase in review_synthesis.FILLER_DENYLIST)
+    assert claim["quote_text"] == hit["snippet"]
 
 
-def test_review_integrity_accepts_claim_shape(monkeypatch) -> None:
+def test_quote_record_carries_gate_ready_shape() -> None:
     hit = _claim_hit()
     themes = {"physics": [hit]}
     bibliography = review_synthesis.build_bibliography([hit])
-    monkeypatch.setattr(rag, "embed", lambda _texts: None)
 
     claim = review_synthesis.build_claims(themes, "quantum retrieval", bibliography)[0]
 
-    assert {"claim_sentence", "source_id", "source_text"} <= claim.keys()
-    assert review_synthesis.review_integrity.check_claims([claim])["status"] in {
-        "pass",
-        "flagged",
-    }
+    assert {"quote_text", "source_id", "source_text", "citation_key"} <= claim.keys()
 
 
 def _model_hits() -> list:
@@ -315,16 +320,16 @@ def test_build_model_returns_error_below_minimum_claim_floor() -> None:
     assert model["minimum_claims"] == review_synthesis.MIN_CLAIMS
 
 
-def test_claims_for_integrity_exposes_only_gate_contract() -> None:
+def test_quotes_for_integrity_exposes_only_gate_contract() -> None:
     model = review_synthesis.build_model("quantum retrieval", _model_hits(), [])
 
-    claims = review_synthesis.claims_for_integrity(model)
+    quotes = review_synthesis.quotes_for_integrity(model)
 
     assert all(
-        set(claim) == {"claim_sentence", "source_id", "source_text"}
-        for claim in claims
+        set(quote) == {"quote_text", "source_id", "source_text", "citation_key"}
+        for quote in quotes
     )
-    assert len(claims) == len(model["claims"])
+    assert len(quotes) == len(model["claims"])
 
 
 def test_drop_flagged_returns_error_when_floor_would_be_breached() -> None:

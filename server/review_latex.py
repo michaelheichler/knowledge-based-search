@@ -58,17 +58,42 @@ def _render_prose(value) -> str:
     return _escape_prose(value or "")
 
 
+def _render_analysis_section(analysis) -> str:
+    """The marker remains a comment because synthesis requires downstream judgment."""
+    blocks = []
+    for theme, values in (analysis or {}).items():
+        records = values if isinstance(values, (list, tuple)) else [values]
+        parts = []
+        for record in records:
+            if not isinstance(record, dict):
+                parts.append(_render_prose(record))
+                continue
+            if record.get("placeholder"):
+                continue
+            quote_text = _escape_prose(record.get("quote_text", ""))
+            parts.append(
+                f"\\begin{{quote}}\n``{quote_text}''\n\\end{{quote}}\n"
+                f"\\citep{{{record.get('citation_key', '')}}}"
+            )
+        parts.append(
+            "% AGENT-SYNTHESIS: write 2-4 sentences connecting the evidence above into one thematic claim. Do not copy verbatim."
+        )
+        blocks.append(f"\\subsection{{{_escape_raw(theme)}}}\n" + "\n\n".join(parts))
+    return "\n\n".join(blocks)
+
+
 def _section_blocks(model) -> str:
     sections = (
         ("Design", model.get("design", "")),
         ("Conduct", model.get("conduct", "")),
-        ("Analysis", model.get("analysis", "")),
+        ("Analysis", model.get("analysis", {})),
         ("Write-up", model.get("write_up", model.get("write-up", ""))),
     )
-    return "\n\n".join(
-        f"\\section{{{title}}}\n{_render_prose(content)}"
-        for title, content in sections
-    )
+    blocks = []
+    for title, content in sections:
+        renderer = _render_analysis_section if title == "Analysis" else _render_prose
+        blocks.append(f"\\section{{{title}}}\n{renderer(content)}")
+    return "\n\n".join(blocks)
 
 
 def _citation_keys(text) -> set[str]:
