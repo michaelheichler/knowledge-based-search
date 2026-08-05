@@ -28,6 +28,27 @@ kbs doctor             # explain config, ranking, daemon, and PATH status
 
 Add `--json` for machine-readable output.
 
+## Scientific literature reviews
+
+Request a bounded Rapid Review explicitly with `--scientific`:
+
+```sh
+kbs search "quantum methods" --scientific --literature-review
+```
+
+`--literature-review` requires `--scientific`. Each run writes its artifacts under
+`<cwd>/reviews/<topic-slug>-<YYYYMMDD-HHMMSS>/`:
+
+- `review.tex`, the Harvard-style LaTeX source
+- `review.bib`, the cited bibliography
+- `review.pdf`, the compiled review
+- `methodology.md`, the run-specific methodology guide
+
+Compilation requires a full TeX distribution, such as MacTeX or TeX Live full.
+MiKTeX users must pre-install `natbib`, `harvard`, `geometry`, `amsmath`, `pgfplots`,
+and `tikz`, or disable on-demand package installation. An on-demand package fetch
+would add a network dependency to an otherwise offline compile step.
+
 ## Requirements
 
 Python 3.11 or newer is required.

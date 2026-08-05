@@ -1,8 +1,11 @@
 """Pin review orchestration order and fail-closed artifact publication."""
 
+import re
+import shutil
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
 import review
 import review_integrity
 
@@ -201,6 +204,52 @@ def test_generate_review_guide_lands_with_compiled_pdf(tmp_path, monkeypatch) ->
     assert guide.is_file()
     assert output / "review.pdf" == Path(result["pdf_path"])
     assert "arxiv: 2" in guide.read_text(encoding="utf-8")
+
+
+def _canned_review_hits() -> list[dict]:
+    return [
+        {
+            "title": "Quantum signal methods",
+            "source_id": "arxiv:2401.00001",
+            "snippet": "Quantum methods improve signal quality.",
+            "engines": ["arxiv"],
+            "categories": ["measurement"],
+            "date": "2024-01-01",
+            "authors": "Doe, Jane",
+        },
+        {
+            "title": "Quantum measurement design",
+            "source_id": "pubmed:12345678",
+            "snippet": "Quantum methods guide measurement design.",
+            "engines": ["pubmed"],
+            "categories": ["simulation"],
+            "date": "2023-01-01",
+            "authors": "Smith, Alex",
+        },
+    ]
+
+
+def _citation_keys(tex: str) -> set[str]:
+    markers = re.findall(r"\\cite[pt]\{([^{}]+)\}", tex)
+    return {key.strip() for marker in markers for key in marker.split(",")}
+
+
+@pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
+def test_real_review_pipeline_publishes_cited_pdf_and_methodology(tmp_path: Path) -> None:
+    result = review.generate_review("quantum methods", _canned_review_hits(), [], tmp_path)
+
+    assert result["status"] == "ok"
+    output = Path(result["pdf_path"]).parent
+    assert Path(result["pdf_path"]).is_file()
+    assert 2 <= result["pages"] <= 4 or result.get("warning")
+    tex = (output / "review.tex").read_text(encoding="utf-8")
+    bib = (output / "review.bib").read_text(encoding="utf-8")
+    bib_keys = set(re.findall(r"@\w+\{([^,]+),", bib))
+    assert re.search(r"\\cite[pt]\{", tex)
+    assert r"\bibliographystyle{agsm}" in tex
+    assert bib_keys
+    assert bib_keys <= _citation_keys(tex)
+    assert (output / "methodology.md").is_file()
 
 
 
