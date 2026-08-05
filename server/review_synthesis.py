@@ -154,7 +154,7 @@ def _source_text(hit) -> str:
         return str(hit.get("source_text") or hit.get("snippet") or "")
     try:
         payload = library_engine.get_passage_from_url(url)
-    except (KeyError, OSError, RuntimeError, TypeError, ValueError):
+    except (IndexError, KeyError, OSError, RuntimeError, TypeError, ValueError):
         return snippet
     deep_text = payload.get("text") or payload.get("passage") or payload.get("content")
     return str(deep_text) if deep_text else snippet
