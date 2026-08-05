@@ -5,7 +5,7 @@ title: "Analysis section quote redesign, attribution integrity gate, Conduct/met
 type: remediation
 status: partial
 completed: 2026-08-05
-tasks_completed: 5
+tasks_completed: 6
 tasks_total: 7
 commit_hashes:
   - c7cf4dafd3db555daedd3c4eb682fc31696e5082
@@ -115,3 +115,16 @@ Task 1 marks CrossRef snippets as metadata and excludes them from claim generati
 - Manual generation with five hits across arXiv, PubMed, Semantic Scholar, and CrossRef produced connected narrative with real counts and trust values, one terminology list, and one `[AGENT:` placeholder confined to Limitations.
 - `python3 -m py_compile server/review.py server/tests/test_review.py` passed.
 - Commit: `18a0c81`.
+
+## Task 6: Reword REQ-20 in REQUIREMENTS.md
+
+### What Was Built
+- REQ-20 now describes verbatim, quotation-marked, cited excerpts, downstream `% AGENT-SYNTHESIS` instructions, and no kbs-authored paraphrase or synthesis prose.
+- The integrity requirement now names exact quote attribution and bidirectional citation completeness, not near-verbatim similarity detection.
+
+### Files Modified
+- `.vbw-planning/REQUIREMENTS.md` -- replaces the incompatible paraphrase and near-verbatim requirement with the implemented quote-plus-placeholder design.
+
+### Verification
+- Cross-checked the requirement against quote records in `review_synthesis.py`, normalized attribution checks in `review_integrity.py`, the raw `% AGENT-SYNTHESIS` marker in `review_latex.py`, and bidirectional citation validation in `_validate_citations`.
+- `grep -n "near-verbatim" .vbw-planning/REQUIREMENTS.md` found only the sentence stating that the check no longer measures or flags near-verbatim similarity.
