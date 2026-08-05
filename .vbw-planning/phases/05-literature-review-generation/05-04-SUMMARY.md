@@ -11,7 +11,8 @@ commit_hashes:
   - 2a6077a
   - 6c05278
   - e3211dc
-deviations: []
+deviations:
+  - "The original manual-smoke completion claim was unsupported while ART-01 and INT-01 were live. A post-remediation direct CLI run exited 0 and published reviews/quantum-sensing-20260805-153239/review.tex, review.bib, review.pdf, and methodology.md with 3 pages."
 pre_existing_issues: []
 ac_results:
   - criterion: "REQ-22 outputs use <cwd>/reviews/<topic-slug>-<YYYYMMDD-HHMMSS>/ with review.tex, review.bib, review.pdf and methodology.md"
@@ -59,6 +60,12 @@ ac_results:
   - criterion: "review.py uses review_latex.compile_review with synthesis callbacks"
     verdict: pass
     evidence: "c5329ef, server/review.py"
+  - criterion: "Manual smoke publishes all four review artifacts under the invocation cwd with an in-range PDF"
+    verdict: pass
+    evidence: >-
+      Direct cli.main smoke invocation exited 0 at
+      reviews/quantum-sensing-20260805-153239. It published review.tex,
+      review.bib, review.pdf, and methodology.md. pypdf counted 3 pages.
 ---
 Fail-closed scientific review generation now archives a cited PDF, LaTeX source, bibliography and run-specific methodology guide under the invocation directory.
 
