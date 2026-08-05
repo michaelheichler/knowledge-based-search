@@ -65,3 +65,88 @@ def test_real_compile_supports_review_toolchain(tmp_path: Path) -> None:
         encoding="utf-8", errors="replace"
     )
 
+
+_MODEL = {
+    "title": "Baseline review",
+    "question": "Which methods recur?",
+    "design": r"Design claim \citep{alpha}.",
+    "conduct": r"Conduct claim \citet{beta}.",
+    "analysis": {"Theme": r"Thematic claim \citep{alpha}."},
+    "write_up": r"Write-up claim \citep{beta}.",
+    "bib": [
+        {
+            "key": "alpha",
+            "authors": "Grant, Maria J. and Booth, Andrew",
+            "year": 2009,
+            "title": "A typology of reviews",
+            "venue": "Review Journal",
+        },
+        {
+            "key": "beta",
+            "authors": "Booth, Andrew and Sutton, Anthea",
+            "year": 2019,
+            "title": "Evidence methods",
+            "venue": "Methods Quarterly",
+        },
+    ],
+    "chart": {2009: 1, 2019: 1},
+    "formulas": [r"x = y"],
+}
+
+
+def test_render_tex_escapes_raw_fields_and_preserves_citations() -> None:
+    """Escaping protects the document while citation commands remain executable."""
+    model = {**_MODEL, "title": r"100% & _ # $ \\ title"}
+    model["design"] = r"20% & _ # $ \\ prose \citep{alpha}."
+
+    tex = review_latex.render_tex(model)
+
+    for escaped in (r"\%", r"\&", r"\_", r"\#", r"\$", r"\textbackslash{}"):
+        assert escaped in tex
+    assert r"\citep{alpha}" in tex
+
+
+def test_render_tex_keeps_snyder_sections_in_order() -> None:
+    """Section order makes the method visible instead of relying on dictionary order."""
+    tex = review_latex.render_tex(_MODEL)
+    positions = [tex.index(rf"\section{{{name}}}") for name in ("Design", "Conduct", "Analysis", "Write-up")]
+
+    assert positions == sorted(positions)
+
+
+def test_render_tex_gates_chart_and_formula_fragments_on_data() -> None:
+    """Absent source data must not produce literature-looking visual content."""
+    empty = {**_MODEL, "chart": {}, "formulas": []}
+    without_fragments = review_latex.render_tex(empty)
+    with_fragments = review_latex.render_tex(_MODEL)
+
+    assert r"\addplot" not in without_fragments
+    assert r"\begin{equation*}" not in without_fragments
+    assert r"\addplot" in with_fragments
+    assert r"\begin{equation*}" in with_fragments
+
+
+def test_render_bib_and_render_tex_require_citation_coverage() -> None:
+    """Bibliography output carries agsm fields and rejects an uncited source."""
+    bib = review_latex.render_bib(_MODEL)
+    uncited = {**_MODEL, "bib": [*_MODEL["bib"], {"key": "orphan"}]}
+
+    assert "author = {Grant, Maria J. and Booth, Andrew}" in bib
+    assert "year = {2009}" in bib
+    assert "journal = {Review Journal}" in bib
+    with pytest.raises(ValueError, match="uncited bibliography entries"):
+        review_latex.render_tex(uncited)
+
+
+@pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
+def test_rendered_model_compiles_with_the_validated_toolchain(tmp_path: Path) -> None:
+    """The rendered model must pass through the same real compiler as the spike."""
+    (tmp_path / "review.tex").write_text(review_latex.render_tex(_MODEL), encoding="utf-8")
+    (tmp_path / "review.bib").write_text(review_latex.render_bib(_MODEL), encoding="utf-8")
+
+    result = review_latex.run_compile(tmp_path, "review")
+
+    assert result["status"] == "ok"
+    assert Path(result["pdf_path"]).is_file()
+    assert review_latex.page_count(result["pdf_path"]) >= 1
+
