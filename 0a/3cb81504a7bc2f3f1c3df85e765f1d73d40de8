@@ -1,0 +1,21 @@
+.vbw-planning/phases/05-literature-review-generation/05-04-SUMMARY.md
+  s_a680ad9514551b::t_c97ea6e17b7033 65-68
+  s_a680ad9514551b::t_edc7a184be80ea 14-15
+  s_a680ad9514551b::t_5353f27350bf0f 63-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "0a3cb81504a7bc2f3f1c3df85e765f1d73d40de8",
+  "prompts": {},
+  "sessions": {
+    "s_a680ad9514551b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13cb5ba9-261c-44fb-a667-c81cd26d0dbe",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
