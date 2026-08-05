@@ -3,21 +3,34 @@ phase: 5
 round: 1
 title: "Analysis section quote redesign, attribution integrity gate, Conduct/methodology cleanup, REQ-20 rewording"
 type: remediation
-status: partial
+status: complete
 completed: 2026-08-05
-tasks_completed: 6
+tasks_completed: 7
 tasks_total: 7
 commit_hashes:
   - c7cf4dafd3db555daedd3c4eb682fc31696e5082
   - 2baec3b
+  - ac1b640
   - a107e7e
   - 18a0c81
+  - f042547
+  - 6233dbf
+  - 4220363
 files_modified:
   - server/science_engines.py
   - server/review_synthesis.py
   - server/review_latex.py
+  - server/review_integrity.py
+  - server/review.py
   - server/tests/test_review_synthesis.py
-deviations: []
+  - server/tests/test_review_integrity.py
+  - server/tests/test_review.py
+  - server/tests/test_cli.py
+  - .vbw-planning/REQUIREMENTS.md
+deviations:
+  - "Two execution attempts at Task 2 were interrupted mid-stream by an unrelated infrastructure error (API response stalled). The first left review_latex.py briefly with a syntax error, and both attempts' broken, uncommitted work were reverted with git restore before retrying. The landed commit 2baec3b is the complete, tested implementation."
+  - "The Task 7 smoke run surfaced a real defect the research/plan did not anticipate: PubMed's ESummary snippet (server/science_engines.py's _pubmed_hit) is journal-name-plus-date metadata, not abstract prose, the same defect class as CrossRef. Fixed by reusing the existing source_text_is_metadata guard (commit 4220363)."
+  - "A follow-on, uncommitted refactor attempt (adding a _view_bibliography helper to retain metadata-flagged hits' bibliography entries in the final rendered bib) was started during that same interrupted Task 7 attempt but never fully wired in. Direct testing confirmed completing it as started would have reintroduced review_latex.py's uncited-bibliography-entries render failure, since retained-but-uncited entries fail _validate_citations. Discarded with git restore rather than completed. The correct, already-consistent behavior is unchanged: metadata-flagged hits count in _pool_counts/Conduct search scope but are not retained in the final citable bibliography, since nothing quotes them."
 known_issue_outcomes: []
 pre_existing_issues: []
 ---
@@ -128,3 +141,32 @@ Task 1 marks CrossRef snippets as metadata and excludes them from claim generati
 ### Verification
 - Cross-checked the requirement against quote records in `review_synthesis.py`, normalized attribution checks in `review_integrity.py`, the raw `% AGENT-SYNTHESIS` marker in `review_latex.py`, and bidirectional citation validation in `_validate_citations`.
 - `grep -n "near-verbatim" .vbw-planning/REQUIREMENTS.md` found only the sentence stating that the check no longer measures or flags near-verbatim similarity.
+
+## Task 7: End-to-end smoke: regenerate a real review and judge the output
+
+### What Was Built
+- Ran a real review generation through the actual CLI entry point (`python3 cli.py search --scientific --literature-review "quantum sensing"`, from `server/`), a live network run against real arXiv, PubMed, and CrossRef results, not synthetic fixtures.
+- Output: `reviews/quantum-sensing-20260805-214437/{review.tex,review.pdf,methodology.md}`. Status `ok`, 2 pages, theme `quant-ph`, 2 sources cited.
+- All six required inspections passed on this real output:
+  1. `review.pdf` compiled and opened, 2 pages.
+  2. Analysis section shows two real, coherent, grammatically correct quoted excerpts from arXiv papers (not scrambled prose, not CrossRef metadata). Example excerpt, citation key `arxiv2024`: "While traditional quantum sensing is often focused on estimating a single parameter with maximum precision, distributed quantum sensing seeks to estimate some function of multiple parameters that are only locally accessible for each party involved."
+  3. `% AGENT-SYNTHESIS:` marker present once in `review.tex`, confirmed absent from the compiled PDF's extracted text layer via `pypdf`.
+  4. Conduct section renders exactly one "Search Scope" subsection (crossref 1, arxiv 2, pubmed 2), no duplicate or bare-number subsections, no empty Terminology Alternatives heading (there were no alternatives for this query).
+  5. `methodology.md` follows the new narrative structure with this run's real data (real pool counts, real trust tiers, theme `quant-ph`), with exactly one `[AGENT:` placeholder, confined to Limitations.
+  6. Integrity check section reports "Status: pass."
+- The smoke run surfaced a real defect the plan and research did not anticipate (see Deviations): PubMed's snippet is metadata, not abstract prose. Fixed by extending the existing `source_text_is_metadata` guard to PubMed (commit `4220363`), the same mechanism Task 1 built for CrossRef.
+- A follow-on refactor attempt during the same interrupted execution (adding a `_view_bibliography` helper to retain metadata-flagged hits in the final rendered bibliography) was discarded rather than completed, see Deviations for why it would have been a regression.
+
+### Files Modified
+- `server/science_engines.py` -- marks PubMed's `_pubmed_hit` snippet as metadata (same guard as CrossRef).
+
+### Known Issue Outcomes
+- None.
+
+### Deviations
+- See the round-level `deviations` array in this file's frontmatter for the PubMed-metadata finding and the discarded follow-on refactor. Both are recorded there, not duplicated here.
+
+### Verification
+- `python3 -m pytest server/tests/ -q`: 224 passed, 1 skipped (unchanged from Task 6, this task added no new test-suite changes beyond the PubMed one-line guard already covered by Task 1's existing CrossRef-pattern tests).
+- Real CLI run, exit implied by `status: ok` JSON output, no exception.
+- Direct PDF text-layer extraction via `pypdf.PdfReader` confirmed `AGENT-SYNTHESIS` absent from rendered text.
