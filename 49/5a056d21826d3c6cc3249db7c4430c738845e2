@@ -1,0 +1,20 @@
+.vbw-planning/milestones/01-scientific-research-backend-v1/SHIPPED.md
+  s_3c155de8533c9a::t_a3cb243257c461 1-33
+  s_3c155de8533c9a::t_f37817920bf7cd 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "495a056d21826d3c6cc3249db7c4430c738845e2",
+  "prompts": {},
+  "sessions": {
+    "s_3c155de8533c9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e72df891-4c72-40d8-b214-4236c48adad8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
