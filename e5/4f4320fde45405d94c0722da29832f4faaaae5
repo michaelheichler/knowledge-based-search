@@ -1,0 +1,22 @@
+server/tests/test_review_synthesis.py
+  s_a680ad9514551b::t_918593dffd47a8 131-148
+  s_a680ad9514551b::t_9e3802bbdab881 214-219,221-222
+server/review_synthesis.py
+  s_a680ad9514551b::t_9f87286316edb5 205,207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "e54f4320fde45405d94c0722da29832f4faaaae5",
+  "prompts": {},
+  "sessions": {
+    "s_a680ad9514551b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13cb5ba9-261c-44fb-a667-c81cd26d0dbe",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
