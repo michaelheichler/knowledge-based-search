@@ -1,11 +1,11 @@
 ---
 phase: 5
 plan_count: 1
-status: in_progress
+status: complete
 started: 2026-08-05
-completed:
+completed: 2026-08-06
 total_tests: 2
-passed: 0
+passed: 1
 skipped: 1
 issues: 0
 ---
@@ -40,11 +40,11 @@ Only entries whose final `Result` is `issue` are blocking UAT issues, empty, `pa
 - **Plan:** R02, Join Search Scope pool sentences into one flowing sentence
 - **Scenario:** The original issue was: the Conduct section's Search Scope subsection listed one sentence per pool as separate paragraphs, and LaTeX's default indentation made arxiv/pubmed look nested under crossref. Regenerate a review (`kbs search --scientific --literature-review "<a topic>"`) or open a freshly compiled `review.pdf` and read the Conduct section's Search Scope subsection.
 - **Expected:** All source pools appear in one flowing sentence at the same visual level, no indentation implying a parent/child relationship between pools.
-- **Result:**
+- **Result:** pass
 
 ## Summary
 
-- Passed: 0
+- Passed: 1
 - Skipped: 1
 - Issues: 0
 - Total: 2
