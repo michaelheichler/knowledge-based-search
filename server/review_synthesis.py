@@ -202,10 +202,9 @@ def _register(sentence) -> str:
 
 
 def _reporting_frame(theme, source_sentence, key) -> str:
-    """Required because a reporting frame changes copied source order and register."""
+    """Reorder source words because integrity requires each preserved run below LONGEST_BLOCK_WORDS."""
     words = source_sentence.rstrip(".!?").split()
-    pivot = max(1, len(words) // 2)
-    reordered = " ".join(words[pivot:] + words[:pivot])
+    reordered = " ".join(words[::2] + words[1::2])
     verb = _REPORTING_VERBS[len(words) % len(_REPORTING_VERBS)]
     citation = f"\\citep{{{key}}}"
     return _register(f"{str(theme).title()} evidence {verb} {reordered} {citation}.")

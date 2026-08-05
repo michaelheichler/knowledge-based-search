@@ -128,6 +128,24 @@ def test_claims_keep_bibliography_pairing_after_theme_reordering() -> None:
     assert all(entries[claim["citation_key"]]["source_id"] == claim["source_id"] for claim in claims)
 
 
+def test_realistic_claims_clear_integrity_gate(monkeypatch) -> None:
+    hit = _claim_hit(
+        snippet=(
+            "Researchers compared longitudinal patient outcomes across three hospital systems using "
+            "a preregistered protocol and found that targeted retrieval reduced errors without "
+            "increasing review time."
+        )
+    )
+    themes = {"physics": [hit]}
+    bibliography = review_synthesis.build_bibliography([hit])
+    monkeypatch.setattr(rag, "embed", lambda _texts: None)
+
+    claims = review_synthesis.build_claims(themes, "targeted retrieval", bibliography)
+
+    assert len(hit["snippet"].split()) >= 20
+    assert review_synthesis.review_integrity.check_claims(claims)["status"] == "pass"
+
+
 def test_library_claims_use_deepened_text_and_keep_snippet_on_failure(monkeypatch) -> None:
     hit = _claim_hit("library://book-1?chunk=2", snippet="Short library snippet.")
     themes = {"physics": [hit]}
@@ -193,35 +211,15 @@ def test_review_integrity_accepts_claim_shape(monkeypatch) -> None:
 
 
 def _model_hits() -> list:
+    rows = [
+        ("https://physics.example/one", "Physics one", "Physics", "2020-01-01", "Quantum retrieval improves measured accuracy in controlled trials."),
+        ("https://physics.example/two", "Physics two", "Physics", "2021-01-01", "Quantum retrieval reduces error across repeated measurements."),
+        ("https://medicine.example/one", "Medicine one", "Medicine", "2021-06-01", "Clinical teams report stronger outcomes after retrieval training."),
+        ("https://medicine.example/two", "Medicine two", "Medicine", "2022-06-01", "Clinical studies associate retrieval practice with better outcomes."),
+    ]
     return [
-        _hit(
-            "https://physics.example/one",
-            title="Physics one",
-            categories=["Physics"],
-            date="2020-01-01",
-            snippet="Quantum retrieval improves measured accuracy in controlled trials.",
-        ),
-        _hit(
-            "https://physics.example/two",
-            title="Physics two",
-            categories=["Physics"],
-            date="2021-01-01",
-            snippet="Quantum retrieval reduces error across repeated measurements.",
-        ),
-        _hit(
-            "https://medicine.example/one",
-            title="Medicine one",
-            categories=["Medicine"],
-            date="2021-06-01",
-            snippet="Clinical teams report stronger outcomes after retrieval training.",
-        ),
-        _hit(
-            "https://medicine.example/two",
-            title="Medicine two",
-            categories=["Medicine"],
-            date="2022-06-01",
-            snippet="Clinical studies associate retrieval practice with better outcomes.",
-        ),
+        _hit(url, title=title, categories=[category], date=date, snippet=snippet)
+        for url, title, category, date, snippet in rows
     ]
 
 
