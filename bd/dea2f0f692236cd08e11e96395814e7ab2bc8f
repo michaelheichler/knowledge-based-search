@@ -1,0 +1,21 @@
+server/library_engine.py
+  s_a680ad9514551b::t_af8df0c00a25de 116
+server/tests/test_library_engine.py
+  s_a680ad9514551b::t_672eec07af89ce 80-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "bddea2f0f692236cd08e11e96395814e7ab2bc8f",
+  "prompts": {},
+  "sessions": {
+    "s_a680ad9514551b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13cb5ba9-261c-44fb-a667-c81cd26d0dbe",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
