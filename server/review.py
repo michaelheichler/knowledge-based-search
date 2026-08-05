@@ -6,10 +6,12 @@ import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import review_integrity
 import review_latex
 import review_synthesis
+import trust
 
 # ponytail: configurable review output root, add a config key when cwd is insufficient.
 
@@ -58,12 +60,35 @@ def _atomic_write(destination: Path, content: str) -> None:
         raise
 
 
+_GUIDE_POOL_DOMAINS = {
+    "arxiv": "arxiv.org",
+    "pubmed": "ncbi.nlm.nih.gov",
+    "semanticscholar": "semanticscholar.org",
+    "crossref": "crossref.org",
+}
+
+
+def _guide_source_pools(model) -> dict:
+    """Why: raw pool counts stay available after Conduct is flattened for LaTeX."""
+    pools = model.get("source_pools")
+    if not isinstance(pools, dict):
+        pools = model.get("conduct", {}).get("source_pools", {})
+    return pools if isinstance(pools, dict) else {}
+
+
 def _guide_pool_lines(model) -> str:
-    """Why: conduct counts let agents audit the bounded source scope."""
-    pools = model.get("conduct", {}).get("source_pools", {})
-    if not isinstance(pools, dict) or not pools:
-        return "- none recorded"
-    return "\n".join(f"- {pool}: {count} hit(s)" for pool, count in pools.items())
+    """Why: connected pool sentences let agents audit the bounded source scope."""
+    pools = _guide_source_pools(model)
+    if pools:
+        details = []
+        for pool, count in pools.items():
+            unit = "hit" if str(count) == "1" else "hits"
+            details.append(f"{pool} ({count} ranked {unit})")
+        return ", ".join(details)
+    scope = model.get("search_scope")
+    if isinstance(scope, dict) and scope:
+        return ", ".join(str(value).rstrip(".") for value in scope.values())
+    return "no source pools were recorded"
 
 
 def _guide_theme_names(model) -> str:
@@ -82,28 +107,165 @@ def _guide_page_outcome(integrity_summary) -> str:
     return f"{outcome} Warning: {warning}" if warning else outcome
 
 
-def _guide_content(model, integrity_summary) -> str:
-    """Why: the companion guide avoids parsing binary output for method evidence."""
-    design = model.get("design", {})
-    question = design.get("question") or model.get("question", "not recorded")
-    classification = design.get("classification", "Rapid Review")
-    source_count = len(model.get("bib", []))
+def _guide_pool_domain(model, pool) -> str:
+    """Why: provider names need their configured domain before trust lookup."""
+    pool_name = str(pool).lower()
+    if pool_name in _GUIDE_POOL_DOMAINS:
+        return _GUIDE_POOL_DOMAINS[pool_name]
+    entries = model.get("_bibliography_pool", model.get("bib", []))
+    if not isinstance(entries, list):
+        return ""
+    for entry in entries:
+        source_id = str(entry.get("source_id") or "").lower()
+        if source_id.startswith(f"{pool_name}:"):
+            hostname = (urlsplit(str(entry.get("url") or "")).hostname or "").lower()
+            return hostname.removeprefix("www.")
+    return ""
+
+
+def _guide_configured_score(data, domain) -> int | None:
+    """Why: methodology reports the fixed score, not the ranking bonus."""
+    if not domain:
+        return None
+    categories = data.get("categories", {})
+    science = categories.get("science", {}) if isinstance(categories, dict) else {}
+    if domain in science:
+        return science[domain]
+    for scores in categories.values() if isinstance(categories, dict) else []:
+        if isinstance(scores, dict) and domain in scores:
+            return scores[domain]
+    return None
+
+
+def _guide_trust_lines(model) -> str:
+    """Why: each present pool must expose the trust configuration used for appraisal."""
+    pools = _guide_source_pools(model)
+    if not pools:
+        return "no source-pool trust tiers were recorded"
+    data = trust._trust_data()
+    lines = []
+    for pool in pools:
+        pool_name = str(pool)
+        if pool_name.lower() == "library":
+            lines.append("library: 95")
+            continue
+        domain = _guide_pool_domain(model, pool_name)
+        score = _guide_configured_score(data, domain)
+        label = domain or pool_name
+        if pool_name.lower() == "pubmed" and domain:
+            label = f"{domain} ({pool_name})"
+        lines.append(f"{label}: {score if score is not None else 'not configured'}")
+    return ", ".join(lines)
+
+
+def _guide_alternatives(model) -> str:
+    """Why: agents need explicit terminology choices even when the list is empty."""
+    alternatives = model.get("terminology_alternatives", [])
+    if not isinstance(alternatives, list) or not alternatives:
+        return "No terminology alternatives were surfaced for this query."
+    lines = []
+    for index, item in enumerate(alternatives, 1):
+        if not isinstance(item, dict):
+            item = {}
+        note = item.get("note", "")
+        suffix = f" ({note})" if note else ""
+        lines.append(f"  {index}. {item.get('term', '')}{suffix}")
+    return "\n".join(lines)
+
+
+def _guide_conduct(model) -> str:
+    """Why: source scope and appraisal need connected sentences for agent handoff."""
     return (
-        "# Review methodology\n\n"
+        "## Conduct\n\n"
+        "### Search scope and source selection\n\n"
+        "This review searched the following source pools, combining relevance rank and "
+        "recency rank on every query, no mode strips either signal: "
+        f"{_guide_pool_lines(model)}. Source selection is bounded by kbs's existing keyless "
+        "provider allowlist. No additional database or paywalled source was queried.\n\n"
+        "### Quality and trust appraisal\n\n"
+        "Each source pool carries a fixed trust tier from kbs's trust configuration "
+        f"(`server/data/trust.json`): {_guide_trust_lines(model)}. Library hits carry a fixed "
+        "tier of 95 with no domain to score. Per-paper ranking additionally weighs citation "
+        "count where the provider exposes it (Semantic Scholar, CrossRef) and query-term "
+        "alignment.\n\n"
+        "### Terminology alternatives considered\n\n"
+        f"{_guide_alternatives(model)}"
+    )
+
+
+def _guide_analysis(model) -> str:
+    """Why: synthesis ownership must remain explicit at the agent boundary."""
+    return (
+        "## Analysis\n\n"
+        f"Themes identified: {_guide_theme_names(model)}. Each theme's evidence is presented "
+        "as directly quoted, cited excerpts. The connecting synthesis sentence per theme is "
+        "delegated to the calling agent to write via the `% AGENT-SYNTHESIS` markers in "
+        "review.tex. kbs does not paraphrase or fabricate synthesis prose."
+    )
+
+
+def _guide_integrity(integrity_summary) -> str:
+    """Why: the guide names both attribution and citation completeness guarantees."""
+    return (
+        "## Integrity check\n\n"
+        f"Status: {integrity_summary.get('status', 'unknown')}. `check_quotes` verifies every "
+        "quoted excerpt to exactly match a sentence in its attributed, retrieved source text "
+        "before finalization, guarding against fabrication or misattribution. "
+        "`review_latex._validate_citations` verifies citation completeness bidirectionally. "
+        "Every bibliography entry is cited in the body and every citation key resolves to a "
+        "bibliography entry."
+    )
+
+
+def _guide_classification(model) -> str:
+    """Why: the classification keeps the review type beside its framing."""
+    classification = model.get("design", {}).get("classification", "Rapid Review")
+    return (
         "## Classification\n\n"
         f"{classification} Grant & Booth (2009) frame this as a time-constrained review "
-        "with limited appraisal and narrative or tabular synthesis, not a Systematic Review.\n\n"
-        "## Snyder phases\n\n"
-        f"### Design\n\nQuestion: {question}\n\n"
-        "### Conduct\n\nSource pools and ranked hit counts:\n"
-        f"{_guide_pool_lines(model)}\n\n"
-        f"### Analysis\n\nThemes: {_guide_theme_names(model)}\n\n"
-        f"### Write-up\n\n{source_count} source(s) remained cited. {_guide_page_outcome(integrity_summary)}\n\n"
-        "## Integrity check\n\n"
-        f"Status: {integrity_summary.get('status', 'unknown')}. Quoted excerpts are checked "
-        "against sentences in their attributed source text. Flagged quotes are dropped and "
-        "checked again before compilation.\n"
+        "with limited appraisal and narrative or tabular synthesis, not a Systematic Review."
     )
+
+
+def _guide_design(model) -> str:
+    """Why: the research question anchors every run-specific method statement."""
+    design = model.get("design", {})
+    question = design.get("question") or model.get("question", "not recorded")
+    return f"## Design\n\nResearch question: {question}"
+
+
+def _guide_write_up(model, integrity_summary) -> str:
+    """Why: source and page outcomes stay tied to the finalized artifact."""
+    source_count = len(model.get("bib", []))
+    return (
+        f"## Write-up\n\n{source_count} source(s) remained cited. "
+        f"{_guide_page_outcome(integrity_summary)}"
+    )
+
+
+def _guide_limitations() -> str:
+    """Why: only run-specific judgment belongs to the downstream agent."""
+    return (
+        "## Limitations\n\n"
+        "[AGENT: describe the limitations of this specific run's search scope and evidence "
+        "coverage, for example thin themes, provider gaps, or terms not tried. kbs does not "
+        "narrate this itself. It is real judgment about this run, not a templated disclaimer.]"
+    )
+
+
+def _guide_content(model, integrity_summary) -> str:
+    """Why: the companion guide narrates method evidence without generating prose."""
+    sections = [
+        "# Review methodology",
+        _guide_classification(model),
+        _guide_design(model),
+        _guide_conduct(model),
+        _guide_analysis(model),
+        _guide_write_up(model, integrity_summary),
+        _guide_integrity(integrity_summary),
+        _guide_limitations(),
+    ]
+    return "\n\n".join(sections) + "\n"
 
 
 

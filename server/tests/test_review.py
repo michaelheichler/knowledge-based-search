@@ -133,29 +133,80 @@ def test_output_directory_uses_slug_and_timestamp(tmp_path, monkeypatch) -> None
     assert output == tmp_path / "reviews" / "a-topic-with-punctuation-20260805-120000"
 
 
-def _methodology_model() -> dict:
+def _methodology_model(alternatives=None) -> dict:
     return {
         "design": {
             "classification": "Rapid Review",
             "topic": "quantum methods",
             "question": "Which quantum methods recur?",
         },
-        "conduct": {
-            "source_pools": {"arxiv": 2, "pubmed": 1},
-            "search_scope": {"arxiv": "2 ranked hit(s)", "pubmed": "1 ranked hit(s)"},
-        },
+        "source_pools": {"arxiv": 2, "pubmed": 1},
+        "search_scope": {"arxiv": "2 ranked hit(s)", "pubmed": "1 ranked hit(s)"},
+        "terminology_alternatives": list(alternatives or []),
         "analysis": {"measurement": [], "simulation": []},
-        "bib": [{"key": "paper2024"}],
+        "bib": [
+            {"key": "arxiv2024", "source_id": "arxiv:1", "url": "https://arxiv.org/abs/1"},
+            {"key": "arxiv2023", "source_id": "arxiv:2", "url": "https://arxiv.org/abs/2"},
+            {"key": "pubmed2024", "source_id": "pubmed:1", "url": "https://pubmed.ncbi.nlm.nih.gov/1/"},
+        ],
     }
 
 
+def _assert_methodology_headings(content: str) -> None:
+    headings = (
+        "## Classification",
+        "## Design",
+        "## Conduct",
+        "### Search scope and source selection",
+        "### Quality and trust appraisal",
+        "### Terminology alternatives considered",
+        "## Analysis",
+        "## Write-up",
+        "## Integrity check",
+        "## Limitations",
+    )
+    for heading in headings:
+        assert heading in content
+
+
+def _assert_methodology_values(content: str) -> None:
+    values = (
+        "Rapid Review",
+        "Grant & Booth (2009)",
+        "Research question: Which quantum methods recur?",
+        "arxiv (2 ranked hits), pubmed (1 ranked hit)",
+        "arxiv.org: 95",
+        "ncbi.nlm.nih.gov (pubmed): 95",
+        "measurement, simulation",
+        "3 source(s) remained cited.",
+        "3 page(s)",
+        "Status: pass.",
+        "`check_quotes` verifies",
+        "`review_latex._validate_citations` verifies citation completeness bidirectionally.",
+        "No terminology alternatives were surfaced for this query.",
+        "% AGENT-SYNTHESIS",
+        "kbs does not paraphrase or fabricate synthesis prose.",
+    )
+    for value in values:
+        assert value in content
+
+
 def _assert_methodology_content(content: str) -> None:
-    for value in ("Rapid Review", "Grant & Booth (2009)", "arxiv: 2", "pubmed: 1"):
-        assert value in content
-    for value in ("measurement", "simulation", "3 page(s)"):
-        assert value in content
-    assert "Quoted excerpts are checked against sentences in their attributed source text." in content
-    assert "Flagged quotes are dropped and checked again before compilation." in content
+    _assert_methodology_headings(content)
+    _assert_methodology_values(content)
+    limitations = content.index("## Limitations")
+    assert "[AGENT:" not in content[:limitations]
+    assert content[limitations:].count("[AGENT:") == 1
+
+
+def test_methodology_guide_lists_terminology_alternatives(tmp_path) -> None:
+    model = _methodology_model([{"term": "quantum sensing", "note": "broader wording"}])
+    content = Path(review.write_methodology_guide(model, {"status": "pass"}, tmp_path)).read_text()
+    assert "  1. quantum sensing (broader wording)" in content
+    assert "No terminology alternatives were surfaced for this query." not in content
+    assert content.count("[AGENT:") == 1
+
+
 
 
 def test_methodology_guide_records_run_data_and_writes_atomically(tmp_path, monkeypatch) -> None:
@@ -208,7 +259,7 @@ def test_generate_review_guide_lands_with_compiled_pdf(tmp_path, monkeypatch) ->
     assert guide == output / "methodology.md"
     assert guide.is_file()
     assert output / "review.pdf" == Path(result["pdf_path"])
-    assert "arxiv: 2" in guide.read_text(encoding="utf-8")
+    assert "arxiv (2 ranked hits)" in guide.read_text(encoding="utf-8")
 
 
 def _canned_review_hits() -> list[dict]:
