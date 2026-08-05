@@ -1,0 +1,21 @@
+.vbw-planning/phases/05-literature-review-generation/remediation/uat/round-02/R02-UAT.md
+  s_3c155de8533c9a::t_21e69a6ef7e1ab 43
+  s_3c155de8533c9a::t_04a5a74ae98288 47
+  s_3c155de8533c9a::t_263dcbc93f520e 4,6,8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d74c008626a16bd73b789ce48e32cb290271cc74",
+  "prompts": {},
+  "sessions": {
+    "s_3c155de8533c9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e72df891-4c72-40d8-b214-4236c48adad8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
