@@ -194,6 +194,7 @@ def _pubmed_hit(pmid, row, rank, categories=None) -> dict | None:
     hit = engines.result(
         row["title"], f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/", snippet, "pubmed", rank
     )
+    hit["source_text_is_metadata"] = True
     hit["date"] = _parse_pubmed_date(row.get("pubdate", ""))
     if categories:
         hit["categories"] = categories
