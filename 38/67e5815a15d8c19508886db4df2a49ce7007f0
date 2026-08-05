@@ -1,0 +1,24 @@
+server/tests/test_review_integrity.py
+  s_a680ad9514551b::t_f0572922c698c3 1-112
+server/review_integrity.py
+  s_a680ad9514551b::t_407690aa8ee4c6 35-36,40,47,53-73
+  s_a680ad9514551b::t_834e2d5f248adb 4
+  s_a680ad9514551b::t_762517c42a56cf 1-3,5-34,76-77,79-83,85-100
+  s_a680ad9514551b::t_e757d1a0aa5ed6 37-39,41-46,48-52,74-75,78,84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "3867e5815a15d8c19508886db4df2a49ce7007f0",
+  "prompts": {},
+  "sessions": {
+    "s_a680ad9514551b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13cb5ba9-261c-44fb-a667-c81cd26d0dbe",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
