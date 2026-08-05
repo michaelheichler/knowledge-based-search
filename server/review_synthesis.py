@@ -315,7 +315,8 @@ def _rebuild_views(model, claims, withheld=None) -> dict:
     result = dict(model)
     result.update({
         "claims": active, "bib": bibliography, "analysis": dict(analysis),
-        "write_up": [claim.get("claim_sentence", "") for claim in active],
+        "write_up": [f"{model.get('design', {}).get('classification', '')} This review synthesizes {len(active)} claims across {', '.join(f'{theme} ({len(items)} claims)' for theme, items in analysis.items())}. "
+                     + f"Sources came from {', '.join(f'{pool} ({count})' for pool, count in model.get('conduct', {}).get('source_pools', {}).items())}. {'A publication-year chart is included.' if chart_from_bibliography(bibliography) else 'No publication-year chart is available.'} {'Formula candidates are included.' if any(_formula_matches(str(claim.get('source_text') or '')) for claim in active) else 'No formula candidates are available.'}"],
         "write_up_order": list(analysis), "chart": chart_from_bibliography(bibliography),
         "formulas": _unique(f for claim in active for f in _formula_matches(str(claim.get("source_text") or ""))),
         "_withheld_claims": list(withheld or []),

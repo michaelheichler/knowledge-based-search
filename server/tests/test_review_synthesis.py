@@ -236,6 +236,14 @@ def test_build_model_contains_four_phases_and_source_pool_counts() -> None:
     assert review_latex.render_tex(model)
 
 
+def test_write_up_is_dense_synthesis_not_analysis_copy() -> None:
+    model = review_synthesis.build_model("quantum retrieval", _model_hits(), [])
+    analysis_sentences = [sentence for sentences in model["analysis"].values() for sentence in sentences]
+
+    assert model["write_up"]
+    assert model["write_up"] != analysis_sentences
+
+
 def test_shrink_and_grow_drop_whole_claims_and_restore_bibliography() -> None:
     model = review_synthesis.build_model("quantum retrieval", _model_hits(), [])
     original_keys = {entry["key"] for entry in model["bib"]}
