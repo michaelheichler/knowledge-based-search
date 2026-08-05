@@ -8,6 +8,8 @@ from unittest.mock import Mock
 import pytest
 import review
 import review_integrity
+import review_latex
+import review_synthesis
 
 
 def _model(claims=3):
@@ -207,25 +209,15 @@ def test_generate_review_guide_lands_with_compiled_pdf(tmp_path, monkeypatch) ->
 
 
 def _canned_review_hits() -> list[dict]:
+    rows = [
+        ("Quantum signal methods", "arxiv:2401.00001", "https://arxiv.org/abs/2401.00001", "Researchers evaluated quantum retrieval across independent clinical cohorts and reported improved diagnostic accuracy when evidence was ranked by calibrated relevance and date.", "arxiv", "physics", "2024-01-01", "Doe, Jane"),
+        ("Structured biology retrieval", "pubmed:12345678", "https://pubmed.ncbi.nlm.nih.gov/12345678/", "A comparative biology study found that structured retrieval improved discovery of relevant findings while preserving reviewer agreement across repeated laboratory analyses.", "pubmed", "biology", "2023-01-01", "Smith, Alex"),
+        ("Quantum measurement design", "arxiv:2402.00002", "https://arxiv.org/abs/2402.00002", "Longitudinal measurements showed quantum retrieval reduced false matches and improved evidence coverage for clinicians working with incomplete records across multiple hospitals.", "arxiv", "physics", "2022-01-01", "Lee, Robin"),
+    ]
     return [
-        {
-            "title": "Quantum signal methods",
-            "source_id": "arxiv:2401.00001",
-            "snippet": "Quantum methods improve signal quality.",
-            "engines": ["arxiv"],
-            "categories": ["measurement"],
-            "date": "2024-01-01",
-            "authors": "Doe, Jane",
-        },
-        {
-            "title": "Quantum measurement design",
-            "source_id": "pubmed:12345678",
-            "snippet": "Quantum methods guide measurement design.",
-            "engines": ["pubmed"],
-            "categories": ["simulation"],
-            "date": "2023-01-01",
-            "authors": "Smith, Alex",
-        },
+        {"title": title, "source_id": source_id, "url": url, "snippet": snippet,
+         "engines": [engine], "categories": [category], "date": date, "authors": authors}
+        for title, source_id, url, snippet, engine, category, date, authors in rows
     ]
 
 
@@ -234,14 +226,11 @@ def _citation_keys(tex: str) -> set[str]:
     return {key.strip() for marker in markers for key in marker.split(",")}
 
 
-@pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
-def test_real_review_pipeline_publishes_cited_pdf_and_methodology(tmp_path: Path) -> None:
-    result = review.generate_review("quantum methods", _canned_review_hits(), [], tmp_path)
-
+def _assert_published_review(result: dict) -> Path:
     assert result["status"] == "ok"
     output = Path(result["pdf_path"]).parent
     assert Path(result["pdf_path"]).is_file()
-    assert 2 <= result["pages"] <= 4 or result.get("warning")
+    assert review_latex.PAGE_MIN <= result["pages"] <= review_latex.PAGE_MAX
     tex = (output / "review.tex").read_text(encoding="utf-8")
     bib = (output / "review.bib").read_text(encoding="utf-8")
     bib_keys = set(re.findall(r"@\w+\{([^,]+),", bib))
@@ -250,7 +239,22 @@ def test_real_review_pipeline_publishes_cited_pdf_and_methodology(tmp_path: Path
     assert bib_keys
     assert bib_keys <= _citation_keys(tex)
     assert (output / "methodology.md").is_file()
+    return output
 
 
+@pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
+def test_real_review_pipeline_publishes_cited_pdf_and_methodology(tmp_path: Path) -> None:
+    hits = _canned_review_hits()
+    themes = review_synthesis.group_themes(hits, query="quantum methods")
+    flattened = [hit for items in themes.values() for hit in items]
+    model = review_synthesis.build_model("quantum methods", hits, [])
+    rendered_bib = review_latex.render_bib(model)
 
+    assert [hit["url"] for hit in flattened] != [hit["url"] for hit in hits]
+    assert all(hit.get("url") for hit in hits)
+    assert all(len(hit["snippet"].split()) >= 16 for hit in hits)
+    assert model["status"] == "ok"
+    assert rendered_bib.count("url = {") == len(hits)
 
+    result = review.generate_review("quantum methods", hits, [], tmp_path)
+    _assert_published_review(result)
