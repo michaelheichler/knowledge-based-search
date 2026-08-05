@@ -6,7 +6,7 @@ started: 2026-08-05
 completed:
 total_tests: 7
 passed: 0
-skipped: 0
+skipped: 3
 issues: 0
 ---
 
@@ -33,7 +33,8 @@ Accepted summary deviations may include an optional `Tracking:` line when the hu
 - **Plan:** R01, Analysis section quote redesign, attribution integrity gate, Conduct/methodology cleanup, REQ-20 rewording
 - **Scenario:** Review a documented implementation deviation from SUMMARY.md
 - **Expected:** Human confirms whether this documented deviation is acceptable for this phase.
-- **Result:**
+- **Result:** skip
+- **Disposition:** skipped-by-user
 
 ### D02: Review summary deviation
 
@@ -45,7 +46,8 @@ Accepted summary deviations may include an optional `Tracking:` line when the hu
 - **Plan:** R01, Analysis section quote redesign, attribution integrity gate, Conduct/methodology cleanup, REQ-20 rewording
 - **Scenario:** Review a documented implementation deviation from SUMMARY.md
 - **Expected:** Human confirms whether this documented deviation is acceptable for this phase.
-- **Result:**
+- **Result:** skip
+- **Disposition:** skipped-by-user
 
 ### D03: Review summary deviation
 
@@ -57,7 +59,8 @@ Accepted summary deviations may include an optional `Tracking:` line when the hu
 - **Plan:** R01, Analysis section quote redesign, attribution integrity gate, Conduct/methodology cleanup, REQ-20 rewording
 - **Scenario:** Review a documented implementation deviation from SUMMARY.md
 - **Expected:** Human confirms whether this documented deviation is acceptable for this phase.
-- **Result:**
+- **Result:** skip
+- **Disposition:** skipped-by-user
 
 ### PR01-T01: Analysis section reads as real evidence, not scrambled prose
 
@@ -90,6 +93,6 @@ Accepted summary deviations may include an optional `Tracking:` line when the hu
 ## Summary
 
 - Passed: 0
-- Skipped: 0
+- Skipped: 3
 - Issues: 0
 - Total: 7
