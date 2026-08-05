@@ -113,7 +113,7 @@ def _document_tool(
     """Fallback invariant: deepening failures never replace existing snippets."""
     try:
         payload = _mcp_tool(name, arguments, timeout, config, post, parser)
-    except (KeyError, OSError, RuntimeError, TypeError, ValueError):
+    except (IndexError, KeyError, OSError, RuntimeError, TypeError, ValueError):
         return {}
     document = payload.get(name.removeprefix("get_"))
     if isinstance(document, dict):

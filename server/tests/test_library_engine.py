@@ -77,6 +77,21 @@ def test_get_passage_absorbs_provider_failure() -> None:
     ) == {}
 
 
+def test_get_passage_absorbs_empty_content_result() -> None:
+    """Failure invariant: an empty MCP content list must not abort synthesis."""
+    responses = [("{}", {"mcp-session-id": "session"}), ("", {}), ("{}", {})]
+
+    def post(*_args, **_kwargs):
+        return responses.pop(0)
+
+    def parser(_body):
+        return {"result": {"content": []}}
+
+    assert library_engine.get_passage(
+        "book", "chunk", config=_CONFIG, post=post, parser=parser
+    ) == {}
+
+
 def test_get_passage_from_url_parses_synthetic_identifier(monkeypatch) -> None:
     """Identity invariant: URL parsing must preserve the attributed chunk."""
     calls = []
