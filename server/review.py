@@ -58,22 +58,55 @@ def _atomic_write(destination: Path, content: str) -> None:
         raise
 
 
+def _guide_pool_lines(model) -> str:
+    """Why: conduct counts let agents audit the bounded source scope."""
+    pools = model.get("conduct", {}).get("source_pools", {})
+    if not isinstance(pools, dict) or not pools:
+        return "- none recorded"
+    return "\n".join(f"- {pool}: {count} hit(s)" for pool, count in pools.items())
+
+
+def _guide_theme_names(model) -> str:
+    """Why: emitted themes must match the run's synthesis model."""
+    themes = model.get("analysis", {})
+    names = themes.keys() if isinstance(themes, dict) else []
+    return ", ".join(str(theme) for theme in names) or "none recorded"
+
+
+def _guide_page_outcome(integrity_summary) -> str:
+    """Why: page warnings must stay visible beside the selected artifact."""
+    pages = integrity_summary.get("pages", "unknown")
+    bound = f"{review_latex.PAGE_MIN}-{review_latex.PAGE_MAX} pages"
+    outcome = f"The compiled artifact contains {pages} page(s); target bound: {bound}."
+    warning = integrity_summary.get("warning")
+    return f"{outcome} Warning: {warning}" if warning else outcome
+
+
 def _guide_content(model, integrity_summary) -> str:
-    """Why: calling agents need run context beside the compiled review."""
-    themes = ", ".join(str(theme) for theme in model.get("analysis", {})) or "none"
-    sources = len(model.get("bib", []))
-    pages = integrity_summary.get("pages", "pending")
+    """Why: the companion guide avoids parsing binary output for method evidence."""
+    design = model.get("design", {})
+    question = design.get("question") or model.get("question", "not recorded")
+    classification = design.get("classification", "Rapid Review")
+    source_count = len(model.get("bib", []))
     return (
         "# Review methodology\n\n"
-        "This report is a Rapid Review, not a Systematic Review, and does not claim exhaustive retrieval.\n\n"
-        "## Themes\n\n"
-        f"{themes}\n\n"
-        "## Integrity\n\n"
-        f"The final integrity status was {integrity_summary.get('status', 'unknown')}; "
-        f"{sources} source(s) remained cited.\n\n"
-        "## Page bound\n\n"
-        f"The selected compiled artifact contains {pages} page(s).\n"
+        "## Classification\n\n"
+        f"{classification} Grant & Booth (2009) frame this as a time-constrained review "
+        "with limited appraisal and narrative or tabular synthesis, not a Systematic Review.\n\n"
+        "## Snyder phases\n\n"
+        f"### Design\n\nQuestion: {question}\n\n"
+        "### Conduct\n\nSource pools and ranked hit counts:\n"
+        f"{_guide_pool_lines(model)}\n\n"
+        f"### Analysis\n\nThemes: {_guide_theme_names(model)}\n\n"
+        f"### Write-up\n\n{source_count} source(s) remained cited. {_guide_page_outcome(integrity_summary)}\n\n"
+        "## Integrity check\n\n"
+        f"Status: {integrity_summary.get('status', 'unknown')}. Claims are compared with their "
+        f"attributed source text. Word ratio threshold: {review_integrity.WORD_RATIO_THRESHOLD}; "
+        f"longest matching block threshold: {review_integrity.LONGEST_BLOCK_WORDS} words; "
+        f"optional embedding cosine threshold: {review_integrity.EMBEDDING_COSINE_THRESHOLD}. "
+        "Flagged claims are dropped and checked again before compilation.\n"
     )
+
 
 
 def write_methodology_guide(model, integrity_summary, out_dir) -> str:

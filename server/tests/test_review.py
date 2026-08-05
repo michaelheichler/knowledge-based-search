@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import review
+import review_integrity
 
 
 def _model(claims=3):
@@ -118,3 +119,89 @@ def test_output_directory_uses_slug_and_timestamp(tmp_path, monkeypatch) -> None
     output = review._output_directory(tmp_path, "A topic: with punctuation!")
 
     assert output == tmp_path / "reviews" / "a-topic-with-punctuation-20260805-120000"
+
+
+def _methodology_model() -> dict:
+    return {
+        "design": {
+            "classification": "Rapid Review",
+            "topic": "quantum methods",
+            "question": "Which quantum methods recur?",
+        },
+        "conduct": {
+            "source_pools": {"arxiv": 2, "pubmed": 1},
+            "search_scope": {"arxiv": "2 ranked hit(s)", "pubmed": "1 ranked hit(s)"},
+        },
+        "analysis": {"measurement": [], "simulation": []},
+        "bib": [{"key": "paper2024"}],
+    }
+
+
+def _assert_methodology_content(content: str) -> None:
+    for value in ("Rapid Review", "Grant & Booth (2009)", "arxiv: 2", "pubmed: 1"):
+        assert value in content
+    for value in ("measurement", "simulation", "3 page(s)"):
+        assert value in content
+    for threshold in (
+        review_integrity.WORD_RATIO_THRESHOLD,
+        review_integrity.LONGEST_BLOCK_WORDS,
+        review_integrity.EMBEDDING_COSINE_THRESHOLD,
+    ):
+        assert str(threshold) in content
+
+
+def test_methodology_guide_records_run_data_and_writes_atomically(tmp_path, monkeypatch) -> None:
+    replacements = []
+    original_replace = review.os.replace
+    monkeypatch.setattr(
+        review.os,
+        "replace",
+        lambda source, destination: (
+            replacements.append((Path(source), Path(destination))),
+            original_replace(source, destination),
+        )[1],
+    )
+
+    path = Path(review.write_methodology_guide(_methodology_model(), {"status": "pass", "pages": 3}, tmp_path))
+    _assert_methodology_content(path.read_text(encoding="utf-8"))
+
+    assert path == tmp_path / "methodology.md"
+    assert len(replacements) == 1
+    assert replacements[0][1] == path
+    assert not list(tmp_path.glob(".methodology.md.*"))
+
+
+def _install_real_guide_stubs(monkeypatch):
+    model = {**_methodology_model(), "status": "ok", "claims": []}
+
+    def compile_stub(_model, directory, *_callbacks) -> dict:
+        output = Path(directory)
+        return {
+            "status": "ok",
+            "pdf_path": str(output / "review.pdf"),
+            "tex_path": str(output / "review.tex"),
+            "pages": 3,
+        }
+
+    monkeypatch.setattr(review.review_synthesis, "build_model", lambda *args: model)
+    monkeypatch.setattr(review.review_synthesis, "claims_for_integrity", lambda value: [])
+    monkeypatch.setattr(review.review_integrity, "check_claims", lambda claims: {"status": "pass"})
+    monkeypatch.setattr(review.review_latex, "compile_review", compile_stub)
+
+
+
+def test_generate_review_guide_lands_with_compiled_pdf(tmp_path, monkeypatch) -> None:
+    _install_real_guide_stubs(monkeypatch)
+
+    result = review.generate_review("topic", [], [], tmp_path)
+
+    output = Path(result["pdf_path"]).parent
+    guide = Path(result["guide_path"])
+    assert guide == output / "methodology.md"
+    assert guide.is_file()
+    assert output / "review.pdf" == Path(result["pdf_path"])
+    assert "arxiv: 2" in guide.read_text(encoding="utf-8")
+
+
+
+
