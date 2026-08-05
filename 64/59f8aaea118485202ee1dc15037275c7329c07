@@ -1,0 +1,25 @@
+server/tests/test_review.py
+  s_3c155de8533c9a::t_6d8d0867dd3125 262
+  s_3c155de8533c9a::t_cde1dcf843f8e3 136,143-145,147-151,156-169,174-188,197-199
+  s_3c155de8533c9a::t_61f24fd5662b98 155,170-173,189-190,192-196,200-209
+server/review.py
+  s_3c155de8533c9a::t_41e7405aac9cd7 63-78,80-91,110-205,207-217,219,221,226-227,230-242
+  s_3c155de8533c9a::t_add7acef40b4e6 9,14
+  s_3c155de8533c9a::t_b93b846284935d 206,218
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "6459f8aaea118485202ee1dc15037275c7329c07",
+  "prompts": {},
+  "sessions": {
+    "s_3c155de8533c9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e72df891-4c72-40d8-b214-4236c48adad8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
