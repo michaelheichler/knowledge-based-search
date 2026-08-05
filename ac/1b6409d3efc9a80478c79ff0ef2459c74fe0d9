@@ -1,0 +1,50 @@
+.vbw-planning/phases/05-literature-review-generation/remediation/uat/round-01/R01-SUMMARY.md
+  s_3c155de8533c9a::t_4ac6c2cdf4cb00 12,16
+  s_3c155de8533c9a::t_ac8550987ac1be 20
+  s_3c155de8533c9a::t_2d6db4a475d305 1-5,7,9-11,13-15,17-19,21-40
+  s_3c155de8533c9a::t_0ee76242eacd29 8
+  s_3c155de8533c9a::t_cfddb638631491 60-86
+  s_3c155de8533c9a::t_584d7207f46c30 6
+  s_3c155de8533c9a::t_96cab7f2f6c30d 41-59
+server/review.py
+  s_3c155de8533c9a::t_10a37745a0f71d 103-105
+  s_3c155de8533c9a::t_d06910dc7c3925 124,126-127
+server/tests/test_cli.py
+  s_3c155de8533c9a::t_acc33c7c165235 725
+server/tests/test_review_synthesis.py
+  s_3c155de8533c9a::t_4a9e3ddd6327c2 192-194
+server/review_integrity.py
+  s_3c155de8533c9a::t_fd73908cb2630d 14,18-19,21-27,29-36
+server/review_synthesis.py
+  s_3c155de8533c9a::t_5e45443f96df33 265-267
+server/tests/test_review.py
+  s_3c155de8533c9a::t_4c2fb3768d542d 91
+  s_3c155de8533c9a::t_ba93f0f4aa9679 114
+  s_3c155de8533c9a::t_5839a76e12cc7c 195-196
+  s_3c155de8533c9a::t_e5c0667ceb7f91 100-101
+  s_3c155de8533c9a::t_843726fb5dcda5 18-26
+  s_3c155de8533c9a::t_3e8d7ce14a80ad 42
+  s_3c155de8533c9a::t_432e77ce6209a5 71
+  s_3c155de8533c9a::t_1bd4a029a0c43b 112
+  s_3c155de8533c9a::t_28ca0206eaa980 157-158
+  s_3c155de8533c9a::t_05b2e666af82c8 53-54
+  s_3c155de8533c9a::t_9b7aa95a6aa55b 75,78,81
+server/tests/test_review_integrity.py
+  s_3c155de8533c9a::t_ee731fa3d28d46 1,6-12,15-17,23-27,30,32-41,44-52,56-57,60-62,68-69,71-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "ac1b6409d3efc9a80478c79ff0ef2459c74fe0d9",
+  "prompts": {},
+  "sessions": {
+    "s_3c155de8533c9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e72df891-4c72-40d8-b214-4236c48adad8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Michael Heichler <iam@michaelheichler.eu>"
+    }
+  }
+}
