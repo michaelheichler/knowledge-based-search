@@ -112,7 +112,11 @@ There is no default SearXNG URL. `KBS_CONFIG` can contain inline JSON or a path 
 
 ## Optional dense ranking
 
-Dense ranking requires the separate `skill-model-loader` project and compatible local models. Without them, search degrades to BM25 ranking. `kbs doctor` reports whether dense ranking is available and explains missing requirements.
+Dense ranking embeds results with [Liquid AI's LFM2.5-Embedding-350M](https://huggingface.co/LiquidAI/LFM2.5-Embedding-350M), combined with BM25 via reciprocal rank fusion. The backend auto-detects per platform. Apple Silicon macOS runs it natively on [MLX](https://github.com/ml-explore/mlx) via [`mlx-embeddings`](https://github.com/Blaizzy/mlx-embeddings) (see `requirements-mlx.txt`). Any other platform runs the [GGUF build](https://huggingface.co/LiquidAI/LFM2.5-Embedding-350M-GGUF) through [`llama-cpp-python`](https://github.com/abetlen/llama-cpp-python) (see `requirements-gguf.txt`). Without the matching package installed, search degrades to BM25 ranking. `kbs doctor` reports whether dense ranking is available and explains missing requirements.
+
+The model downloads once from Hugging Face into the standard `huggingface_hub` cache on first use. Set `KBS_EMBED_MODEL_ID` to use a different MLX checkpoint, or `KBS_EMBED_GGUF_REPO`/`KBS_EMBED_GGUF_FILE` to use a different GGUF checkpoint or quantization.
+
+The MLX path runs LFM2's backbone through `mlx-lm`'s causal decoder layer and mean-pools the result, rather than the official bidirectional-patched checkpoint used by `sentence-transformers`. Ranking quality is good but will not exactly match published benchmark numbers for this model.
 
 ## Uninstall
 

@@ -6,6 +6,7 @@ import os
 import socket
 import stat
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -21,50 +22,24 @@ _spawn_lock = threading.Lock()
 _RRF_K = 60
 
 
-def _loader_dir():
-    return os.environ.get(
-        "KBS_LOADER_DIR",
-        os.path.join(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            ),
-            "skill-model-loader",
-        ),
-    )
-
-
-def _loader_python():
-    return os.environ.get(
-        "KBS_PYTHON", os.path.join(_loader_dir(), ".venv", "bin", "python")
-    )
+def _host_python():
+    return os.environ.get("KBS_PYTHON", sys.executable)
 
 
 def dense_ranking_status():
-    """Report whether the external dense model host can be started."""
-    loader = Path(_loader_dir())
-    checks = [
-        ("model loader", loader / "refcount.py"),
-        ("model loader Python", Path(_loader_python())),
-    ]
-    if os.environ.get("KBS_FAKE_MODEL") != "1":
-        models = Path.home() / ".english-for-agents" / "models"
-        embed = Path(
-            os.environ.get(
-                "KBS_EMBED_MLX_MODEL_DIR", models / "jina-embeddings-v5-text-nano-mlx"
-            )
-        )
-        rerank = Path(
-            os.environ.get("KBS_JINA_MLX_DIR", models / "jina-reranker-v3-mlx")
-        )
-        checks.extend((("embedding model", embed), ("reranking model", rerank)))
-    for label, path in checks:
-        if not path.exists():
-            return {"available": False, "reason": f"{label} missing at {path}"}
-    python_path = Path(_loader_python())
-    if not python_path.is_file() or not os.access(python_path, os.X_OK):
-        reason = f"model loader Python is not executable at {python_path}"
-        return {"available": False, "reason": reason}
-    return {"available": True, "reason": "model loader and model paths are present"}
+    import embed_backend
+
+    if embed_backend.is_apple_silicon():
+        try:
+            import mlx_embeddings  # noqa: F401
+        except ImportError as exc:
+            return {"available": False, "reason": f"mlx_embeddings not installed: {exc}"}
+        return {"available": True, "reason": "mlx_embeddings is installed"}
+    try:
+        import llama_cpp  # noqa: F401
+    except ImportError as exc:
+        return {"available": False, "reason": f"llama_cpp not installed: {exc}"}
+    return {"available": True, "reason": "llama_cpp is installed"}
 
 
 def _runtime_dir():
@@ -77,13 +52,12 @@ def _runtime_dir():
     return directory
 
 
-def default_sock_path():
-    """Return the configured or private default daemon socket path."""
+def default_sock_path() -> str:
     override = os.environ.get("KBS_RAG_SOCK_PATH")
     return override or str(_runtime_dir() / "rag.sock")
 
 
-def default_ref_dir():
+def default_ref_dir() -> str:
     return os.environ.get("KBS_RAG_REF_DIR", default_sock_path() + ".refs")
 
 
@@ -195,7 +169,7 @@ def _recover_or_spawn(sock_path, ref_dir, host_argv, env):
     if os.path.exists(sock_path):
         with contextlib.suppress(OSError):
             os.remove(sock_path)
-    argv = list(host_argv) if host_argv else [_loader_python(), _HOST]
+    argv = list(host_argv) if host_argv else [_host_python(), _HOST]
     subprocess.Popen(
         argv + [sock_path, ref_dir],
         start_new_session=True,
@@ -256,7 +230,6 @@ def _base_daemon_status(socket_path):
 
 
 def daemon_status(sock_path=None):
-    """Report daemon reachability and model warmth."""
     socket_path = sock_path or default_sock_path()
     status = _base_daemon_status(socket_path)
     if not status["socket_exists"]:

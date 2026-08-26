@@ -144,13 +144,6 @@ def test_default_host_spawn_uses_kbs_python(monkeypatch):
     assert spawned[0][0] == "/tmp/kbs-python"
 
 
-def test_rag_host_loader_dir_uses_env(monkeypatch):
-    monkeypatch.setenv("KBS_LOADER_DIR", "/tmp/loader")
-    host = _fake_host()
-
-    assert host._loader_dir() == "/tmp/loader"
-
-
 def test_run_unlinks_the_socket_after_a_graceful_shutdown(monkeypatch):
     host = _fake_host()
     sock_path, ref_dir = _paths()

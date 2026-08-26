@@ -67,6 +67,11 @@ install_python() {
 		touch "$VENV_DIR/$VENV_MARKER"
 	fi
 	"$VENV_DIR/bin/python" -m pip install -r "$ROOT/requirements.txt"
+	if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
+		"$VENV_DIR/bin/python" -m pip install -r "$ROOT/requirements-mlx.txt"
+	else
+		"$VENV_DIR/bin/python" -m pip install -r "$ROOT/requirements-gguf.txt"
+	fi
 }
 
 write_wrapper() {

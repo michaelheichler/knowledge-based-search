@@ -2,8 +2,6 @@
 import contextlib
 import fcntl
 import hashlib
-import importlib
-import importlib.util
 import json
 import os
 import signal
@@ -14,16 +12,13 @@ import threading
 from typing import Any, cast
 import time
 
+import refcount
+
 _ENGLISH_MODELS = os.path.expanduser("~/.english-for-agents/models")
 _RUNTIME_SUBDIR = "kbs"
-_EMBED_DIR = os.environ.get(
-    "KBS_EMBED_MLX_MODEL_DIR",
-    os.path.join(_ENGLISH_MODELS, "jina-embeddings-v5-text-nano-mlx"),
-)
 _JINA_DIR = os.environ.get(
     "KBS_JINA_MLX_DIR", os.path.join(_ENGLISH_MODELS, "jina-reranker-v3-mlx")
 )
-_EMBED_TASK = os.environ.get("KBS_EMBED_TASK", "text-matching")
 _FAKE = os.environ.get("KBS_FAKE_MODEL") == "1"
 
 
@@ -65,23 +60,6 @@ def _clear_mlx_cache():
         mx.clear_cache()
     except Exception:
         pass
-
-
-def _loader_dir():
-    return os.environ.get(
-        "KBS_LOADER_DIR",
-        os.path.join(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            ),
-            "skill-model-loader",
-        ),
-    )
-
-
-_LOADER_DIR = _loader_dir()
-sys.path.insert(0, _LOADER_DIR)
-refcount = importlib.import_module("refcount")
 
 
 class _Handler(socketserver.StreamRequestHandler):
@@ -126,13 +104,12 @@ def _runtime_dir():
     return directory
 
 
-def default_sock_path():
-    """Return the configured or private default daemon socket path."""
+def default_sock_path() -> str:
     override = os.environ.get("KBS_RAG_SOCK_PATH")
     return override or str(_runtime_dir() / "rag.sock")
 
 
-def default_ref_dir():
+def default_ref_dir() -> str:
     return os.environ.get("KBS_RAG_REF_DIR", default_sock_path() + ".refs")
 
 
@@ -278,84 +255,14 @@ def _fake_rerank(query, docs):
     return rows
 
 
-def _embedding_config():
-    """Metadata is checked first because invalid settings must fail before weight allocation."""
-    try:
-        with open(os.path.join(_EMBED_DIR, "config.json"), encoding="utf-8") as handle:
-            return json.load(handle)
-    except (OSError, ValueError) as exc:
-        raise RuntimeError("embedding config not readable") from exc
-
-
-def _embedding_module():
-    """Path loading is required because the model implementation is not an installed package."""
-    spec = importlib.util.spec_from_file_location(
-        "kbs_jina_embed", os.path.join(_EMBED_DIR, "model.py")
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError("embedding model module not found")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def _initialize_embedder(mx, tokenizer_class):
-    """Assets share one directory because mismatched weights and tokens produce invalid vectors."""
-    module = _embedding_module()
-    model_class = next(
-        getattr(module, name)
-        for name in dir(module)
-        if name.endswith("EmbeddingModel") and isinstance(getattr(module, name), type)
-    )
-    model = _build_embed_model(module, model_class, _embedding_config())
-    weights = mx.load(os.path.join(_EMBED_DIR, "model.safetensors"))
-    if hasattr(model, "sanitize"):
-        weights = model.sanitize(weights)
-    model.load_weights(list(weights.items()))
-    mx.eval(model.parameters())
-    tokenizer = tokenizer_class.from_file(os.path.join(_EMBED_DIR, "tokenizer.json"))
-    return model, tokenizer
-
-
 def _load_embedder():
     global _embedder
     if _embedder is not None:
         return _embedder
-    import mlx.core as mx  # type: ignore[import-not-found]
-    from tokenizers import Tokenizer  # type: ignore[import-not-found]
+    import embed_backend
 
-    model, tokenizer = _initialize_embedder(mx, Tokenizer)
-
-    def encode(texts):
-        output = model.encode(texts, tokenizer, task_type=_EMBED_TASK)
-        mx.eval(output)
-        return output
-
-    _embedder = encode
+    _embedder = embed_backend.load_encoder()
     return _embedder
-
-
-def _build_embed_model(module, model_class, config):
-    try:
-        return model_class(config)
-    except TypeError:
-        pass
-    except ValueError:
-        pass
-    except RuntimeError:
-        pass
-    for name in dir(module):
-        candidate = getattr(module, name)
-        if name.endswith("Config") and hasattr(candidate, "from_dict"):
-            try:
-                return model_class(candidate.from_dict(config))
-            except TypeError:
-                continue
-            except ValueError:
-                continue
-            except RuntimeError:
-                continue
-    raise RuntimeError("no usable Jina embedding config")
 
 
 def _load_reranker():

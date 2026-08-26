@@ -10,10 +10,6 @@ from pathlib import Path
 import pytest
 import rag
 
-_EMBED_DIR = os.path.expanduser(
-    "~/.english-for-agents/models/jina-embeddings-v5-text-nano-mlx"
-)
-
 
 def _fresh_real_host(cache_limit_bytes):
     os.environ.pop("KBS_FAKE_MODEL", None)
@@ -30,10 +26,10 @@ def _fake_host():
     return importlib.reload(rag_host)
 
 
-@pytest.mark.skipif(
-    not os.path.isdir(_EMBED_DIR), reason="jina embed MLX weights not present"
-)
+@pytest.mark.integration
 def test_repeated_embeds_keep_the_cache_capped_and_cleared():
+    if os.environ.get("KBS_OFFLINE") == "1":
+        pytest.skip("KBS_OFFLINE=1")
     mlx_core = pytest.importorskip("mlx.core")
     cap = 32 * 1024 * 1024
     host = _fresh_real_host(cap)
@@ -106,11 +102,35 @@ def test_live_host_lock_prevents_socket_unlink(monkeypatch, tmp_path):
         os.close(lock_fd)
 
 
-def test_dense_status_explains_missing_loader(monkeypatch, tmp_path):
-    missing = tmp_path / "missing-loader"
-    monkeypatch.setenv("KBS_LOADER_DIR", str(missing))
+def test_dense_status_explains_missing_backend(monkeypatch):
+    import embed_backend
+
+    monkeypatch.setattr(embed_backend, "is_apple_silicon", lambda: True)
+    real_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+
+    def blocked_import(name, *args, **kwargs):
+        if name == "mlx_embeddings" or name.startswith("mlx_embeddings."):
+            raise ImportError("no module named mlx_embeddings")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", blocked_import)
 
     status = rag.dense_ranking_status()
 
     assert status["available"] is False
-    assert status["reason"] == f"model loader missing at {missing / 'refcount.py'}"
+    assert "mlx_embeddings" in status["reason"]
+
+
+def test_dense_status_reports_available_for_this_platform():
+    import embed_backend
+
+    if embed_backend.is_apple_silicon():
+        pytest.importorskip("mlx_embeddings")
+        expected_reason = "mlx_embeddings is installed"
+    else:
+        pytest.importorskip("llama_cpp")
+        expected_reason = "llama_cpp is installed"
+
+    status = rag.dense_ranking_status()
+
+    assert status == {"available": True, "reason": expected_reason}
