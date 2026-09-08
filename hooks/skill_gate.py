@@ -6,15 +6,14 @@ import re
 import shlex
 import sys
 
-from codex_skill_reads import CodexSkillReads
+from codex_skill_reads import CodexSkillReads, SKILL_NAME
 
-SKILL_NAME = "knowledge-based-search"
 _CONTROL_TOKENS = set(";&|(){}\n`")
 _KBS_FALLBACK_RE = re.compile(r"(?:^|[\s('\"])(?:\S*/)?kbs(?:\s|$)")
 _TRANSCRIPT_CACHE: dict[str, tuple[int, bool]] = {}
 SKILL_DENY_REASON = (
-    "Load the knowledge-based-search skill with the Skill tool, or read its full SKILL.md "
-    "with cat in Codex, then reformulate the "
+    f"Load the {SKILL_NAME} skill with the Skill tool, or run "
+    f"cat ~/.codex/skills/{SKILL_NAME}/SKILL.md in Codex, then reformulate the "
     "query with its method and run the search again. This gate fires until the skill is loaded "
     "this session."
 )

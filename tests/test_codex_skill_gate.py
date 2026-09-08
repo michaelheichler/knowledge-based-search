@@ -71,3 +71,15 @@ def test_missing_exit_status_does_not_load_gate(tmp_path, skill_path):
     output = {"output": skill_path.read_text()}
     event = transcript_event(tmp_path, "exec_command", {"cmd": f"cat {skill_path}"}, output)
     assert should_block(event)
+
+
+@pytest.mark.parametrize("payload", [
+    {"type": [], "name": "exec_command"},
+    {"type": "function_call", "name": None},
+    {"type": "function_call", "name": []},
+])
+def test_malformed_codex_payload_keeps_gate_closed(tmp_path, payload):
+    event = transcript_event(tmp_path, "exec_command", {"cmd": "echo hello"}, "pending")
+    with (tmp_path / "session.jsonl").open("a") as handle:
+        handle.write("\n" + json.dumps({"type": "response_item", "payload": payload}))
+    assert should_block(event)

@@ -4,6 +4,7 @@ import shlex
 from pathlib import Path, PurePosixPath
 
 
+SKILL_NAME = "knowledge-based-search"
 _EXEC_COMMAND = re.compile(r'^\s*(?:text\(\s*|(?:const|let|var)\s+\w+\s*=\s*)?await tools\.exec_command\(\s*\{\s*["\']?cmd["\']?\s*:\s*')
 
 
@@ -20,7 +21,7 @@ def _skill_paths():
     home = Path.home()
     roots = [home / host / "skills" for host in (".codex", ".agents", ".claude")]
     roots.append(Path(__file__).resolve().parents[1] / "skills")
-    return {(root / "knowledge-based-search" / "SKILL.md").resolve() for root in roots}
+    return {(root / SKILL_NAME / "SKILL.md").resolve() for root in roots}
 
 
 def _skill_content(command):
@@ -42,7 +43,10 @@ def _skill_content(command):
 
 
 def _command(payload):
-    name = payload.get("name", "").removeprefix("functions.")
+    name = payload.get("name")
+    if not isinstance(name, str):
+        return None
+    name = name.removeprefix("functions.")
     if name == "exec_command":
         args = _json(payload.get("arguments"))
         return args.get("cmd") if isinstance(args, dict) else None
@@ -62,7 +66,7 @@ def _command(payload):
 def _delivered_skill(output, content):
     parsed = _json(output)
     if isinstance(parsed, dict):
-        if parsed.get("type") in {"input_text", "text"}:
+        if parsed.get("type") in ("input_text", "text"):
             return _delivered_skill(parsed.get("text"), content)
         return parsed.get("exit_code") == 0 and content in str(parsed.get("output", ""))
     if isinstance(parsed, list):
@@ -82,6 +86,8 @@ class CodexSkillReads:
             return False
         call_id = payload.get("call_id")
         kind = payload.get("type")
+        if not isinstance(kind, str):
+            return False
         if kind in {"function_call", "custom_tool_call"}:
             content = _skill_content(_command(payload))
             if content and isinstance(call_id, str):
