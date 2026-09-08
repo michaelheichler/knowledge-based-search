@@ -51,7 +51,7 @@ would add a network dependency to an otherwise offline compile step.
 
 ## Requirements
 
-Python 3.11 or newer is required.
+KBS requires Python 3.12 or newer.
 
 ## Claude Code install
 

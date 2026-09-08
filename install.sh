@@ -62,8 +62,8 @@ for arg in "$@"; do
 done
 
 require_python() {
-	if ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 11))' >/dev/null 2>&1; then
-		printf '%s\n' "kbs requires python3 3.11 or newer" >&2
+	if ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 12))' >/dev/null 2>&1; then
+		printf '%s\n' "kbs requires python3 3.12 or newer" >&2
 		exit 1
 	fi
 }
