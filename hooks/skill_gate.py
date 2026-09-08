@@ -6,12 +6,14 @@ import re
 import shlex
 import sys
 
-SKILL_NAME = "knowledge-based-search"
+from codex_skill_reads import CodexSkillReads, SKILL_NAME
+
 _CONTROL_TOKENS = set(";&|(){}\n`")
 _KBS_FALLBACK_RE = re.compile(r"(?:^|[\s('\"])(?:\S*/)?kbs(?:\s|$)")
 _TRANSCRIPT_CACHE: dict[str, tuple[int, bool]] = {}
 SKILL_DENY_REASON = (
-    "Load the knowledge-based-search skill with the Skill tool first, then reformulate the "
+    f"Load the {SKILL_NAME} skill with the Skill tool, or run "
+    f"cat ~/.codex/skills/{SKILL_NAME}/SKILL.md in Codex, then reformulate the "
     "query with its method and run the search again. This gate fires until the skill is loaded "
     "this session."
 )
@@ -27,6 +29,8 @@ def _line_loads_skill(line):
     try:
         entry = json.loads(line)
     except ValueError:
+        return False
+    if not isinstance(entry, dict) or not isinstance(entry.get("message", {}), dict):
         return False
     content = entry.get("message", {}).get("content")
     if not isinstance(content, list):
@@ -233,7 +237,6 @@ def _transcript_is_readable(path):
 
 
 def deny_reason(event) -> str:
-    """Return the denial reason that explains the blocked action."""
     if _tool_name(event) in _WEB_SEARCH_TOOLS:
         return WEB_SEARCH_DENY_REASON
     if "transcript_path" in event and not _transcript_is_readable(
@@ -248,13 +251,26 @@ def _transcript_loaded_skill(path, stamp):
     if cached and cached[0] == stamp:
         return cached[1]
     with open(path, encoding="utf-8") as handle:
-        loaded = any(SKILL_NAME in line and _line_loads_skill(line) for line in handle)
+        loaded = _session_loaded_skill(handle)
     _TRANSCRIPT_CACHE[path] = (stamp, loaded)
     return loaded
 
 
+def _session_loaded_skill(lines):
+    codex_reads = CodexSkillReads()
+    for line in lines:
+        if _line_loads_skill(line):
+            return True
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if codex_reads.loads_skill(entry):
+            return True
+    return False
+
+
 def should_block(event) -> bool:
-    """Return whether the hook must deny this tool invocation."""
     if _tool_name(event) in _WEB_SEARCH_TOOLS:
         return True
     if not _is_kbs_invocation(event):
@@ -272,7 +288,6 @@ def should_block(event) -> bool:
 
 
 def deny_output(reason=SKILL_DENY_REASON) -> dict:
-    """Build a Claude Code PreToolUse denial response."""
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -283,7 +298,6 @@ def deny_output(reason=SKILL_DENY_REASON) -> dict:
 
 
 def main() -> None:
-    """Read one hook event and print a denial only when required."""
     try:
         event = json.load(sys.stdin)
     except (ValueError, OSError):
@@ -325,7 +339,6 @@ _DEMO_BYPASSES = (
 
 
 def demo() -> None:
-    """Check exact skill detection and invocation bypass coverage."""
     assert _line_loads_skill(_demo_skill_line(SKILL_NAME))
     decoy = _demo_skill_line("interview-me", args=SKILL_NAME)
     assert not _line_loads_skill(decoy)
